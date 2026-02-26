@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "ru.nekostul.worldzero.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "ClientPacketListenerMixin",
+    "CreateWorldScreenMixin",
+    "NaturalSpawnerMixin",
+    "ShareToLanScreenMixin",
+    "SoundEngineMixin",
+    "WorldSelectionListAccessor",
+    "WorldSelectionListEntryMixin",
+    "WorldOpenFlowsMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

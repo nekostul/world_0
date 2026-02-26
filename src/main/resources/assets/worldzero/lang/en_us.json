@@ -1,0 +1,12 @@
+{
+  "worldzero.error.title": "Internal Exception: java.lang.IllegalStateException",
+  "worldzero.error.inactive_world": "World instance is inactive",
+  "worldzero.error.multiplayer_login_mismatch": "Internal Exception: io.netty.handler.codec.DecoderException:\njava.io.IOException: Packet 0/20 (ClientboundLoginPacket)\ndoes not match active world instance (world_0)",
+  "worldzero.error.reactivated_overlay": "Internal Exception: java.lang.RuntimeException: [WORLD_0] recovered session pointer mismatch",
+  "worldzero.error.command_blocked_vanilla": "Unknown or incomplete command, see below for error",
+  "worldzero.error.command_blocked_trace": "at worldzero.command.filter: policy gate returned state=readonly",
+  "worldzero.error.lan_cheats_title": "Internal Exception: java.lang.IllegalStateException",
+  "worldzero.error.lan_cheats_message": "Internal Exception: java.io.IOException:\nlogin tunnel closed during local publish sequence\nfield lanCheatsNonce is marked internal",
+  "worldzero.error.command_once_anomaly": "Internal Exception: java.lang.IllegalAccessError:\npermission mirror returned operatorLevel=4 for profile='local'\ntrace dump: /runtime/authority-map.bin is marked [do-not-serialize]",
+  "worldzero.error.command_cheats_disabled": "Cheats are not enabled in this level"
+}

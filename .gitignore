@@ -1,0 +1,8 @@
+/run/
+/build/
+/out/
+/.idea/
+/.gradle/
+/logs/
+*.iml
+*.log

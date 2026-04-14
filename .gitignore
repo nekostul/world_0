@@ -4,5 +4,6 @@
 /.idea/
 /.gradle/
 /logs/
+/.vscode/
 *.iml
 *.log

@@ -55,15 +55,13 @@ public final class WorldZeroHouseDetector {
         for (int y = playerPos.getY() - verticalRange; y <= playerPos.getY() + verticalRange; y++) {
             for (int x = playerPos.getX() - searchRadius; x <= playerPos.getX() + searchRadius; x++) {
                 for (int z = playerPos.getZ() - searchRadius; z <= playerPos.getZ() + searchRadius; z++) {
-                    BlockPos candidate = new BlockPos(x, y, z);
-                    if (player.distanceToSqr(
-                            x + 0.5D,
-                            y + 0.5D,
-                            z + 0.5D
-                    ) > (double) (searchRadius * searchRadius)) {
+                    double dx = player.getX() - (x + 0.5D);
+                    double dz = player.getZ() - (z + 0.5D);
+                    if (dx * dx + dz * dz > (double) (searchRadius * searchRadius)) {
                         continue;
                     }
 
+                    BlockPos candidate = new BlockPos(x, y, z);
                     long candidateKey = candidate.asLong();
                     if (visited.contains(candidateKey)) {
                         continue;

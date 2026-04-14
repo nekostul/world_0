@@ -3,6 +3,8 @@ package ru.nekostul.worldzero;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.ScreenEvent;
@@ -21,11 +23,16 @@ public final class WorldZeroFreezeClientController {
     private static double worldzero$lockedZ;
     private static float worldzero$lockedYaw;
     private static float worldzero$lockedPitch;
+    private static int worldzero$focusEntityId = -1;
 
     private WorldZeroFreezeClientController() {
     }
 
     public static void startFreeze(int durationTicks) {
+        startFreeze(durationTicks, -1);
+    }
+
+    public static void startFreeze(int durationTicks, int focusEntityId) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null) {
             return;
@@ -34,6 +41,7 @@ public final class WorldZeroFreezeClientController {
         worldzero$freezeActive = true;
         worldzero$fallbackTicksRemaining = WORLDZERO_FREEZE_FALLBACK_TICKS;
         worldzero$capturedPlayerState = false;
+        worldzero$focusEntityId = focusEntityId;
 
         if (minecraft.getSoundManager() != null) {
             minecraft.getSoundManager().stop();
@@ -79,12 +87,25 @@ public final class WorldZeroFreezeClientController {
         player.setDeltaMovement(0.0D, 0.0D, 0.0D);
         player.setSprinting(false);
         player.setPos(worldzero$lockedX, worldzero$lockedY, worldzero$lockedZ);
-        player.setYRot(worldzero$lockedYaw);
-        player.setYHeadRot(worldzero$lockedYaw);
-        player.setYBodyRot(worldzero$lockedYaw);
-        player.setXRot(worldzero$lockedPitch);
-        player.yRotO = worldzero$lockedYaw;
-        player.xRotO = worldzero$lockedPitch;
+        float targetYaw = worldzero$lockedYaw;
+        float targetPitch = worldzero$lockedPitch;
+        if (worldzero$focusEntityId >= 0) {
+            Entity focusEntity = minecraft.level.getEntity(worldzero$focusEntityId);
+            if (focusEntity != null) {
+                double deltaX = focusEntity.getX() - player.getX();
+                double deltaY = focusEntity.getEyeY() - player.getEyeY();
+                double deltaZ = focusEntity.getZ() - player.getZ();
+                double horizontalDistance = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
+                targetYaw = (float) (Mth.atan2(deltaZ, deltaX) * (180.0D / Math.PI)) - 90.0F;
+                targetPitch = (float) (-(Mth.atan2(deltaY, horizontalDistance) * (180.0D / Math.PI)));
+            }
+        }
+        player.setYRot(targetYaw);
+        player.setYHeadRot(targetYaw);
+        player.setYBodyRot(targetYaw);
+        player.setXRot(targetPitch);
+        player.yRotO = targetYaw;
+        player.xRotO = targetPitch;
 
         worldzero$fallbackTicksRemaining--;
         if (worldzero$fallbackTicksRemaining <= 0) {
@@ -124,5 +145,6 @@ public final class WorldZeroFreezeClientController {
         worldzero$freezeActive = false;
         worldzero$fallbackTicksRemaining = 0;
         worldzero$capturedPlayerState = false;
+        worldzero$focusEntityId = -1;
     }
 }

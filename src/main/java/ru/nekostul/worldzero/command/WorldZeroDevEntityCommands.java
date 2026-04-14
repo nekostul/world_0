@@ -51,6 +51,8 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerEchoRuleBreak(context.getSource())))
                         .then(Commands.literal("trigger_freeze")
                                 .executes(context -> worldzero$triggerFreeze(context.getSource())))
+                        .then(Commands.literal("trigger_fall")
+                                .executes(context -> worldzero$triggerFall(context.getSource())))
                         .then(Commands.literal("trigger_house")
                                 .executes(context -> worldzero$triggerHouse(context.getSource())))
                         .then(Commands.literal("trigger_house_real")
@@ -145,6 +147,20 @@ public final class WorldZeroDevEntityCommands {
         return triggered ? 1 : 0;
     }
 
+    private static int worldzero$triggerFall(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroFallEvent.worldzero$triggerFallNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] fall event force-triggered"
+                        : "[WORLD_0][DEV] fall event trigger failed (already active, invalid player, or no valid black_echo spawn)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
     private static int worldzero$triggerHouse(CommandSourceStack source) {
         if (source.getPlayer() == null) {
             return 0;
@@ -154,7 +170,7 @@ public final class WorldZeroDevEntityCommands {
         source.sendSuccess(() -> Component.literal(
                 triggered
                         ? "[WORLD_0][DEV] house event force-triggered (debug)"
-                        : "[WORLD_0][DEV] house force-trigger failed (no detected/remembered house, active scene, or no valid spawn point)"
+                        : "[WORLD_0][DEV] house force-trigger failed (already active)"
         ), false);
         return triggered ? 1 : 0;
     }
@@ -176,7 +192,6 @@ public final class WorldZeroDevEntityCommands {
                 source.getPlayer().getX(),
                 source.getPlayer().getZ()
         );
-        boolean houseVisible = detectedHouse.worldzero$isVisibleToPlayer(source.getPlayer());
         if (!inTriggerRange) {
             double distanceToBounds = Math.sqrt(
                     detectedHouse.worldzero$horizontalDistanceToBoundsSqr(
@@ -195,18 +210,12 @@ public final class WorldZeroDevEntityCommands {
             ), false);
             return 0;
         }
-        if (!houseVisible) {
-            source.sendSuccess(() -> Component.literal(
-                    "[WORLD_0][DEV] house event real-trigger failed (player does not see the house)"
-            ), false);
-            return 0;
-        }
 
         boolean triggered = WorldZeroHouseEvent.worldzero$triggerHouseNow(source.getPlayer());
         source.sendSuccess(() -> Component.literal(
                 triggered
                         ? "[WORLD_0][DEV] house event real-triggered"
-                        : "[WORLD_0][DEV] house event real-trigger failed (scene already active or no valid spawn point)"
+                        : "[WORLD_0][DEV] house event real-trigger failed (already active)"
         ), false);
         return triggered ? 1 : 0;
     }

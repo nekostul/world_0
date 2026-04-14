@@ -34,12 +34,30 @@ public final class WorldZeroNetwork {
                 WorldZeroFreezeEndPacket::decode,
                 WorldZeroFreezeEndPacket::handle
         );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroFallClientPacket.class,
+                WorldZeroFallClientPacket::encode,
+                WorldZeroFallClientPacket::decode,
+                WorldZeroFallClientPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroFallRespawnPacket.class,
+                WorldZeroFallRespawnPacket::encode,
+                WorldZeroFallRespawnPacket::decode,
+                WorldZeroFallRespawnPacket::handle
+        );
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks) {
+        sendFreezeStart(player, durationTicks, -1);
+    }
+
+    public static void sendFreezeStart(ServerPlayer player, int durationTicks, int focusEntityId) {
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
-                new WorldZeroFreezeStartPacket(durationTicks)
+                new WorldZeroFreezeStartPacket(durationTicks, focusEntityId)
         );
     }
 
@@ -48,5 +66,16 @@ public final class WorldZeroNetwork {
                 PacketDistributor.PLAYER.with(() -> player),
                 new WorldZeroFreezeEndPacket()
         );
+    }
+
+    public static void sendFallClientAction(ServerPlayer player, byte action) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroFallClientPacket(action)
+        );
+    }
+
+    public static void sendFallRespawn() {
+        WORLDZERO_CHANNEL.sendToServer(new WorldZeroFallRespawnPacket());
     }
 }

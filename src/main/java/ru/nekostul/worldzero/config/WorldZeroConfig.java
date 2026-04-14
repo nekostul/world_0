@@ -16,7 +16,11 @@ public final class WorldZeroConfig {
     private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_LIFETIME_MAX_SECONDS;
     private static final ForgeConfigSpec.DoubleValue WORLDZERO_HOUSE_TRIGGER_DISTANCE_MIN_BLOCKS;
     private static final ForgeConfigSpec.DoubleValue WORLDZERO_HOUSE_TRIGGER_DISTANCE_MAX_BLOCKS;
+    private static final ForgeConfigSpec.DoubleValue WORLDZERO_HOUSE_RESTORE_DISTANCE_MIN_BLOCKS;
+    private static final ForgeConfigSpec.DoubleValue WORLDZERO_HOUSE_RESTORE_DISTANCE_MAX_BLOCKS;
+    private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_BEDROCK_MAX_BLOCKS;
     private static final ForgeConfigSpec.DoubleValue WORLDZERO_HOUSE_DISAPPEAR_DISTANCE_BLOCKS;
+    private static final ForgeConfigSpec.DoubleValue WORLDZERO_HOUSE_FIRE_CLEAR_DISTANCE_BLOCKS;
     private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_SCAN_INTERVAL_SECONDS;
     private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_SEARCH_RADIUS_BLOCKS;
     private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_SEARCH_VERTICAL_RANGE_BLOCKS;
@@ -65,14 +69,26 @@ public final class WorldZeroConfig {
                 .comment("Scene lifetime maximum in seconds.")
                 .defineInRange("lifetime_max_seconds", 20, 1, 120);
         WORLDZERO_HOUSE_TRIGGER_DISTANCE_MIN_BLOCKS = builder
-                .comment("Minimum horizontal distance from player to detected house bounds (event starts far away).")
-                .defineInRange("trigger_distance_min_blocks", 60.0D, 60.0D, 256.0D);
+                .comment("Minimum horizontal distance to trigger bedrock house illusion.")
+                .defineInRange("trigger_distance_min_blocks", 65.0D, 1.0D, 256.0D);
         WORLDZERO_HOUSE_TRIGGER_DISTANCE_MAX_BLOCKS = builder
-                .comment("Maximum horizontal distance from player to detected house bounds (event starts far away).")
-                .defineInRange("trigger_distance_max_blocks", 70.0D, 70.0D, 256.0D);
+                .comment("Maximum horizontal distance to trigger bedrock house illusion.")
+                .defineInRange("trigger_distance_max_blocks", 70.0D, 1.0D, 256.0D);
+        WORLDZERO_HOUSE_RESTORE_DISTANCE_MIN_BLOCKS = builder
+                .comment("Minimum distance at which bedrock illusion restores the original house view.")
+                .defineInRange("restore_distance_min_blocks", 15.0D, 1.0D, 128.0D);
+        WORLDZERO_HOUSE_RESTORE_DISTANCE_MAX_BLOCKS = builder
+                .comment("Maximum distance at which bedrock illusion restores the original house view.")
+                .defineInRange("restore_distance_max_blocks", 20.0D, 1.0D, 128.0D);
+        WORLDZERO_HOUSE_BEDROCK_MAX_BLOCKS = builder
+                .comment("Maximum number of visual fire blocks for the house illusion.")
+                .defineInRange("bedrock_max_blocks", 2500, 64, 12000);
         WORLDZERO_HOUSE_DISAPPEAR_DISTANCE_BLOCKS = builder
-                .comment("Distance at which the fake builder instantly disappears.")
+                .comment("Distance at which the house black echo instantly disappears.")
                 .defineInRange("disappear_distance_blocks", 15.0D, 2.0D, 64.0D);
+        WORLDZERO_HOUSE_FIRE_CLEAR_DISTANCE_BLOCKS = builder
+                .comment("Distance at which the house fire illusion clears.")
+                .defineInRange("fire_clear_distance_blocks", 4.0D, 1.0D, 32.0D);
         WORLDZERO_HOUSE_SCAN_INTERVAL_SECONDS = builder
                 .comment("Detector scan interval in seconds.")
                 .defineInRange("scan_interval_seconds", 5, 1, 60);
@@ -81,7 +97,7 @@ public final class WorldZeroConfig {
                 .defineInRange("search_radius_blocks", 20, 6, 64);
         WORLDZERO_HOUSE_SEARCH_VERTICAL_RANGE_BLOCKS = builder
                 .comment("Vertical detector search range above and below the player.")
-                .defineInRange("search_vertical_range_blocks", 6, 2, 32);
+                .defineInRange("search_vertical_range_blocks", 32, 2, 256);
         WORLDZERO_HOUSE_ROOM_MAX_HORIZONTAL_RADIUS_BLOCKS = builder
                 .comment("Maximum horizontal flood-fill reach from detected room center.")
                 .defineInRange("room_max_horizontal_radius_blocks", 12, 4, 24);
@@ -163,18 +179,37 @@ public final class WorldZeroConfig {
     }
 
     public static double worldzero$houseTriggerDistanceMinBlocks() {
-        return Math.max(60.0D, WORLDZERO_HOUSE_TRIGGER_DISTANCE_MIN_BLOCKS.get());
+        return Math.max(1.0D, WORLDZERO_HOUSE_TRIGGER_DISTANCE_MIN_BLOCKS.get());
     }
 
     public static double worldzero$houseTriggerDistanceMaxBlocks() {
         return Math.max(
                 worldzero$houseTriggerDistanceMinBlocks(),
-                Math.max(70.0D, WORLDZERO_HOUSE_TRIGGER_DISTANCE_MAX_BLOCKS.get())
+                WORLDZERO_HOUSE_TRIGGER_DISTANCE_MAX_BLOCKS.get()
         );
+    }
+
+    public static double worldzero$houseRestoreDistanceMinBlocks() {
+        return Math.max(1.0D, WORLDZERO_HOUSE_RESTORE_DISTANCE_MIN_BLOCKS.get());
+    }
+
+    public static double worldzero$houseRestoreDistanceMaxBlocks() {
+        return Math.max(
+                worldzero$houseRestoreDistanceMinBlocks(),
+                WORLDZERO_HOUSE_RESTORE_DISTANCE_MAX_BLOCKS.get()
+        );
+    }
+
+    public static int worldzero$houseBedrockMaxBlocks() {
+        return WORLDZERO_HOUSE_BEDROCK_MAX_BLOCKS.get();
     }
 
     public static double worldzero$houseDisappearDistanceBlocks() {
         return WORLDZERO_HOUSE_DISAPPEAR_DISTANCE_BLOCKS.get();
+    }
+
+    public static double worldzero$houseFireClearDistanceBlocks() {
+        return WORLDZERO_HOUSE_FIRE_CLEAR_DISTANCE_BLOCKS.get();
     }
 
     public static int worldzero$houseScanIntervalTicks() {
@@ -186,7 +221,7 @@ public final class WorldZeroConfig {
     }
 
     public static int worldzero$houseSearchVerticalRangeBlocks() {
-        return WORLDZERO_HOUSE_SEARCH_VERTICAL_RANGE_BLOCKS.get();
+        return Math.max(32, WORLDZERO_HOUSE_SEARCH_VERTICAL_RANGE_BLOCKS.get());
     }
 
     public static int worldzero$houseRoomMaxHorizontalRadiusBlocks() {

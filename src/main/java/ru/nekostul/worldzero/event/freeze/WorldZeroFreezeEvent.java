@@ -109,6 +109,15 @@ public final class WorldZeroFreezeEvent {
         return worldzero$startFreezeEvent(level, state, player);
     }
 
+    public static boolean worldzero$isFreezeActive(MinecraftServer server) {
+        if (server == null) {
+            return false;
+        }
+
+        SessionState state = WORLDZERO_SESSION_STATES.get(server);
+        return state != null && state.worldzero$eventActive;
+    }
+
     private static boolean worldzero$tryStartFreezeEvent(ServerLevel level, SessionState state) {
         ServerPlayer targetPlayer = worldzero$pickTargetPlayer(level);
         if (targetPlayer == null) {

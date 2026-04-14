@@ -39,8 +39,18 @@ public abstract class ClientPacketListenerMixin {
             return;
         }
 
+        if (WorldZeroState.consumeCreateRedirectOverlayPending(minecraft)) {
+            minecraft.gui.setOverlayMessage(WorldZeroState.createRedirectOverlayMessage(), false);
+            return;
+        }
+
         if (WorldZeroState.consumeReactivationOverlayPending(minecraft)) {
             minecraft.gui.setOverlayMessage(WorldZeroState.reactivationOverlayMessage(), false);
+        }
+
+        String primaryWorldId = WorldZeroState.readPrimaryWorldId(minecraft);
+        if (primaryWorldId != null) {
+            WorldZeroState.refreshPrimaryWorldBackup(minecraft, minecraft.getLevelSource(), primaryWorldId);
         }
     }
 }

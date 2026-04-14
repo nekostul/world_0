@@ -8,6 +8,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import ru.nekostul.worldzero.WorldZeroFreezeClientController;
 
 @Mixin(SoundEngine.class)
 public abstract class SoundEngineMixin {
@@ -15,7 +16,7 @@ public abstract class SoundEngineMixin {
     private static final long WORLDZERO_MOB_FADE_START_TICKS = 30L * 60L * 20L;
 
     @Unique
-    private static final long WORLDZERO_MOB_FADE_END_TICKS = 90L * 60L * 20L;
+    private static final long WORLDZERO_MOB_FADE_END_TICKS = 180L * 60L * 20L;
 
     @Inject(method = "calculateVolume(FLnet/minecraft/sounds/SoundSource;)F", at = @At("RETURN"), cancellable = true)
     private void worldzero$fadeMobSounds(
@@ -23,6 +24,13 @@ public abstract class SoundEngineMixin {
             SoundSource source,
             CallbackInfoReturnable<Float> callbackInfo
     ) {
+        if (WorldZeroFreezeClientController.isFreezeActive()) {
+            if (source != SoundSource.PLAYERS) {
+                callbackInfo.setReturnValue(0.0F);
+                return;
+            }
+        }
+
         if (source != SoundSource.AMBIENT) {
             return;
         }

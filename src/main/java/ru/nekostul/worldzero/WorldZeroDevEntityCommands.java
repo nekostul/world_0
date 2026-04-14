@@ -1,0 +1,265 @@
+package ru.nekostul.worldzero;
+
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.phys.AABB;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+
+@Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+public final class WorldZeroDevEntityCommands {
+    private static final AABB WORLDZERO_ENTITY_SCAN_AABB = new AABB(
+            -30_000_000.0D,
+            -2_048.0D,
+            -30_000_000.0D,
+            30_000_000.0D,
+            4_096.0D,
+            30_000_000.0D
+    );
+
+    private WorldZeroDevEntityCommands() {
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onRegisterCommands(RegisterCommandsEvent event) {
+        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
+        dispatcher.register(
+                Commands.literal("wzdev")
+                        .requires(WorldZeroDevCheats::isAllowedForSource)
+                        .then(Commands.literal("remove_echo")
+                                .executes(context -> worldzero$removeByType(
+                                        context.getSource(),
+                                        WorldZeroEntities.WORLDZERO_ECHO.get(),
+                                        "worldzero_echo"
+                                )))
+                        .then(Commands.literal("remove_black_echo")
+                                .executes(context -> worldzero$removeByType(
+                                        context.getSource(),
+                                        WorldZeroEntities.WORLDZERO_BLACK_ECHO.get(),
+                                        "worldzero_black_echo"
+                                )))
+                        .then(Commands.literal("remove_all_echoes")
+                                .executes(context -> worldzero$removeAll(context.getSource())))
+                        .then(Commands.literal("trigger_echo")
+                                .executes(context -> worldzero$triggerEcho(context.getSource())))
+                        .then(Commands.literal("trigger_echo_rule_break")
+                                .executes(context -> worldzero$triggerEchoRuleBreak(context.getSource())))
+                        .then(Commands.literal("trigger_freeze")
+                                .executes(context -> worldzero$triggerFreeze(context.getSource())))
+                        .then(Commands.literal("trigger_house")
+                                .executes(context -> worldzero$triggerHouse(context.getSource())))
+                        .then(Commands.literal("trigger_house_real")
+                                .executes(context -> worldzero$triggerHouseReal(context.getSource())))
+                        .then(Commands.literal("detect_house")
+                                .executes(context -> worldzero$detectHouse(context.getSource())))
+        );
+    }
+
+    private static int worldzero$removeByType(
+            CommandSourceStack source,
+            EntityType<? extends WorldZeroEchoEntity> type,
+            String debugName
+    ) {
+        int removed = 0;
+        for (ServerLevel level : source.getServer().getAllLevels()) {
+            for (WorldZeroEchoEntity entity : level.getEntitiesOfClass(
+                    WorldZeroEchoEntity.class,
+                    WORLDZERO_ENTITY_SCAN_AABB,
+                    candidate -> candidate.getType() == type
+            )) {
+                entity.discard();
+                removed++;
+            }
+        }
+
+        int finalRemoved = removed;
+        source.sendSuccess(() -> Component.literal(
+                "[WORLD_0][DEV] removed " + finalRemoved + " entities of type " + debugName
+        ), false);
+        return removed;
+    }
+
+    private static int worldzero$removeAll(CommandSourceStack source) {
+        int removed = 0;
+        for (ServerLevel level : source.getServer().getAllLevels()) {
+            for (WorldZeroEchoEntity entity : level.getEntitiesOfClass(
+                    WorldZeroEchoEntity.class,
+                    WORLDZERO_ENTITY_SCAN_AABB
+            )) {
+                entity.discard();
+                removed++;
+            }
+        }
+
+        int finalRemoved = removed;
+        source.sendSuccess(() -> Component.literal(
+                "[WORLD_0][DEV] removed total echo entities: " + finalRemoved
+        ), false);
+        return removed;
+    }
+
+    private static int worldzero$triggerEcho(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean spawned = WorldZeroEchoPhaseOneSpawner.worldzero$triggerPhaseOneSpawn(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                spawned
+                        ? "[WORLD_0][DEV] phase-1 echo spawn triggered"
+                        : "[WORLD_0][DEV] phase-1 echo spawn failed (active echo or no valid spawn point)"
+        ), false);
+        return spawned ? 1 : 0;
+    }
+
+    private static int worldzero$triggerEchoRuleBreak(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean spawned = WorldZeroEchoPhaseOneSpawner.worldzero$triggerRuleBreakSpawn(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                spawned
+                        ? "[WORLD_0][DEV] rule-break echo spawn triggered"
+                        : "[WORLD_0][DEV] rule-break echo spawn failed (active echo or no valid spawn point)"
+        ), false);
+        return spawned ? 1 : 0;
+    }
+
+    private static int worldzero$triggerFreeze(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroFreezeEvent.worldzero$triggerFreezeNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] freeze event triggered"
+                        : "[WORLD_0][DEV] freeze event trigger failed (already active or invalid player)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerHouse(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroHouseEvent.worldzero$triggerHouseNowDebug(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] house event force-triggered (debug)"
+                        : "[WORLD_0][DEV] house force-trigger failed (no detected/remembered house, active scene, or no valid spawn point)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerHouseReal(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        WorldZeroHouseDetector.DetectedHouse detectedHouse = WorldZeroHouseDetector.worldzero$findNearbyHouseForDebug(source.getPlayer());
+        if (detectedHouse == null) {
+            source.sendSuccess(() -> Component.literal(
+                    "[WORLD_0][DEV] house event real-trigger failed (house geometry/features not detected nearby)"
+            ), false);
+            return 0;
+        }
+
+        boolean inTriggerRange = detectedHouse.worldzero$isWithinTriggerDistanceRange(
+                source.getPlayer().getX(),
+                source.getPlayer().getZ()
+        );
+        boolean houseVisible = detectedHouse.worldzero$isVisibleToPlayer(source.getPlayer());
+        if (!inTriggerRange) {
+            double distanceToBounds = Math.sqrt(
+                    detectedHouse.worldzero$horizontalDistanceToBoundsSqr(
+                            source.getPlayer().getX(),
+                            source.getPlayer().getZ()
+                    )
+            );
+            source.sendSuccess(() -> Component.literal(
+                    "[WORLD_0][DEV] house event real-trigger failed (player is out of trigger range: "
+                            + String.format("%.2f", distanceToBounds)
+                            + " blocks to house, need "
+                            + String.format("%.1f", WorldZeroConfig.worldzero$houseTriggerDistanceMinBlocks())
+                            + "-"
+                            + String.format("%.1f", WorldZeroConfig.worldzero$houseTriggerDistanceMaxBlocks())
+                            + ")"
+            ), false);
+            return 0;
+        }
+        if (!houseVisible) {
+            source.sendSuccess(() -> Component.literal(
+                    "[WORLD_0][DEV] house event real-trigger failed (player does not see the house)"
+            ), false);
+            return 0;
+        }
+
+        boolean triggered = WorldZeroHouseEvent.worldzero$triggerHouseNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] house event real-triggered"
+                        : "[WORLD_0][DEV] house event real-trigger failed (scene already active or no valid spawn point)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$detectHouse(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        WorldZeroHouseDetector.DetectedHouse detectedHouse = WorldZeroHouseDetector.worldzero$findNearbyHouseForDebug(source.getPlayer());
+        if (detectedHouse == null) {
+            source.sendSuccess(() -> Component.literal(
+                    "[WORLD_0][DEV] house detector: no valid house geometry/features found nearby"
+            ), false);
+            return 0;
+        }
+
+        int width = detectedHouse.interiorMax().getX() - detectedHouse.interiorMin().getX() + 1;
+        int length = detectedHouse.interiorMax().getZ() - detectedHouse.interiorMin().getZ() + 1;
+        int height = detectedHouse.interiorMax().getY() - detectedHouse.interiorMin().getY() + 1;
+        int structureWidth = width + 2;
+        int structureLength = length + 2;
+        int structureHeight = height + 2;
+        double distanceToBounds = Math.sqrt(
+                detectedHouse.worldzero$horizontalDistanceToBoundsSqr(
+                        source.getPlayer().getX(),
+                        source.getPlayer().getZ()
+                )
+        );
+        boolean inTriggerRange = detectedHouse.worldzero$isWithinTriggerDistanceRange(
+                source.getPlayer().getX(),
+                source.getPlayer().getZ()
+        );
+        boolean houseVisible = detectedHouse.worldzero$isVisibleToPlayer(source.getPlayer());
+
+        String rangeInfo = "distance_to_house=" + String.format("%.2f", distanceToBounds)
+                + ", trigger_range_ok=" + inTriggerRange
+                + ", house_visible=" + houseVisible
+                + " (need "
+                + String.format("%.1f", WorldZeroConfig.worldzero$houseTriggerDistanceMinBlocks())
+                + "-"
+                + String.format("%.1f", WorldZeroConfig.worldzero$houseTriggerDistanceMaxBlocks())
+                + ")";
+        source.sendSuccess(() -> Component.literal(
+                "[WORLD_0][DEV] house detector: score=" + detectedHouse.score()
+                        + ", features=" + detectedHouse.featureCategories()
+                        + ", interior=" + width + "x" + length + "x" + height
+                        + ", structure=" + structureWidth + "x" + structureLength + "x" + structureHeight
+                        + ", center=" + detectedHouse.center().getX() + " "
+                        + detectedHouse.center().getY() + " "
+                        + detectedHouse.center().getZ()
+                        + ", " + rangeInfo
+        ), false);
+        return 1;
+    }
+}

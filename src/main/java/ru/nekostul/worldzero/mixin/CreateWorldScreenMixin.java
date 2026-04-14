@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import ru.nekostul.worldzero.WorldZeroDevCheats;
 import ru.nekostul.worldzero.WorldZeroState;
 
 import java.util.Optional;
@@ -49,6 +50,18 @@ public abstract class CreateWorldScreenMixin {
         }
 
         if (WorldZeroState.primaryWorldExists(minecraft.getLevelSource(), primaryWorldId)) {
+            WorldZeroState.markCreateRedirectOverlayPending(minecraft);
+            minecraft.createWorldOpenFlows().loadLevel(minecraft.screen, primaryWorldId);
+            callbackInfo.setReturnValue(Optional.empty());
+            return;
+        }
+
+        if (WorldZeroState.restorePrimaryWorldFromBackup(
+                minecraft,
+                minecraft.getLevelSource(),
+                primaryWorldId
+        )) {
+            WorldZeroState.markReactivationOverlayPending(minecraft);
             minecraft.createWorldOpenFlows().loadLevel(minecraft.screen, primaryWorldId);
             callbackInfo.setReturnValue(Optional.empty());
             return;
@@ -91,6 +104,10 @@ public abstract class CreateWorldScreenMixin {
 
     @Inject(method = "createLevelSettings", at = @At("RETURN"), cancellable = true)
     private void worldzero$forceCheatsOff(CallbackInfoReturnable<LevelSettings> callbackInfo) {
+        if (WorldZeroDevCheats.isAllowedForCurrentClient()) {
+            return;
+        }
+
         LevelSettings levelSettings = callbackInfo.getReturnValue();
         if (!levelSettings.allowCommands()) {
             return;

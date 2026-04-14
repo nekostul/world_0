@@ -53,6 +53,19 @@ public abstract class WorldOpenFlowsMixin {
         }
 
         if (!WorldZeroState.primaryWorldExists(this.levelSource, primaryWorldId)) {
+            if (WorldZeroState.restorePrimaryWorldFromBackup(this.minecraft, this.levelSource, primaryWorldId)) {
+                WorldZeroState.markReactivationOverlayPending(this.minecraft);
+                WORLDZERO_INTERNAL_CALL.set(true);
+                try {
+                    ((WorldOpenFlows) (Object) this).loadLevel(screen, primaryWorldId);
+                } finally {
+                    WORLDZERO_INTERNAL_CALL.set(false);
+                }
+
+                callbackInfo.cancel();
+                return;
+            }
+
             if (WorldZeroState.hiddenPrimaryWorldExists(this.minecraft, primaryWorldId)) {
                 this.worldzero$showNoPrimaryScreen(screen);
                 callbackInfo.cancel();

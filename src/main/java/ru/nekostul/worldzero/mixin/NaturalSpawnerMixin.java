@@ -16,10 +16,10 @@ public abstract class NaturalSpawnerMixin {
     private static final long WORLDZERO_SPAWN_FADE_START_TICKS = 30L * 60L * 20L;
 
     @Unique
-    private static final long WORLDZERO_SPAWN_FADE_END_TICKS = 2L * 60L * 60L * 20L;
+    private static final long WORLDZERO_SPAWN_FADE_END_TICKS = 180L * 60L * 20L;
 
     @Unique
-    private static final float WORLDZERO_MIN_SPAWN_MULTIPLIER = 0.01f;
+    private static final float WORLDZERO_MIN_SPAWN_MULTIPLIER = 0.0f;
 
     @Inject(method = "spawnCategoryForChunk", at = @At("HEAD"), cancellable = true)
     private static void worldzero$reduceNaturalMobSpawns(
@@ -35,6 +35,11 @@ public abstract class NaturalSpawnerMixin {
         }
 
         float spawnMultiplier = worldzero$spawnMultiplier(serverLevel.getGameTime());
+        if (spawnMultiplier <= 0.0f) {
+            callbackInfo.cancel();
+            return;
+        }
+
         if (spawnMultiplier >= 0.999f) {
             return;
         }

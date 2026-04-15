@@ -4,9 +4,11 @@
   "package": "ru.nekostul.worldzero.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
+    "ChatComponentAccessor",
     "ClientPacketListenerMixin",
     "CreateWorldScreenMixin",
     "EntityTurnMixin",
+    "KeyboardHandlerMixin",
     "LevelChunkMixin",
     "MouseHandlerMixin",
     "NaturalSpawnerMixin",

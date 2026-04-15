@@ -53,6 +53,8 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerFreeze(context.getSource())))
                         .then(Commands.literal("trigger_fall")
                                 .executes(context -> worldzero$triggerFall(context.getSource())))
+                        .then(Commands.literal("trigger_footsteps")
+                                .executes(context -> worldzero$triggerFootsteps(context.getSource())))
                         .then(Commands.literal("trigger_house")
                                 .executes(context -> worldzero$triggerHouse(context.getSource())))
                         .then(Commands.literal("trigger_house_real")
@@ -157,6 +159,20 @@ public final class WorldZeroDevEntityCommands {
                 triggered
                         ? "[WORLD_0][DEV] fall event force-triggered"
                         : "[WORLD_0][DEV] fall event trigger failed (already active, invalid player, or no valid black_echo spawn)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerFootsteps(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroFootstepsEvent.worldzero$triggerFootstepsNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] footsteps event force-triggered"
+                        : "[WORLD_0][DEV] footsteps event trigger failed (already active or invalid player)"
         ), false);
         return triggered ? 1 : 0;
     }

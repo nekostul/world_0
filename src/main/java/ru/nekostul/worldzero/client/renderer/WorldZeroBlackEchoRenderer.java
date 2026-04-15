@@ -18,4 +18,9 @@ public class WorldZeroBlackEchoRenderer extends WorldZeroEchoRenderer {
     public ResourceLocation getTextureLocation(WorldZeroEchoEntity entity) {
         return WORLDZERO_BLACK_TEXTURE;
     }
+
+    @Override
+    protected boolean shouldShowName(WorldZeroEchoEntity entity) {
+        return false;
+    }
 }

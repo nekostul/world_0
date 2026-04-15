@@ -1,8 +1,16 @@
 {
-  "falling_11": {
+  "falling": {
     "sounds": [
       {
-        "name": "worldzero:falling_11",
+        "name": "worldzero:falling",
+        "stream": true
+      }
+    ]
+  },
+  "warning": {
+    "sounds": [
+      {
+        "name": "worldzero:warning",
         "stream": true
       }
     ]

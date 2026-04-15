@@ -81,6 +81,9 @@ public final class WorldZeroFreezeClientController {
         if (minecraft.screen != null) {
             minecraft.setScreen(null);
         }
+        if (!minecraft.mouseHandler.isMouseGrabbed()) {
+            minecraft.mouseHandler.grabMouse();
+        }
 
         worldzero$releaseControlKeys(minecraft.options);
 
@@ -139,6 +142,11 @@ public final class WorldZeroFreezeClientController {
         options.keyDrop.setDown(false);
         options.keySwapOffhand.setDown(false);
         options.keyInventory.setDown(false);
+        options.keySaveHotbarActivator.setDown(false);
+        options.keyLoadHotbarActivator.setDown(false);
+        for (int index = 0; index < options.keyHotbarSlots.length; index++) {
+            options.keyHotbarSlots[index].setDown(false);
+        }
     }
 
     private static void worldzero$clearState() {

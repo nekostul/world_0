@@ -6,6 +6,10 @@ public final class WorldZeroConfig {
     public static final ForgeConfigSpec SPEC;
 
     private static final ForgeConfigSpec.BooleanValue WORLDZERO_HOUSE_EVENT_ENABLED;
+    private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_ACTIVE_START_MINUTES;
+    private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_ACTIVE_END_MINUTES;
+    private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_REAL_FIRE_MIN_MINUTES;
+    private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_REAL_FIRE_MAX_MINUTES;
     private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_INITIAL_DELAY_MIN_SECONDS;
     private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_INITIAL_DELAY_MAX_SECONDS;
     private static final ForgeConfigSpec.IntValue WORLDZERO_HOUSE_REPEAT_MIN_MINUTES;
@@ -44,6 +48,18 @@ public final class WorldZeroConfig {
         WORLDZERO_HOUSE_EVENT_ENABLED = builder
                 .comment("Enables the horror house scene.")
                 .define("enabled", true);
+        WORLDZERO_HOUSE_ACTIVE_START_MINUTES = builder
+                .comment("In-game minute when the repeating house event window starts.")
+                .defineInRange("active_start_minutes", 60, 1, 600);
+        WORLDZERO_HOUSE_ACTIVE_END_MINUTES = builder
+                .comment("In-game minute when the repeating house event window ends.")
+                .defineInRange("active_end_minutes", 120, 1, 600);
+        WORLDZERO_HOUSE_REAL_FIRE_MIN_MINUTES = builder
+                .comment("Earliest in-game minute for the final real house fire.")
+                .defineInRange("real_fire_min_minutes", 115, 1, 600);
+        WORLDZERO_HOUSE_REAL_FIRE_MAX_MINUTES = builder
+                .comment("Latest in-game minute for the final real house fire.")
+                .defineInRange("real_fire_max_minutes", 120, 1, 600);
         WORLDZERO_HOUSE_INITIAL_DELAY_MIN_SECONDS = builder
                 .comment("First trigger delay minimum in seconds.")
                 .defineInRange("initial_delay_min_seconds", 1, 0, 60);
@@ -55,7 +71,7 @@ public final class WorldZeroConfig {
                 .defineInRange("repeat_min_minutes", 10, 1, 180);
         WORLDZERO_HOUSE_REPEAT_MAX_MINUTES = builder
                 .comment("Repeat cooldown maximum in minutes.")
-                .defineInRange("repeat_max_minutes", 20, 1, 180);
+                .defineInRange("repeat_max_minutes", 15, 1, 180);
         WORLDZERO_HOUSE_REPEAT_DELAY_MIN_SECONDS = builder
                 .comment("Delay before repeated appearances in seconds.")
                 .defineInRange("repeat_delay_min_seconds", 3, 0, 60);
@@ -160,6 +176,27 @@ public final class WorldZeroConfig {
 
     public static int worldzero$houseRepeatMaxTicks() {
         return WORLDZERO_HOUSE_REPEAT_MAX_MINUTES.get() * 60 * 20;
+    }
+
+    public static long worldzero$houseActiveStartTick() {
+        return (long) WORLDZERO_HOUSE_ACTIVE_START_MINUTES.get() * 60L * 20L;
+    }
+
+    public static long worldzero$houseActiveEndTick() {
+        return Math.max(
+                worldzero$houseActiveStartTick(),
+                (long) WORLDZERO_HOUSE_ACTIVE_END_MINUTES.get() * 60L * 20L
+        );
+    }
+
+    public static long worldzero$houseRealFireMinTick() {
+        long minTick = (long) WORLDZERO_HOUSE_REAL_FIRE_MIN_MINUTES.get() * 60L * 20L;
+        return Math.max(worldzero$houseActiveStartTick(), Math.min(minTick, worldzero$houseActiveEndTick()));
+    }
+
+    public static long worldzero$houseRealFireMaxTick() {
+        long maxTick = (long) WORLDZERO_HOUSE_REAL_FIRE_MAX_MINUTES.get() * 60L * 20L;
+        return Math.max(worldzero$houseRealFireMinTick(), Math.min(maxTick, worldzero$houseActiveEndTick()));
     }
 
     public static int worldzero$houseRepeatDelayMinTicks() {

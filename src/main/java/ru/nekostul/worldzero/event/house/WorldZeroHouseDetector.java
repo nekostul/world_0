@@ -16,6 +16,7 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.AABB;
 
 import javax.annotation.Nullable;
 import java.util.ArrayDeque;
@@ -38,6 +39,41 @@ public final class WorldZeroHouseDetector {
     @Nullable
     public static DetectedHouse worldzero$findNearbyHouseForDebug(ServerPlayer player) {
         return worldzero$findNearbyHouse(player, false);
+    }
+
+    @Nullable
+    public static DetectedHouse worldzero$findContainingHouse(ServerPlayer player) {
+        DetectedHouse detectedHouse = worldzero$findNearbyHouse(player, false);
+        if (detectedHouse == null) {
+            return null;
+        }
+
+        return worldzero$isPlayerInsideHouse(player, detectedHouse) ? detectedHouse : null;
+    }
+
+    public static boolean worldzero$isPlayerInsideHouse(ServerPlayer player, DetectedHouse detectedHouse) {
+        AABB playerBox = player.getBoundingBox();
+        double minX = detectedHouse.interiorMin().getX();
+        double maxX = detectedHouse.interiorMax().getX() + 1.0D;
+        double minY = detectedHouse.interiorMin().getY();
+        double maxY = detectedHouse.interiorMax().getY() + 1.95D;
+        double minZ = detectedHouse.interiorMin().getZ();
+        double maxZ = detectedHouse.interiorMax().getZ() + 1.0D;
+
+        boolean intersectsInterior = playerBox.maxX > minX
+                && playerBox.minX < maxX
+                && playerBox.maxY > minY
+                && playerBox.minY < maxY
+                && playerBox.maxZ > minZ
+                && playerBox.minZ < maxZ;
+        if (!intersectsInterior) {
+            return false;
+        }
+
+        ServerLevel level = player.serverLevel();
+        BlockPos feetPos = player.blockPosition();
+        BlockPos eyePos = BlockPos.containing(player.getEyePosition());
+        return !level.canSeeSky(feetPos) || !level.canSeeSky(eyePos);
     }
 
     @Nullable

@@ -82,10 +82,27 @@ public final class WorldZeroHouseEvent {
         );
 
         long gameTime = player.serverLevel().getGameTime();
+        worldzero$ensureHouseTimeline(player.serverLevel(), playerState);
+        if (playerState.worldzero$realFireTriggered) {
+            if (playerState.worldzero$bedrockActive) {
+                worldzero$deactivateBedrockScene(server, player, playerState);
+            }
+            return;
+        }
+
+        if (gameTime < WorldZeroConfig.worldzero$houseActiveStartTick()) {
+            return;
+        }
+
         if (playerState.worldzero$bedrockActive) {
             if (playerState.worldzero$activeHouse == null
                     || playerState.worldzero$activeVisualBlocks.isEmpty()) {
                 worldzero$deactivateBedrockScene(server, player, playerState);
+                return;
+            }
+
+            if (gameTime >= playerState.worldzero$finalRealFireTick
+                    && worldzero$igniteRealHouseFire(player, playerState, playerState.worldzero$activeHouse)) {
                 return;
             }
 
@@ -156,11 +173,23 @@ public final class WorldZeroHouseEvent {
 
         boolean insideTriggerBand = distanceToHouse >= playerState.worldzero$triggerBandMin
                 && distanceToHouse <= playerState.worldzero$triggerBandMax;
-        if (!playerState.worldzero$wasInsideTriggerBand && insideTriggerBand) {
-            playerState.worldzero$approachEntryCounter++;
+
+        if (gameTime >= playerState.worldzero$finalRealFireTick) {
+            if (insideTriggerBand) {
+                worldzero$igniteRealHouseFire(player, playerState, detectedHouse);
+                playerState.worldzero$armedForApproach = false;
+            }
+            playerState.worldzero$wasInsideTriggerBand = insideTriggerBand;
+            return;
+        }
+
+        if (!playerState.worldzero$wasInsideTriggerBand
+                && insideTriggerBand
+                && gameTime >= playerState.worldzero$nextScheduledVisualTick) {
             playerState.worldzero$armedForApproach = false;
-            if ((playerState.worldzero$approachEntryCounter & 1) == 1) {
-                worldzero$activateBedrockScene(player, playerState, detectedHouse, false);
+            if (worldzero$activateBedrockScene(player, playerState, detectedHouse, false)) {
+                playerState.worldzero$nextScheduledVisualTick = gameTime
+                        + worldzero$randomVisualRepeatTicks(player.serverLevel());
             }
         }
         playerState.worldzero$wasInsideTriggerBand = insideTriggerBand;
@@ -309,6 +338,88 @@ public final class WorldZeroHouseEvent {
         return true;
     }
 
+    private static boolean worldzero$igniteRealHouseFire(
+            ServerPlayer player,
+            PlayerState playerState,
+            @Nullable WorldZeroHouseDetector.DetectedHouse detectedHouse
+    ) {
+        if (detectedHouse == null) {
+            return false;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return false;
+        }
+
+        ServerLevel level = player.serverLevel();
+        int minX = detectedHouse.interiorMin().getX() - 1;
+        int minY = detectedHouse.interiorMin().getY() - 1;
+        int minZ = detectedHouse.interiorMin().getZ() - 1;
+        int maxX = detectedHouse.interiorMax().getX() + 1;
+        int maxY = detectedHouse.interiorMax().getY() + 1;
+        int maxZ = detectedHouse.interiorMax().getZ() + 1;
+
+        List<BlockPos> fireBlocks = worldzero$collectVisualHouseFireBlocks(
+                level,
+                minX,
+                minY,
+                minZ,
+                maxX,
+                maxY,
+                maxZ,
+                false
+        );
+        List<BlockPos> burnoutBlocks = worldzero$collectVisualBurnoutBlocks(
+                level,
+                minX,
+                minY,
+                minZ,
+                maxX,
+                maxY,
+                maxZ,
+                false
+        );
+        if (fireBlocks.isEmpty() && burnoutBlocks.isEmpty()) {
+            return false;
+        }
+
+        worldzero$deactivateBedrockScene(server, player, playerState);
+
+        boolean changed = false;
+        for (BlockPos blockPos : burnoutBlocks) {
+            BlockState currentState = level.getBlockState(blockPos);
+            if (!currentState.isAir() && currentState.getFluidState().isEmpty()) {
+                changed = true;
+                level.setBlock(blockPos, Blocks.AIR.defaultBlockState(), 3);
+            }
+        }
+
+        for (BlockPos blockPos : fireBlocks) {
+            BlockState fireState = worldzero$createVisualFireState(level, blockPos);
+            if (fireState.isAir()) {
+                continue;
+            }
+            BlockState currentState = level.getBlockState(blockPos);
+            if (!currentState.isAir() || !currentState.getFluidState().isEmpty()) {
+                continue;
+            }
+            changed = true;
+            level.setBlock(blockPos, fireState, 3);
+        }
+
+        if (!changed) {
+            return false;
+        }
+
+        playerState.worldzero$realFireTriggered = true;
+        playerState.worldzero$armedForApproach = false;
+        playerState.worldzero$wasInsideTriggerBand = false;
+        playerState.worldzero$rememberedHouse = null;
+        playerState.worldzero$rememberedHouseUntilTick = 0L;
+        return true;
+    }
+
     private static void worldzero$deactivateBedrockScene(
             MinecraftServer server,
             @Nullable ServerPlayer player,
@@ -368,6 +479,28 @@ public final class WorldZeroHouseEvent {
                 200L,
                 (long) WorldZeroConfig.worldzero$houseScanIntervalTicks() * WORLDZERO_HOUSE_MEMORY_MULTIPLIER
         );
+    }
+
+    private static void worldzero$ensureHouseTimeline(ServerLevel level, PlayerState playerState) {
+        long activeStartTick = WorldZeroConfig.worldzero$houseActiveStartTick();
+        if (playerState.worldzero$nextScheduledVisualTick < activeStartTick) {
+            playerState.worldzero$nextScheduledVisualTick = activeStartTick;
+        }
+
+        if (playerState.worldzero$finalRealFireTick < 0L) {
+            long minTick = WorldZeroConfig.worldzero$houseRealFireMinTick();
+            long maxTick = WorldZeroConfig.worldzero$houseRealFireMaxTick();
+            long span = Math.max(0L, maxTick - minTick);
+            playerState.worldzero$finalRealFireTick = minTick
+                    + (long) Math.floor(level.random.nextDouble() * (double) (span + 1L));
+        }
+    }
+
+    private static long worldzero$randomVisualRepeatTicks(ServerLevel level) {
+        long minTicks = WorldZeroConfig.worldzero$houseRepeatMinTicks();
+        long maxTicks = Math.max(minTicks, (long) WorldZeroConfig.worldzero$houseRepeatMaxTicks());
+        long span = Math.max(0L, maxTicks - minTicks);
+        return minTicks + (long) Math.floor(level.random.nextDouble() * (double) (span + 1L));
     }
 
     private static void worldzero$rollTriggerBand(ServerLevel level, PlayerState playerState) {
@@ -816,6 +949,7 @@ public final class WorldZeroHouseEvent {
     private static final class PlayerState {
         private long worldzero$lastScanTick;
         private boolean worldzero$bedrockActive;
+        private boolean worldzero$realFireTriggered;
         private WorldZeroHouseDetector.DetectedHouse worldzero$activeHouse;
         private double worldzero$restoreDistanceThreshold = -1.0D;
         private final List<BlockPos> worldzero$activeVisualBlocks = new ArrayList<>();
@@ -824,9 +958,10 @@ public final class WorldZeroHouseEvent {
 
         private boolean worldzero$armedForApproach = true;
         private boolean worldzero$wasInsideTriggerBand;
-        private int worldzero$approachEntryCounter;
         private double worldzero$triggerBandMin = -1.0D;
         private double worldzero$triggerBandMax = -1.0D;
+        private long worldzero$nextScheduledVisualTick = -1L;
+        private long worldzero$finalRealFireTick = -1L;
 
         private WorldZeroHouseDetector.DetectedHouse worldzero$rememberedHouse;
         private long worldzero$rememberedHouseUntilTick;

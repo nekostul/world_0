@@ -12,6 +12,7 @@ public final class WorldZeroMod {
     public WorldZeroMod() {
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, WorldZeroConfig.SPEC);
         WorldZeroEntities.ENTITY_TYPES.register(FMLJavaModLoadingContext.get().getModEventBus());
+        WorldZeroItems.ITEMS.register(FMLJavaModLoadingContext.get().getModEventBus());
         WorldZeroNetwork.register();
     }
 }

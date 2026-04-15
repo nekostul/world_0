@@ -17,7 +17,9 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -31,7 +33,7 @@ import java.util.WeakHashMap;
 public final class WorldZeroFallEvent {
     private static final long WORLDZERO_FALL_WINDOW_START_TICKS = 45L * 60L * 20L;
     private static final long WORLDZERO_FALL_WINDOW_END_TICKS = 120L * 60L * 20L;
-    private static final int WORLDZERO_FALL_FREEZE_TICKS = 2 * 20;
+    private static final int WORLDZERO_FALL_FREEZE_TICKS = 5 * 20;
     private static final double WORLDZERO_BLACK_ECHO_FRONT_DISTANCE_BLOCKS = 3.0D;
     private static final int WORLDZERO_HOLE_RADIUS_BLOCKS = 1;
     private static final int WORLDZERO_RESPAWN_SEARCH_RADIUS_MIN = 2;
@@ -114,6 +116,27 @@ public final class WorldZeroFallEvent {
         }
 
         if (state.worldzero$targetPlayerId.equals(player.getUUID())) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (event.getEntity() instanceof ServerPlayer player && worldzero$isInteractionBlocked(player)) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        if (event.getEntity() instanceof ServerPlayer player && worldzero$isInteractionBlocked(player)) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onBlockPlace(BlockEvent.EntityPlaceEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player && worldzero$isInteractionBlocked(player)) {
             event.setCanceled(true);
         }
     }
@@ -208,8 +231,8 @@ public final class WorldZeroFallEvent {
             saveData.setDirty();
         }
 
-        WorldZeroNetwork.sendFallClientAction(player, WorldZeroFallClientPacket.WORLDZERO_ACTION_BEGIN);
         WorldZeroNetwork.sendFreezeStart(player, WORLDZERO_FALL_FREEZE_TICKS, blackEcho.getId());
+        WorldZeroNetwork.sendFallClientAction(player, WorldZeroFallClientPacket.WORLDZERO_ACTION_BEGIN);
         return true;
     }
 
@@ -251,9 +274,8 @@ public final class WorldZeroFallEvent {
     }
 
     private static void worldzero$tickFallingPhase(ServerLevel level, SessionState state, ServerPlayer player) {
-        if (player.getDeltaMovement().y > -0.6D) {
-            player.setDeltaMovement(player.getDeltaMovement().x, -0.6D, player.getDeltaMovement().z);
-        }
+        worldzero$clearFallingFluids(level, state);
+        player.setDeltaMovement(0.0D, -1.2D, 0.0D);
         player.fallDistance = 0.0F;
 
         if (player.getY() > level.getMinBuildHeight() + 4.0D) {
@@ -389,6 +411,34 @@ public final class WorldZeroFallEvent {
         return level.noCollision(spawnBox) && !level.containsAnyLiquid(spawnBox);
     }
 
+    private static void worldzero$clearFallingFluids(ServerLevel level, SessionState state) {
+        if (state.worldzero$holeCenter == null || state.worldzero$targetPlayerId == null) {
+            return;
+        }
+
+        ServerPlayer player = level.getServer().getPlayerList().getPlayer(state.worldzero$targetPlayerId);
+        if (player == null) {
+            return;
+        }
+
+        int minY = Math.max(level.getMinBuildHeight(), Mth.floor(player.getY()) - 2);
+        int maxY = Math.min(level.getMaxBuildHeight() - 1, Mth.floor(player.getY()) + 2);
+        for (int x = state.worldzero$holeCenter.getX() - WORLDZERO_HOLE_RADIUS_BLOCKS;
+             x <= state.worldzero$holeCenter.getX() + WORLDZERO_HOLE_RADIUS_BLOCKS;
+             x++) {
+            for (int z = state.worldzero$holeCenter.getZ() - WORLDZERO_HOLE_RADIUS_BLOCKS;
+                 z <= state.worldzero$holeCenter.getZ() + WORLDZERO_HOLE_RADIUS_BLOCKS;
+                 z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    BlockPos blockPos = new BlockPos(x, y, z);
+                    if (!level.getBlockState(blockPos).getFluidState().isEmpty()) {
+                        level.setBlock(blockPos, Blocks.AIR.defaultBlockState(), 3);
+                    }
+                }
+            }
+        }
+    }
+
     private static void worldzero$createHole(ServerLevel level, BlockPos holeCenter) {
         int minY = level.getMinBuildHeight();
         int topY = holeCenter.getY() - 1;
@@ -471,6 +521,20 @@ public final class WorldZeroFallEvent {
         }
 
         return null;
+    }
+
+    private static boolean worldzero$isInteractionBlocked(ServerPlayer player) {
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return false;
+        }
+
+        SessionState state = WORLDZERO_SESSION_STATES.get(server);
+        if (state == null || state.worldzero$phase == Phase.INACTIVE || state.worldzero$targetPlayerId == null) {
+            return false;
+        }
+
+        return state.worldzero$targetPlayerId.equals(player.getUUID());
     }
 
     private static void worldzero$clearState(MinecraftServer server, SessionState state) {

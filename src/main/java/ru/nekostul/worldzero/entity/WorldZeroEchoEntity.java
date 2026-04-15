@@ -1,9 +1,9 @@
 package ru.nekostul.worldzero;
 
-import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -19,7 +19,6 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import java.util.UUID;
 
 public class WorldZeroEchoEntity extends Monster {
-    private static final Component WORLDZERO_BLACK_ECHO_NAME = Component.literal("0");
     private static final double WORLDZERO_ECHO_DESPAWN_MIN_DISTANCE = 5.0D;
     private static final double WORLDZERO_ECHO_DESPAWN_MAX_DISTANCE = 10.0D;
     private static final double WORLDZERO_RULE_BREAK_DESPAWN_DISTANCE_SQR = 4.0D * 4.0D;
@@ -44,6 +43,9 @@ public class WorldZeroEchoEntity extends Monster {
     private double worldzero$freezePassDirectionZ;
     private double worldzero$freezePassSpeed;
     private int worldzero$freezePassTicksRemaining;
+    private boolean worldzero$windowWatchActive;
+    private UUID worldzero$windowWatchTargetPlayerId;
+    private int worldzero$windowWatchTicksRemaining;
 
     public WorldZeroEchoEntity(EntityType<? extends Monster> entityType, Level level) {
         super(entityType, level);
@@ -86,6 +88,7 @@ public class WorldZeroEchoEntity extends Monster {
         }
 
         Player nearestPlayer = this.level().getNearestPlayer(this, 128.0D);
+        Player focusPlayer = this.worldzero$resolveFocusPlayer(nearestPlayer);
         if (this.getType() == WorldZeroEntities.WORLDZERO_BLACK_ECHO.get() && this.worldzero$freezePassActive) {
             this.worldzero$tickFreezePass();
             if (this.isRemoved()) {
@@ -93,13 +96,18 @@ public class WorldZeroEchoEntity extends Monster {
             }
         }
 
-        if (nearestPlayer != null) {
-            this.worldzero$lookAtPlayer(nearestPlayer);
+        if (focusPlayer != null) {
+            this.worldzero$lookAtPlayer(focusPlayer);
         }
 
         if (this.getType() == WorldZeroEntities.WORLDZERO_ECHO.get()) {
-            if (this.worldzero$ruleBreakEventActive) {
-                this.worldzero$tickRuleBreakEvent(nearestPlayer);
+            if (this.worldzero$windowWatchActive) {
+                this.worldzero$tickWindowWatchEvent(focusPlayer);
+                if (this.isRemoved()) {
+                    return;
+                }
+            } else if (this.worldzero$ruleBreakEventActive) {
+                this.worldzero$tickRuleBreakEvent(focusPlayer);
                 if (this.isRemoved()) {
                     return;
                 }
@@ -110,17 +118,17 @@ public class WorldZeroEchoEntity extends Monster {
         }
 
         if (this.tickCount == 1 || this.tickCount % 20 == 0) {
-            this.worldzero$updateNameTag(this.worldzero$resolveRuleBreakTargetPlayer(nearestPlayer));
+            this.worldzero$updateNameTag(this.worldzero$resolveFocusPlayer(nearestPlayer));
         }
     }
 
     private void worldzero$updateNameTag(Player nearestPlayer) {
         if (this.getType() == WorldZeroEntities.WORLDZERO_BLACK_ECHO.get()) {
-            if (!WORLDZERO_BLACK_ECHO_NAME.getString().equals(this.getName().getString())) {
-                this.setCustomName(WORLDZERO_BLACK_ECHO_NAME);
+            if (this.getCustomName() != null) {
+                this.setCustomName(null);
             }
-            if (!this.isCustomNameVisible()) {
-                this.setCustomNameVisible(true);
+            if (this.isCustomNameVisible()) {
+                this.setCustomNameVisible(false);
             }
             return;
         }
@@ -197,6 +205,13 @@ public class WorldZeroEchoEntity extends Monster {
         this.worldzero$freezePassActive = true;
     }
 
+    public void worldzero$configureWindowWatch(UUID targetPlayerId, int durationTicks) {
+        this.worldzero$windowWatchActive = true;
+        this.worldzero$windowWatchTargetPlayerId = targetPlayerId;
+        this.worldzero$windowWatchTicksRemaining = Math.max(20, durationTicks);
+        this.worldzero$ruleBreakEventActive = false;
+    }
+
     private void worldzero$tickRuleBreakEvent(Player fallbackNearestPlayer) {
         Player targetPlayer = this.worldzero$resolveRuleBreakTargetPlayer(fallbackNearestPlayer);
         if (targetPlayer != null) {
@@ -229,6 +244,19 @@ public class WorldZeroEchoEntity extends Monster {
         }
     }
 
+    private void worldzero$tickWindowWatchEvent(Player focusPlayer) {
+        if (focusPlayer != null) {
+            this.worldzero$lookAtPlayer(focusPlayer);
+        }
+
+        this.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        this.setSprinting(false);
+        this.worldzero$windowWatchTicksRemaining--;
+        if (this.worldzero$windowWatchTicksRemaining <= 0) {
+            this.discard();
+        }
+    }
+
     private Player worldzero$resolveRuleBreakTargetPlayer(Player fallbackNearestPlayer) {
         if (!this.worldzero$ruleBreakEventActive || this.worldzero$ruleBreakTargetPlayerId == null) {
             return fallbackNearestPlayer;
@@ -240,6 +268,19 @@ public class WorldZeroEchoEntity extends Monster {
 
         Player targetPlayer = serverLevel.getPlayerByUUID(this.worldzero$ruleBreakTargetPlayerId);
         return targetPlayer != null ? targetPlayer : fallbackNearestPlayer;
+    }
+
+    private Player worldzero$resolveFocusPlayer(Player fallbackNearestPlayer) {
+        if (this.worldzero$windowWatchActive && this.worldzero$windowWatchTargetPlayerId != null) {
+            if (this.level() instanceof ServerLevel serverLevel) {
+                Player targetPlayer = serverLevel.getPlayerByUUID(this.worldzero$windowWatchTargetPlayerId);
+                if (targetPlayer != null) {
+                    return targetPlayer;
+                }
+            }
+        }
+
+        return this.worldzero$resolveRuleBreakTargetPlayer(fallbackNearestPlayer);
     }
 
     private void worldzero$chaseTowardPlayer(Player player) {

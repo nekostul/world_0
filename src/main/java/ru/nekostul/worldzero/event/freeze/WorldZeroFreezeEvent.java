@@ -1,5 +1,6 @@
 package ru.nekostul.worldzero;
 
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
@@ -9,6 +10,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -25,6 +27,8 @@ import java.util.WeakHashMap;
 public final class WorldZeroFreezeEvent {
     private static final long WORLDZERO_FREEZE_WINDOW_START_TICKS = 45L * 60L * 20L;
     private static final long WORLDZERO_FREEZE_WINDOW_END_TICKS = 60L * 60L * 20L;
+    private static final long WORLDZERO_DELAY_AFTER_FALL_MIN_TICKS = 15L * 60L * 20L;
+    private static final long WORLDZERO_DELAY_AFTER_FALL_MAX_TICKS = 30L * 60L * 20L;
     private static final int WORLDZERO_FREEZE_DURATION_TICKS = 5 * 20;
     private static final int WORLDZERO_BLACK_ECHO_PASS_MIN_TICKS = 20;
     private static final int WORLDZERO_BLACK_ECHO_PASS_MAX_TICKS = 40;
@@ -34,6 +38,7 @@ public final class WorldZeroFreezeEvent {
     private static final double WORLDZERO_BLACK_ECHO_SPAWN_SIDE_MAX_BLOCKS = 18.0D;
     private static final double WORLDZERO_BLACK_ECHO_SPAWN_FORWARD_MIN_BLOCKS = 10.0D;
     private static final double WORLDZERO_BLACK_ECHO_SPAWN_FORWARD_MAX_BLOCKS = 16.0D;
+    private static final String WORLDZERO_SAVE_ID = "worldzero_freeze_event";
     private static final AABB WORLDZERO_ENTITY_SCAN_AABB = new AABB(
             -30_000_000.0D,
             -2_048.0D,
@@ -63,30 +68,42 @@ public final class WorldZeroFreezeEvent {
 
         MinecraftServer server = level.getServer();
         SessionState state = WORLDZERO_SESSION_STATES.computeIfAbsent(server, ignored -> new SessionState());
-        if (state.worldzero$triggerTick < 0L) {
+        if (state.worldzero$eventActive) {
+            worldzero$applyFreeze(server, state);
+            if (level.getGameTime() >= state.worldzero$freezeEndTick) {
+                worldzero$finishFreeze(level, state);
+            }
+            return;
+        }
+
+        if (WorldZeroFallEvent.worldzero$isFallActive(server)) {
+            return;
+        }
+
+        FreezeSaveData saveData = worldzero$getSaveData(level);
+        if (saveData.worldzero$completed) {
+            return;
+        }
+
+        if (saveData.worldzero$triggerTick < 0L) {
             long tickSpan = WORLDZERO_FREEZE_WINDOW_END_TICKS - WORLDZERO_FREEZE_WINDOW_START_TICKS + 1L;
-            state.worldzero$triggerTick = WORLDZERO_FREEZE_WINDOW_START_TICKS
+            saveData.worldzero$triggerTick = WORLDZERO_FREEZE_WINDOW_START_TICKS
                     + (long) (level.random.nextDouble() * tickSpan);
+            saveData.setDirty();
         }
 
         long gameTime = level.getGameTime();
         if (!state.worldzero$eventTriggered) {
-            if (gameTime > WORLDZERO_FREEZE_WINDOW_END_TICKS) {
+            if (gameTime > WORLDZERO_FREEZE_WINDOW_END_TICKS
+                    && saveData.worldzero$triggerTick <= WORLDZERO_FREEZE_WINDOW_END_TICKS) {
                 state.worldzero$eventTriggered = true;
-            } else if (gameTime >= state.worldzero$triggerTick) {
-                if (worldzero$tryStartFreezeEvent(level, state)) {
+                saveData.worldzero$completed = true;
+                saveData.setDirty();
+            } else if (gameTime >= saveData.worldzero$triggerTick) {
+                if (worldzero$tryStartFreezeEvent(level, state, saveData)) {
                     state.worldzero$eventTriggered = true;
                 }
             }
-        }
-
-        if (!state.worldzero$eventActive) {
-            return;
-        }
-
-        worldzero$applyFreeze(server, state);
-        if (gameTime >= state.worldzero$freezeEndTick) {
-            worldzero$finishFreeze(level, state);
         }
     }
 
@@ -106,7 +123,7 @@ public final class WorldZeroFreezeEvent {
             return false;
         }
 
-        return worldzero$startFreezeEvent(level, state, player);
+        return worldzero$startFreezeEvent(level, state, player, null);
     }
 
     public static boolean worldzero$isFreezeActive(MinecraftServer server) {
@@ -118,21 +135,41 @@ public final class WorldZeroFreezeEvent {
         return state != null && state.worldzero$eventActive;
     }
 
-    private static boolean worldzero$tryStartFreezeEvent(ServerLevel level, SessionState state) {
+    public static void worldzero$rescheduleAfterFall(ServerLevel level) {
+        if (level == null || level.isClientSide() || level.dimension() != Level.OVERWORLD) {
+            return;
+        }
+
+        FreezeSaveData saveData = worldzero$getSaveData(level);
+        if (saveData.worldzero$completed) {
+            return;
+        }
+
+        saveData.worldzero$triggerTick = level.getGameTime() + worldzero$randomDelayAfterFall(level);
+        saveData.setDirty();
+    }
+
+    private static boolean worldzero$tryStartFreezeEvent(
+            ServerLevel level,
+            SessionState state,
+            FreezeSaveData saveData
+    ) {
         ServerPlayer targetPlayer = worldzero$pickTargetPlayer(level);
         if (targetPlayer == null) {
             return false;
         }
 
-        return worldzero$startFreezeEvent(level, state, targetPlayer);
+        return worldzero$startFreezeEvent(level, state, targetPlayer, saveData);
     }
 
     private static boolean worldzero$startFreezeEvent(
             ServerLevel level,
             SessionState state,
-            ServerPlayer targetPlayer
+            ServerPlayer targetPlayer,
+            @javax.annotation.Nullable FreezeSaveData saveData
     ) {
         state.worldzero$eventActive = true;
+        state.worldzero$eventTriggered = true;
         state.worldzero$freezeEndTick = level.getGameTime() + WORLDZERO_FREEZE_DURATION_TICKS;
         state.worldzero$targetPlayerId = targetPlayer.getUUID();
         state.worldzero$lockedX = targetPlayer.getX();
@@ -140,6 +177,12 @@ public final class WorldZeroFreezeEvent {
         state.worldzero$lockedZ = targetPlayer.getZ();
         state.worldzero$lockedYaw = targetPlayer.getYRot();
         state.worldzero$lockedPitch = targetPlayer.getXRot();
+
+        if (saveData != null) {
+            saveData.worldzero$completed = true;
+            saveData.setDirty();
+            WorldZeroFallEvent.worldzero$rescheduleAfterFreeze(level);
+        }
 
         worldzero$spawnFreezeBlackEcho(level, targetPlayer);
         WorldZeroNetwork.sendFreezeStart(targetPlayer, WORLDZERO_FREEZE_DURATION_TICKS);
@@ -274,8 +317,20 @@ public final class WorldZeroFreezeEvent {
         return true;
     }
 
+    private static FreezeSaveData worldzero$getSaveData(ServerLevel level) {
+        return level.getDataStorage().computeIfAbsent(
+                FreezeSaveData::worldzero$load,
+                FreezeSaveData::new,
+                WORLDZERO_SAVE_ID
+        );
+    }
+
+    private static long worldzero$randomDelayAfterFall(ServerLevel level) {
+        long span = WORLDZERO_DELAY_AFTER_FALL_MAX_TICKS - WORLDZERO_DELAY_AFTER_FALL_MIN_TICKS + 1L;
+        return WORLDZERO_DELAY_AFTER_FALL_MIN_TICKS + (long) (level.random.nextDouble() * span);
+    }
+
     private static final class SessionState {
-        private long worldzero$triggerTick = -1L;
         private boolean worldzero$eventTriggered;
         private boolean worldzero$eventActive;
         private long worldzero$freezeEndTick;
@@ -285,5 +340,24 @@ public final class WorldZeroFreezeEvent {
         private double worldzero$lockedZ;
         private float worldzero$lockedYaw;
         private float worldzero$lockedPitch;
+    }
+
+    private static final class FreezeSaveData extends SavedData {
+        private long worldzero$triggerTick = -1L;
+        private boolean worldzero$completed;
+
+        private static FreezeSaveData worldzero$load(CompoundTag tag) {
+            FreezeSaveData saveData = new FreezeSaveData();
+            saveData.worldzero$triggerTick = tag.getLong("trigger_tick");
+            saveData.worldzero$completed = tag.getBoolean("completed");
+            return saveData;
+        }
+
+        @Override
+        public CompoundTag save(CompoundTag tag) {
+            tag.putLong("trigger_tick", this.worldzero$triggerTick);
+            tag.putBoolean("completed", this.worldzero$completed);
+            return tag;
+        }
     }
 }

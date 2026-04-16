@@ -1,5 +1,8 @@
 package ru.nekostul.worldzero;
 
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
@@ -12,6 +15,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.FireBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
@@ -33,6 +37,7 @@ import java.util.WeakHashMap;
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class WorldZeroHouseEvent {
     private static final String WORLDZERO_HOUSE_BLACK_ECHO_TAG = "worldzero_house_black_echo";
+    private static final String WORLDZERO_SAVE_ID = "worldzero_house_event";
     private static final AABB WORLDZERO_ENTITY_SCAN_AABB = new AABB(
             -30_000_000.0D,
             -2_048.0D,
@@ -80,9 +85,10 @@ public final class WorldZeroHouseEvent {
                 player.getUUID(),
                 ignored -> new PlayerState()
         );
+        worldzero$loadPersistentPlayerState(player.serverLevel(), player.getUUID(), playerState);
 
         long gameTime = player.serverLevel().getGameTime();
-        worldzero$ensureHouseTimeline(player.serverLevel(), playerState);
+        worldzero$ensureHouseTimeline(player.serverLevel(), player.getUUID(), playerState);
         if (playerState.worldzero$realFireTriggered) {
             if (playerState.worldzero$bedrockActive) {
                 worldzero$deactivateBedrockScene(server, player, playerState);
@@ -190,6 +196,7 @@ public final class WorldZeroHouseEvent {
             if (worldzero$activateBedrockScene(player, playerState, detectedHouse, false)) {
                 playerState.worldzero$nextScheduledVisualTick = gameTime
                         + worldzero$randomVisualRepeatTicks(player.serverLevel());
+                worldzero$savePersistentPlayerState(player.serverLevel(), player.getUUID(), playerState);
             }
         }
         playerState.worldzero$wasInsideTriggerBand = insideTriggerBand;
@@ -207,6 +214,20 @@ public final class WorldZeroHouseEvent {
 
     public static boolean worldzero$triggerHouseNowDebug(ServerPlayer player) {
         return worldzero$triggerHouseNowInternal(player, false);
+    }
+
+    public static boolean worldzero$isHouseActive(MinecraftServer server) {
+        SessionState sessionState = WORLDZERO_SERVER_STATES.get(server);
+        if (sessionState == null) {
+            return false;
+        }
+
+        for (PlayerState playerState : sessionState.worldzero$playerStates.values()) {
+            if (playerState.worldzero$bedrockActive) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean worldzero$triggerHouseNowInternal(ServerPlayer player, boolean enforceRealConditions) {
@@ -228,6 +249,7 @@ public final class WorldZeroHouseEvent {
                 player.getUUID(),
                 ignored -> new PlayerState()
         );
+        worldzero$loadPersistentPlayerState(player.serverLevel(), player.getUUID(), playerState);
         if (playerState.worldzero$bedrockActive) {
             return false;
         }
@@ -417,6 +439,7 @@ public final class WorldZeroHouseEvent {
         playerState.worldzero$wasInsideTriggerBand = false;
         playerState.worldzero$rememberedHouse = null;
         playerState.worldzero$rememberedHouseUntilTick = 0L;
+        worldzero$savePersistentPlayerState(level, player.getUUID(), playerState);
         return true;
     }
 
@@ -481,10 +504,69 @@ public final class WorldZeroHouseEvent {
         );
     }
 
-    private static void worldzero$ensureHouseTimeline(ServerLevel level, PlayerState playerState) {
+    private static void worldzero$loadPersistentPlayerState(
+            ServerLevel level,
+            UUID playerId,
+            PlayerState playerState
+    ) {
+        if (playerState.worldzero$persistentLoaded) {
+            return;
+        }
+
+        HouseSaveData saveData = worldzero$getSaveData(level);
+        PersistentPlayerState persistentState = saveData.worldzero$playerStates.get(playerId);
+        if (persistentState != null) {
+            playerState.worldzero$realFireTriggered = persistentState.worldzero$realFireTriggered;
+            playerState.worldzero$nextScheduledVisualTick = persistentState.worldzero$nextScheduledVisualTick;
+            playerState.worldzero$finalRealFireTick = persistentState.worldzero$finalRealFireTick;
+        }
+        playerState.worldzero$persistentLoaded = true;
+    }
+
+    private static void worldzero$savePersistentPlayerState(
+            ServerLevel level,
+            UUID playerId,
+            PlayerState playerState
+    ) {
+        HouseSaveData saveData = worldzero$getSaveData(level);
+        PersistentPlayerState persistentState = saveData.worldzero$playerStates.computeIfAbsent(
+                playerId,
+                ignored -> new PersistentPlayerState()
+        );
+
+        boolean changed = false;
+        if (persistentState.worldzero$realFireTriggered != playerState.worldzero$realFireTriggered) {
+            persistentState.worldzero$realFireTriggered = playerState.worldzero$realFireTriggered;
+            changed = true;
+        }
+        if (persistentState.worldzero$nextScheduledVisualTick != playerState.worldzero$nextScheduledVisualTick) {
+            persistentState.worldzero$nextScheduledVisualTick = playerState.worldzero$nextScheduledVisualTick;
+            changed = true;
+        }
+        if (persistentState.worldzero$finalRealFireTick != playerState.worldzero$finalRealFireTick) {
+            persistentState.worldzero$finalRealFireTick = playerState.worldzero$finalRealFireTick;
+            changed = true;
+        }
+
+        if (changed) {
+            saveData.setDirty();
+        }
+    }
+
+    private static HouseSaveData worldzero$getSaveData(ServerLevel level) {
+        return level.getDataStorage().computeIfAbsent(
+                HouseSaveData::worldzero$load,
+                HouseSaveData::new,
+                WORLDZERO_SAVE_ID
+        );
+    }
+
+    private static void worldzero$ensureHouseTimeline(ServerLevel level, UUID playerId, PlayerState playerState) {
+        boolean changed = false;
         long activeStartTick = WorldZeroConfig.worldzero$houseActiveStartTick();
         if (playerState.worldzero$nextScheduledVisualTick < activeStartTick) {
             playerState.worldzero$nextScheduledVisualTick = activeStartTick;
+            changed = true;
         }
 
         if (playerState.worldzero$finalRealFireTick < 0L) {
@@ -493,6 +575,11 @@ public final class WorldZeroHouseEvent {
             long span = Math.max(0L, maxTick - minTick);
             playerState.worldzero$finalRealFireTick = minTick
                     + (long) Math.floor(level.random.nextDouble() * (double) (span + 1L));
+            changed = true;
+        }
+
+        if (changed) {
+            worldzero$savePersistentPlayerState(level, playerId, playerState);
         }
     }
 
@@ -947,6 +1034,7 @@ public final class WorldZeroHouseEvent {
     }
 
     private static final class PlayerState {
+        private boolean worldzero$persistentLoaded;
         private long worldzero$lastScanTick;
         private boolean worldzero$bedrockActive;
         private boolean worldzero$realFireTriggered;
@@ -965,5 +1053,48 @@ public final class WorldZeroHouseEvent {
 
         private WorldZeroHouseDetector.DetectedHouse worldzero$rememberedHouse;
         private long worldzero$rememberedHouseUntilTick;
+    }
+
+    private static final class PersistentPlayerState {
+        private boolean worldzero$realFireTriggered;
+        private long worldzero$nextScheduledVisualTick = -1L;
+        private long worldzero$finalRealFireTick = -1L;
+    }
+
+    private static final class HouseSaveData extends SavedData {
+        private final Map<UUID, PersistentPlayerState> worldzero$playerStates = new HashMap<>();
+
+        private static HouseSaveData worldzero$load(CompoundTag tag) {
+            HouseSaveData saveData = new HouseSaveData();
+            ListTag players = tag.getList("players", Tag.TAG_COMPOUND);
+            for (int index = 0; index < players.size(); index++) {
+                CompoundTag playerTag = players.getCompound(index);
+                if (!playerTag.hasUUID("player_id")) {
+                    continue;
+                }
+
+                PersistentPlayerState playerState = new PersistentPlayerState();
+                playerState.worldzero$realFireTriggered = playerTag.getBoolean("real_fire_triggered");
+                playerState.worldzero$nextScheduledVisualTick = playerTag.getLong("next_visual_tick");
+                playerState.worldzero$finalRealFireTick = playerTag.getLong("final_fire_tick");
+                saveData.worldzero$playerStates.put(playerTag.getUUID("player_id"), playerState);
+            }
+            return saveData;
+        }
+
+        @Override
+        public CompoundTag save(CompoundTag tag) {
+            ListTag players = new ListTag();
+            for (Map.Entry<UUID, PersistentPlayerState> entry : this.worldzero$playerStates.entrySet()) {
+                CompoundTag playerTag = new CompoundTag();
+                playerTag.putUUID("player_id", entry.getKey());
+                playerTag.putBoolean("real_fire_triggered", entry.getValue().worldzero$realFireTriggered);
+                playerTag.putLong("next_visual_tick", entry.getValue().worldzero$nextScheduledVisualTick);
+                playerTag.putLong("final_fire_tick", entry.getValue().worldzero$finalRealFireTick);
+                players.add(playerTag);
+            }
+            tag.put("players", players);
+            return tag;
+        }
     }
 }

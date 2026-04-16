@@ -139,6 +139,11 @@ public final class WorldZeroFootstepsEvent {
         return worldzero$startEvent(player.serverLevel(), sessionState, null, player, detectedHouse);
     }
 
+    public static boolean worldzero$isFootstepsActive(MinecraftServer server) {
+        SessionState state = WORLDZERO_SESSION_STATES.get(server);
+        return state != null && state.worldzero$phase != Phase.INACTIVE;
+    }
+
     private static boolean worldzero$startEvent(
             ServerLevel level,
             SessionState state,

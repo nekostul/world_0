@@ -46,6 +46,7 @@ public class WorldZeroEchoEntity extends Monster {
     private boolean worldzero$windowWatchActive;
     private UUID worldzero$windowWatchTargetPlayerId;
     private int worldzero$windowWatchTicksRemaining;
+    private boolean worldzero$paralysisBedActive;
 
     public WorldZeroEchoEntity(EntityType<? extends Monster> entityType, Level level) {
         super(entityType, level);
@@ -96,12 +97,15 @@ public class WorldZeroEchoEntity extends Monster {
             }
         }
 
-        if (focusPlayer != null) {
+        if (focusPlayer != null && !this.worldzero$paralysisBedActive) {
             this.worldzero$lookAtPlayer(focusPlayer);
         }
 
         if (this.getType() == WorldZeroEntities.WORLDZERO_ECHO.get()) {
-            if (this.worldzero$windowWatchActive) {
+            if (this.worldzero$paralysisBedActive) {
+                this.setDeltaMovement(0.0D, 0.0D, 0.0D);
+                this.setSprinting(false);
+            } else if (this.worldzero$windowWatchActive) {
                 this.worldzero$tickWindowWatchEvent(focusPlayer);
                 if (this.isRemoved()) {
                     return;
@@ -210,6 +214,16 @@ public class WorldZeroEchoEntity extends Monster {
         this.worldzero$windowWatchTargetPlayerId = targetPlayerId;
         this.worldzero$windowWatchTicksRemaining = Math.max(20, durationTicks);
         this.worldzero$ruleBreakEventActive = false;
+    }
+
+    public void worldzero$setParalysisBedActive(boolean active) {
+        this.worldzero$paralysisBedActive = active;
+        if (active) {
+            this.worldzero$windowWatchActive = false;
+            this.worldzero$ruleBreakEventActive = false;
+            this.setDeltaMovement(0.0D, 0.0D, 0.0D);
+            this.setSprinting(false);
+        }
     }
 
     private void worldzero$tickRuleBreakEvent(Player fallbackNearestPlayer) {

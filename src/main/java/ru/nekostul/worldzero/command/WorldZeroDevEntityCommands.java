@@ -53,6 +53,8 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerFreeze(context.getSource())))
                         .then(Commands.literal("trigger_fall")
                                 .executes(context -> worldzero$triggerFall(context.getSource())))
+                        .then(Commands.literal("trigger_paralysis")
+                                .executes(context -> worldzero$triggerParalysis(context.getSource())))
                         .then(Commands.literal("trigger_footsteps")
                                 .executes(context -> worldzero$triggerFootsteps(context.getSource())))
                         .then(Commands.literal("trigger_house")
@@ -173,6 +175,20 @@ public final class WorldZeroDevEntityCommands {
                 triggered
                         ? "[WORLD_0][DEV] footsteps event force-triggered"
                         : "[WORLD_0][DEV] footsteps event trigger failed (already active or invalid player)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerParalysis(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroParalysisEvent.worldzero$triggerParalysisNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] paralysis event force-triggered"
+                        : "[WORLD_0][DEV] paralysis event trigger failed (already active, invalid player, or no bed found)"
         ), false);
         return triggered ? 1 : 0;
     }

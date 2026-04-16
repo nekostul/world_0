@@ -1,5 +1,6 @@
 package ru.nekostul.worldzero;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkRegistry;
@@ -48,6 +49,20 @@ public final class WorldZeroNetwork {
                 WorldZeroFallRespawnPacket::decode,
                 WorldZeroFallRespawnPacket::handle
         );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroParalysisClientPacket.class,
+                WorldZeroParalysisClientPacket::encode,
+                WorldZeroParalysisClientPacket::decode,
+                WorldZeroParalysisClientPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroParalysisCameraAlignedPacket.class,
+                WorldZeroParalysisCameraAlignedPacket::encode,
+                WorldZeroParalysisCameraAlignedPacket::decode,
+                WorldZeroParalysisCameraAlignedPacket::handle
+        );
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks) {
@@ -77,5 +92,16 @@ public final class WorldZeroNetwork {
 
     public static void sendFallRespawn() {
         WORLDZERO_CHANNEL.sendToServer(new WorldZeroFallRespawnPacket());
+    }
+
+    public static void sendParalysisClientAction(ServerPlayer player, byte action, BlockPos targetPos, int entityId, int durationTicks) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroParalysisClientPacket(action, targetPos, entityId, durationTicks)
+        );
+    }
+
+    public static void sendParalysisCameraAligned() {
+        WORLDZERO_CHANNEL.sendToServer(new WorldZeroParalysisCameraAlignedPacket());
     }
 }

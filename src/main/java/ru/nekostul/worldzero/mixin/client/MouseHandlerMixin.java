@@ -7,6 +7,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ru.nekostul.worldzero.WorldZeroFallClientController;
 import ru.nekostul.worldzero.WorldZeroFreezeClientController;
+import ru.nekostul.worldzero.WorldZeroParalysisClientController;
 
 @Mixin(MouseHandler.class)
 public abstract class MouseHandlerMixin {
@@ -44,6 +45,7 @@ public abstract class MouseHandlerMixin {
 
     private static boolean worldzero$isMouseBlocked() {
         return WorldZeroFreezeClientController.isFreezeActive()
-                || WorldZeroFallClientController.worldzero$isFallPauseBlocked();
+                || WorldZeroFallClientController.worldzero$isFallPauseBlocked()
+                || WorldZeroParalysisClientController.worldzero$isInputBlocked();
     }
 }

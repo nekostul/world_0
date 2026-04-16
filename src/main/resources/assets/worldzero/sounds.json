@@ -14,5 +14,20 @@
         "stream": true
       }
     ]
+  },
+  "creak": {
+    "sounds": [
+      {
+        "name": "worldzero:creak"
+      }
+    ]
+  },
+  "breath": {
+    "sounds": [
+      {
+        "name": "worldzero:breath",
+        "stream": true
+      }
+    ]
   }
 }

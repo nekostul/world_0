@@ -33,6 +33,8 @@ import java.util.WeakHashMap;
 public final class WorldZeroFallEvent {
     private static final long WORLDZERO_FALL_WINDOW_START_TICKS = 45L * 60L * 20L;
     private static final long WORLDZERO_FALL_WINDOW_END_TICKS = 120L * 60L * 20L;
+    private static final long WORLDZERO_DELAY_AFTER_FREEZE_MIN_TICKS = 15L * 60L * 20L;
+    private static final long WORLDZERO_DELAY_AFTER_FREEZE_MAX_TICKS = 30L * 60L * 20L;
     private static final int WORLDZERO_FALL_FREEZE_TICKS = 5 * 20;
     private static final double WORLDZERO_BLACK_ECHO_FRONT_DISTANCE_BLOCKS = 3.0D;
     private static final int WORLDZERO_HOLE_RADIUS_BLOCKS = 1;
@@ -184,12 +186,27 @@ public final class WorldZeroFallEvent {
         }
 
         WorldZeroNetwork.sendFallClientAction(player, WorldZeroFallClientPacket.WORLDZERO_ACTION_CLEAR);
+        WorldZeroParalysisEvent.worldzero$scheduleAfterFall(player);
         worldzero$clearState(server, state);
     }
 
     public static boolean worldzero$isFallActive(MinecraftServer server) {
         SessionState state = WORLDZERO_SESSION_STATES.get(server);
         return state != null && state.worldzero$phase != Phase.INACTIVE;
+    }
+
+    public static void worldzero$rescheduleAfterFreeze(ServerLevel level) {
+        if (level == null || level.isClientSide() || level.dimension() != Level.OVERWORLD) {
+            return;
+        }
+
+        FallSaveData saveData = worldzero$getSaveData(level);
+        if (saveData.worldzero$completed) {
+            return;
+        }
+
+        saveData.worldzero$triggerTick = level.getGameTime() + worldzero$randomDelayAfterFreeze(level);
+        saveData.setDirty();
     }
 
     private static boolean worldzero$startEvent(
@@ -229,6 +246,7 @@ public final class WorldZeroFallEvent {
         if (saveData != null) {
             saveData.worldzero$completed = true;
             saveData.setDirty();
+            WorldZeroFreezeEvent.worldzero$rescheduleAfterFall(level);
         }
 
         WorldZeroNetwork.sendFreezeStart(player, WORLDZERO_FALL_FREEZE_TICKS, blackEcho.getId());
@@ -553,6 +571,11 @@ public final class WorldZeroFallEvent {
 
     private static FallSaveData worldzero$getSaveData(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(FallSaveData::load, FallSaveData::new, WORLDZERO_SAVE_ID);
+    }
+
+    private static long worldzero$randomDelayAfterFreeze(ServerLevel level) {
+        long span = WORLDZERO_DELAY_AFTER_FREEZE_MAX_TICKS - WORLDZERO_DELAY_AFTER_FREEZE_MIN_TICKS + 1L;
+        return WORLDZERO_DELAY_AFTER_FREEZE_MIN_TICKS + (long) (level.random.nextDouble() * span);
     }
 
     private enum Phase {

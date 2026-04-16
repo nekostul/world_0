@@ -7,6 +7,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ru.nekostul.worldzero.WorldZeroFallClientController;
 import ru.nekostul.worldzero.WorldZeroFreezeClientController;
+import ru.nekostul.worldzero.WorldZeroParalysisClientController;
 
 @Mixin(KeyboardHandler.class)
 public abstract class KeyboardHandlerMixin {
@@ -15,7 +16,7 @@ public abstract class KeyboardHandlerMixin {
             long windowPointer,
             int key,
             int scanCode,
-            int action,
+            int action, 
             int modifiers,
             CallbackInfo callbackInfo
     ) {
@@ -26,6 +27,7 @@ public abstract class KeyboardHandlerMixin {
 
     private static boolean worldzero$isKeyboardBlocked() {
         return WorldZeroFreezeClientController.isFreezeActive()
-                || WorldZeroFallClientController.worldzero$isFallPauseBlocked();
+                || WorldZeroFallClientController.worldzero$isFallPauseBlocked()
+                || WorldZeroParalysisClientController.worldzero$isInputBlocked();
     }
 }

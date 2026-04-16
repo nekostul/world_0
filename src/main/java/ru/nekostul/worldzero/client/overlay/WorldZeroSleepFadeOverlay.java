@@ -11,8 +11,23 @@ import net.minecraftforge.fml.common.Mod;
 public final class WorldZeroSleepFadeOverlay {
     private static final double WORLDZERO_SLEEP_FADE_TICKS = 3.0D * 20.0D;
     private static double worldzero$sleepStartTick = -1.0D;
+    private static double worldzero$forcedFadeStartTick = -1.0D;
+    private static double worldzero$forcedFadeDurationTicks = 0.0D;
+    private static boolean worldzero$forcedFadeActive;
 
     private WorldZeroSleepFadeOverlay() {
+    }
+
+    public static void worldzero$startForcedFade(int durationTicks) {
+        worldzero$forcedFadeActive = true;
+        worldzero$forcedFadeStartTick = -1.0D;
+        worldzero$forcedFadeDurationTicks = Math.max(1.0D, durationTicks);
+    }
+
+    public static void worldzero$clearForcedFade() {
+        worldzero$forcedFadeActive = false;
+        worldzero$forcedFadeStartTick = -1.0D;
+        worldzero$forcedFadeDurationTicks = 0.0D;
     }
 
     @SubscribeEvent
@@ -20,20 +35,33 @@ public final class WorldZeroSleepFadeOverlay {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.player == null || minecraft.level == null) {
             worldzero$sleepStartTick = -1.0D;
+            worldzero$clearForcedFade();
             return;
         }
 
-        if (!minecraft.player.isSleeping()) {
+        boolean playerSleeping = minecraft.player.isSleeping();
+        if (!playerSleeping) {
             worldzero$sleepStartTick = -1.0D;
-            return;
         }
 
         double currentTick = minecraft.level.getGameTime() + event.getPartialTick();
-        if (worldzero$sleepStartTick < 0.0D) {
+        if (playerSleeping && worldzero$sleepStartTick < 0.0D) {
             worldzero$sleepStartTick = currentTick;
         }
 
-        double progress = (currentTick - worldzero$sleepStartTick) / WORLDZERO_SLEEP_FADE_TICKS;
+        double progress = 0.0D;
+        if (playerSleeping && worldzero$sleepStartTick >= 0.0D) {
+            progress = Math.max(progress, (currentTick - worldzero$sleepStartTick) / WORLDZERO_SLEEP_FADE_TICKS);
+        }
+        if (worldzero$forcedFadeActive) {
+            if (worldzero$forcedFadeStartTick < 0.0D) {
+                worldzero$forcedFadeStartTick = currentTick;
+            }
+            progress = Math.max(
+                    progress,
+                    (currentTick - worldzero$forcedFadeStartTick) / worldzero$forcedFadeDurationTicks
+            );
+        }
         if (progress <= 0.0D) {
             return;
         }

@@ -29,5 +29,13 @@
         "stream": true
       }
     ]
+  },
+  "fake_disc11": {
+    "sounds": [
+      {
+        "name": "worldzero:fake_disc11",
+        "stream": true
+      }
+    ]
   }
 }

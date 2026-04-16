@@ -57,6 +57,8 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerParalysis(context.getSource())))
                         .then(Commands.literal("trigger_footsteps")
                                 .executes(context -> worldzero$triggerFootsteps(context.getSource())))
+                        .then(Commands.literal("clean_disc")
+                                .executes(context -> worldzero$cleanDisc(context.getSource())))
                         .then(Commands.literal("trigger_house")
                                 .executes(context -> worldzero$triggerHouse(context.getSource())))
                         .then(Commands.literal("trigger_house_real")
@@ -191,6 +193,16 @@ public final class WorldZeroDevEntityCommands {
                         : "[WORLD_0][DEV] paralysis event trigger failed (already active, invalid player, or no bed found)"
         ), false);
         return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$cleanDisc(CommandSourceStack source) {
+        boolean changed = WorldZeroFootstepsEvent.worldzero$resetBlankDiscPlayback(source.getServer());
+        source.sendSuccess(() -> Component.literal(
+                changed
+                        ? "[WORLD_0][DEV] blank disc playback status cleared"
+                        : "[WORLD_0][DEV] blank disc playback status was already clean"
+        ), false);
+        return changed ? 1 : 0;
     }
 
     private static int worldzero$triggerHouse(CommandSourceStack source) {

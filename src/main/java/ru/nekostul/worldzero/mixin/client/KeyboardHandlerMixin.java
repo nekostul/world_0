@@ -5,6 +5,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import ru.nekostul.worldzero.WorldZeroBlankDiscClientController;
 import ru.nekostul.worldzero.WorldZeroFallClientController;
 import ru.nekostul.worldzero.WorldZeroFreezeClientController;
 import ru.nekostul.worldzero.WorldZeroParalysisClientController;
@@ -20,6 +21,11 @@ public abstract class KeyboardHandlerMixin {
             int modifiers,
             CallbackInfo callbackInfo
     ) {
+        if (WorldZeroBlankDiscClientController.worldzero$shouldBlockEscape(key, action)) {
+            callbackInfo.cancel();
+            return;
+        }
+
         if (worldzero$isKeyboardBlocked()) {
             callbackInfo.cancel();
         }

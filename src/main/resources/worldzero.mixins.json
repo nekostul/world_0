@@ -10,6 +10,7 @@
     "EntityTurnMixin",
     "KeyboardHandlerMixin",
     "LevelChunkMixin",
+    "MinecraftMixin",
     "MouseHandlerMixin",
     "NaturalSpawnerMixin",
     "OptionsMixin",

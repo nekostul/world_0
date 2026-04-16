@@ -63,6 +63,27 @@ public final class WorldZeroNetwork {
                 WorldZeroParalysisCameraAlignedPacket::decode,
                 WorldZeroParalysisCameraAlignedPacket::handle
         );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroBlankDiscPlaybackPacket.class,
+                WorldZeroBlankDiscPlaybackPacket::encode,
+                WorldZeroBlankDiscPlaybackPacket::decode,
+                WorldZeroBlankDiscPlaybackPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroBlankDiscFinishedPacket.class,
+                WorldZeroBlankDiscFinishedPacket::encode,
+                WorldZeroBlankDiscFinishedPacket::decode,
+                WorldZeroBlankDiscFinishedPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroBlankDiscErrorPacket.class,
+                WorldZeroBlankDiscErrorPacket::encode,
+                WorldZeroBlankDiscErrorPacket::decode,
+                WorldZeroBlankDiscErrorPacket::handle
+        );
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks) {
@@ -113,5 +134,23 @@ public final class WorldZeroNetwork {
 
     public static void sendParalysisCameraAligned() {
         WORLDZERO_CHANNEL.sendToServer(new WorldZeroParalysisCameraAlignedPacket());
+    }
+
+    public static void sendBlankDiscPlayback(ServerPlayer player) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroBlankDiscPlaybackPacket()
+        );
+    }
+
+    public static void sendBlankDiscPlaybackFinished() {
+        WORLDZERO_CHANNEL.sendToServer(new WorldZeroBlankDiscFinishedPacket());
+    }
+
+    public static void sendBlankDiscPlaybackError(ServerPlayer player) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroBlankDiscErrorPacket()
+        );
     }
 }

@@ -2,11 +2,13 @@ package ru.nekostul.worldzero;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
@@ -27,6 +29,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -69,6 +72,7 @@ public final class WorldZeroFootstepsEvent {
     );
     private static final String WORLDZERO_SAVE_ID = "worldzero_footsteps_event";
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SESSION_STATES = new WeakHashMap<>();
+    private static final Map<MinecraftServer, BlankDiscPlaybackState> WORLDZERO_BLANK_DISC_PLAYBACKS = new WeakHashMap<>();
     private static final Set<UUID> WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS = new HashSet<>();
 
     private WorldZeroFootstepsEvent() {
@@ -123,7 +127,94 @@ public final class WorldZeroFootstepsEvent {
     @SubscribeEvent
     public static void worldzero$onServerStopped(ServerStoppedEvent event) {
         WORLDZERO_SESSION_STATES.remove(event.getServer());
+        WORLDZERO_BLANK_DISC_PLAYBACKS.remove(event.getServer());
         WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS.clear();
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        BlockState state = event.getLevel().getBlockState(event.getPos());
+        if (!(state.getBlock() instanceof JukeboxBlock)) {
+            return;
+        }
+
+        if (!(event.getLevel().getBlockEntity(event.getPos()) instanceof JukeboxBlockEntity jukeboxBlockEntity)) {
+            return;
+        }
+
+        if (worldzero$hasBlankDisc(jukeboxBlockEntity.getItem(0))) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide()));
+            return;
+        }
+
+        if (!worldzero$hasBlankDisc(event.getItemStack()) || state.getValue(JukeboxBlock.HAS_RECORD)) {
+            return;
+        }
+
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide()));
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        worldzero$insertBlankDisc(player.serverLevel(), event.getPos(), state, jukeboxBlockEntity, player, event.getHand());
+    }
+
+    public static void worldzero$acknowledgeBlankDiscPlaybackFinished(ServerPlayer player) {
+        if (player == null) {
+            return;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return;
+        }
+
+        BlankDiscPlaybackState playbackState = worldzero$getBlankDiscPlaybackState(server);
+        if (playbackState == null || !playbackState.worldzero$playerId.equals(player.getUUID())) {
+            return;
+        }
+
+        ServerLevel level = server.getLevel(playbackState.worldzero$dimension);
+        if (level != null && level.getBlockEntity(playbackState.worldzero$jukeboxPos) instanceof JukeboxBlockEntity jukeboxBlockEntity) {
+            if (worldzero$hasBlankDisc(jukeboxBlockEntity.getItem(0))) {
+                jukeboxBlockEntity.popOutRecord();
+                WorldZeroNetwork.sendBlankDiscPlaybackError(player);
+            }
+        }
+
+        FootstepsSaveData saveData = worldzero$getPersistentSaveData(server);
+        saveData.worldzero$blankDiscPlaybackDone = true;
+        saveData.setDirty();
+        WORLDZERO_BLANK_DISC_PLAYBACKS.remove(server);
+    }
+
+    public static boolean worldzero$resetBlankDiscPlayback(MinecraftServer server) {
+        if (server == null) {
+            return false;
+        }
+
+        boolean changed = false;
+        BlankDiscPlaybackState playbackState = WORLDZERO_BLANK_DISC_PLAYBACKS.remove(server);
+        if (playbackState != null) {
+            ServerLevel level = server.getLevel(playbackState.worldzero$dimension);
+            if (level != null && level.getBlockEntity(playbackState.worldzero$jukeboxPos) instanceof JukeboxBlockEntity jukeboxBlockEntity) {
+                if (worldzero$hasBlankDisc(jukeboxBlockEntity.getItem(0))) {
+                    jukeboxBlockEntity.popOutRecord();
+                }
+            }
+            changed = true;
+        }
+
+        FootstepsSaveData saveData = worldzero$getPersistentSaveData(server);
+        if (saveData.worldzero$blankDiscPlaybackDone) {
+            saveData.worldzero$blankDiscPlaybackDone = false;
+            saveData.setDirty();
+            changed = true;
+        }
+
+        return changed;
     }
 
     public static boolean worldzero$triggerFootstepsNow(ServerPlayer player) {
@@ -832,6 +923,88 @@ public final class WorldZeroFootstepsEvent {
         return level.getDataStorage().computeIfAbsent(FootstepsSaveData::load, FootstepsSaveData::new, WORLDZERO_SAVE_ID);
     }
 
+    private static FootstepsSaveData worldzero$getPersistentSaveData(MinecraftServer server) {
+        ServerLevel overworld = server.overworld();
+        return worldzero$getSaveData(overworld != null ? overworld : server.getAllLevels().iterator().next());
+    }
+
+    private static void worldzero$insertBlankDisc(
+            ServerLevel level,
+            BlockPos pos,
+            BlockState state,
+            JukeboxBlockEntity jukeboxBlockEntity,
+            ServerPlayer player,
+            net.minecraft.world.InteractionHand hand
+    ) {
+        ItemStack heldStack = player.getItemInHand(hand);
+        if (!worldzero$hasBlankDisc(heldStack)) {
+            return;
+        }
+
+        MinecraftServer server = level.getServer();
+        if (server == null) {
+            return;
+        }
+
+        worldzero$placeBlankDiscIntoJukebox(level, pos, state, jukeboxBlockEntity, heldStack, player);
+
+        FootstepsSaveData saveData = worldzero$getPersistentSaveData(server);
+        if (saveData.worldzero$blankDiscPlaybackDone) {
+            jukeboxBlockEntity.popOutRecord();
+            return;
+        }
+
+        BlankDiscPlaybackState activePlayback = worldzero$getBlankDiscPlaybackState(server);
+        if (activePlayback != null) {
+            jukeboxBlockEntity.popOutRecord();
+            return;
+        }
+
+        WORLDZERO_BLANK_DISC_PLAYBACKS.put(
+                server,
+                new BlankDiscPlaybackState(player.getUUID(), level.dimension(), pos.immutable())
+        );
+        WorldZeroNetwork.sendBlankDiscPlayback(player);
+    }
+
+    private static void worldzero$placeBlankDiscIntoJukebox(
+            ServerLevel level,
+            BlockPos pos,
+            BlockState state,
+            JukeboxBlockEntity jukeboxBlockEntity,
+            ItemStack heldStack,
+            ServerPlayer player
+    ) {
+        ItemStack insertedStack = heldStack.copy();
+        insertedStack.setCount(1);
+        jukeboxBlockEntity.setRecordWithoutPlaying(insertedStack);
+        jukeboxBlockEntity.setChanged();
+        level.setBlock(pos, state.setValue(JukeboxBlock.HAS_RECORD, true), 3);
+
+        if (!player.getAbilities().instabuild) {
+            heldStack.shrink(1);
+        }
+    }
+
+    @Nullable
+    private static BlankDiscPlaybackState worldzero$getBlankDiscPlaybackState(MinecraftServer server) {
+        BlankDiscPlaybackState playbackState = WORLDZERO_BLANK_DISC_PLAYBACKS.get(server);
+        if (playbackState == null) {
+            return null;
+        }
+
+        if (server.getPlayerList().getPlayer(playbackState.worldzero$playerId) == null) {
+            WORLDZERO_BLANK_DISC_PLAYBACKS.remove(server);
+            return null;
+        }
+
+        return playbackState;
+    }
+
+    private static boolean worldzero$hasBlankDisc(ItemStack stack) {
+        return !stack.isEmpty() && stack.is(WorldZeroItems.WORLDZERO_BLANK_DISC.get());
+    }
+
     private static void worldzero$checkBlankDiscInJukeboxes(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
             BlockPos playerPos = player.blockPosition();
@@ -888,14 +1061,28 @@ public final class WorldZeroFootstepsEvent {
         private long worldzero$openedChestCloseTick = -1L;
     }
 
+    private static final class BlankDiscPlaybackState {
+        private final UUID worldzero$playerId;
+        private final ResourceKey<Level> worldzero$dimension;
+        private final BlockPos worldzero$jukeboxPos;
+
+        private BlankDiscPlaybackState(UUID playerId, ResourceKey<Level> dimension, BlockPos jukeboxPos) {
+            this.worldzero$playerId = playerId;
+            this.worldzero$dimension = dimension;
+            this.worldzero$jukeboxPos = jukeboxPos;
+        }
+    }
+
     private static final class FootstepsSaveData extends SavedData {
         private long worldzero$triggerTick = -1L;
         private boolean worldzero$completed;
+        private boolean worldzero$blankDiscPlaybackDone;
 
         public static FootstepsSaveData load(CompoundTag tag) {
             FootstepsSaveData saveData = new FootstepsSaveData();
             saveData.worldzero$triggerTick = tag.getLong("trigger_tick");
             saveData.worldzero$completed = tag.getBoolean("completed");
+            saveData.worldzero$blankDiscPlaybackDone = tag.getBoolean("blank_disc_playback_done");
             return saveData;
         }
 
@@ -903,6 +1090,7 @@ public final class WorldZeroFootstepsEvent {
         public CompoundTag save(CompoundTag tag) {
             tag.putLong("trigger_tick", this.worldzero$triggerTick);
             tag.putBoolean("completed", this.worldzero$completed);
+            tag.putBoolean("blank_disc_playback_done", this.worldzero$blankDiscPlaybackDone);
             return tag;
         }
     }

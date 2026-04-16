@@ -1,0 +1,19 @@
+{
+  "display": {
+    "title": {"translate": "advancements.worldzero.forgotten_disc"},
+    "description": {"translate": "advancements.worldzero.forgotten_disc.desc"},
+    "icon": {
+      "item": "minecraft:music_disc_otherside"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "background": "minecraft:textures/gui/advancements/backgrounds/end.png"
+  },
+  "criteria": {
+    "trigger": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "requirements": [["trigger"]]
+}

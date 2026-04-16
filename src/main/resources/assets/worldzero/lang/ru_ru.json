@@ -10,5 +10,11 @@
   "worldzero.error.lan_cheats_message": "Internal Exception: java.io.IOException:\nlogin tunnel closed during local publish sequence\nfield lanCheatsNonce is marked internal",
   "worldzero.error.command_once_anomaly": "Internal Exception: java.lang.IllegalAccessError:\npermission mirror returned operatorLevel=4 for profile='local'\ntrace dump: /runtime/authority-map.bin is marked [do-not-serialize]",
   "worldzero.error.command_cheats_disabled": "Читы не включены в этом мире",
-  "message.worldzero.paralysis.bed_occupied": "Кровать уже занята Вами."
+  "message.worldzero.paralysis.bed_occupied": "Кровать уже занята Вами.",
+  "advancements.worldzero.he_is_close": "Он близко",
+  "advancements.worldzero.he_is_close.desc": "Смотреть на себя 15 секунд",
+  "advancements.worldzero.paralysis": "Паралич",
+  "advancements.worldzero.paralysis.desc": "Уснуть и проснуться не в своём теле",
+  "advancements.worldzero.forgotten_disc": "Забытая пластинка",
+  "advancements.worldzero.forgotten_disc.desc": "Проиграть пластинку без имени"
 }

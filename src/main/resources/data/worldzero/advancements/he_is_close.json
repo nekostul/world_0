@@ -1,0 +1,20 @@
+{
+  "display": {
+    "title": {"translate": "advancements.worldzero.he_is_close"},
+    "description": {"translate": "advancements.worldzero.he_is_close.desc"},
+    "icon": {
+      "item": "minecraft:amethyst_block"
+    },
+    "frame": "goal",
+    "hidden": true,
+    "show_toast": true,
+    "announce_to_chat": true,
+    "background": "minecraft:textures/gui/advancements/backgrounds/end.png"
+  },
+  "criteria": {
+    "trigger": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "requirements": [["trigger"]]
+}

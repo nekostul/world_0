@@ -1,0 +1,19 @@
+{
+  "display": {
+    "title": {"translate": "advancements.worldzero.paralysis"},
+    "description": {"translate": "advancements.worldzero.paralysis.desc"},
+    "icon": {
+      "item": "minecraft:purple_bed"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "background": "minecraft:textures/gui/advancements/backgrounds/end.png"
+  },
+  "criteria": {
+    "trigger": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "requirements": [["trigger"]]
+}

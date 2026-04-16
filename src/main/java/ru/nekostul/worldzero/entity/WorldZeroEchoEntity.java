@@ -4,6 +4,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -15,6 +16,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.Vec3;
+import ru.nekostul.worldzero.achievement.WorldZeroAdvancementTriggers;
 
 import java.util.UUID;
 
@@ -32,6 +35,8 @@ public class WorldZeroEchoEntity extends Monster {
     private static final int WORLDZERO_FREEZE_PASS_MIN_TICKS = 20;
     private static final int WORLDZERO_FREEZE_PASS_MAX_TICKS = 40;
     private static final int WORLDZERO_FREEZE_PASS_FOOTSTEP_INTERVAL_TICKS = 4;
+    private static final int WORLDZERO_HE_IS_CLOSE_REQUIRED_TICKS = 15 * 20;
+    private static final double WORLDZERO_HE_IS_CLOSE_LOOK_DOT_THRESHOLD = 0.975D;
     private double worldzero$echoDespawnDistanceSqr = 8.0D * 8.0D;
     private boolean worldzero$ruleBreakEventActive;
     private UUID worldzero$ruleBreakTargetPlayerId;
@@ -47,6 +52,10 @@ public class WorldZeroEchoEntity extends Monster {
     private UUID worldzero$windowWatchTargetPlayerId;
     private int worldzero$windowWatchTicksRemaining;
     private boolean worldzero$paralysisBedActive;
+    private boolean worldzero$heIsCloseTrackingActive;
+    private UUID worldzero$heIsCloseTargetPlayerId;
+    private int worldzero$heIsCloseLookTicks;
+    private boolean worldzero$heIsCloseGranted;
 
     public WorldZeroEchoEntity(EntityType<? extends Monster> entityType, Level level) {
         super(entityType, level);
@@ -102,6 +111,7 @@ public class WorldZeroEchoEntity extends Monster {
         }
 
         if (this.getType() == WorldZeroEntities.WORLDZERO_ECHO.get()) {
+            this.worldzero$tickHeIsCloseTracking();
             if (this.worldzero$paralysisBedActive) {
                 this.setDeltaMovement(0.0D, 0.0D, 0.0D);
                 this.setSprinting(false);
@@ -216,6 +226,13 @@ public class WorldZeroEchoEntity extends Monster {
         this.worldzero$ruleBreakEventActive = false;
     }
 
+    public void worldzero$configureHeIsCloseTracking(UUID targetPlayerId) {
+        this.worldzero$heIsCloseTrackingActive = true;
+        this.worldzero$heIsCloseTargetPlayerId = targetPlayerId;
+        this.worldzero$heIsCloseLookTicks = 0;
+        this.worldzero$heIsCloseGranted = false;
+    }
+
     public void worldzero$setParalysisBedActive(boolean active) {
         this.worldzero$paralysisBedActive = active;
         if (active) {
@@ -224,6 +241,49 @@ public class WorldZeroEchoEntity extends Monster {
             this.setDeltaMovement(0.0D, 0.0D, 0.0D);
             this.setSprinting(false);
         }
+    }
+
+    private void worldzero$tickHeIsCloseTracking() {
+        if (!this.worldzero$heIsCloseTrackingActive || this.worldzero$heIsCloseGranted) {
+            return;
+        }
+
+        if (!(this.level() instanceof ServerLevel serverLevel) || this.worldzero$heIsCloseTargetPlayerId == null) {
+            this.worldzero$heIsCloseLookTicks = 0;
+            return;
+        }
+
+        Player targetPlayer = serverLevel.getPlayerByUUID(this.worldzero$heIsCloseTargetPlayerId);
+        if (!(targetPlayer instanceof ServerPlayer serverPlayer) || !targetPlayer.isAlive() || targetPlayer.isSpectator()) {
+            this.worldzero$heIsCloseLookTicks = 0;
+            return;
+        }
+
+        if (!this.worldzero$isLookedAtBy(serverPlayer)) {
+            this.worldzero$heIsCloseLookTicks = 0;
+            return;
+        }
+
+        this.worldzero$heIsCloseLookTicks++;
+        if (this.worldzero$heIsCloseLookTicks >= WORLDZERO_HE_IS_CLOSE_REQUIRED_TICKS) {
+            WorldZeroAdvancementTriggers.grantHeIsClose(serverPlayer);
+            this.worldzero$heIsCloseGranted = true;
+        }
+    }
+
+    private boolean worldzero$isLookedAtBy(ServerPlayer player) {
+        if (!player.hasLineOfSight(this)) {
+            return false;
+        }
+
+        Vec3 eyePosition = player.getEyePosition();
+        Vec3 directionToEcho = this.getBoundingBox().getCenter().subtract(eyePosition);
+        if (directionToEcho.lengthSqr() < 0.0001D) {
+            return false;
+        }
+
+        Vec3 lookVector = player.getViewVector(1.0F).normalize();
+        return lookVector.dot(directionToEcho.normalize()) >= WORLDZERO_HE_IS_CLOSE_LOOK_DOT_THRESHOLD;
     }
 
     private void worldzero$tickRuleBreakEvent(Player fallbackNearestPlayer) {

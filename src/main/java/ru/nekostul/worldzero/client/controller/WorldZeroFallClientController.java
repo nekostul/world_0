@@ -30,6 +30,8 @@ import java.util.Map;
 public final class WorldZeroFallClientController {
     private static final String WORLDZERO_WARNING_CHAT_PREFIX = "<0> ";
     private static final int WORLDZERO_WARNING_CHAT_UPDATE_TICKS = 20;
+    private static final int WORLDZERO_LOCKED_RENDER_DISTANCE_OPTION = 2;
+    private static final int WORLDZERO_EFFECTIVE_RENDER_DISTANCE = 1;
     private static final String[] WORLDZERO_WARNING_CHAT_SEGMENTS = {
             "anchor_lost",
             "void_signal",
@@ -54,6 +56,8 @@ public final class WorldZeroFallClientController {
     private static int worldzero$warningChatTicksUntilAppend;
     private static int worldzero$warningChatSegmentCount;
     private static boolean worldzero$volumeBoostActive;
+    private static boolean worldzero$renderDistanceLocked;
+    private static int worldzero$previousRenderDistance = -1;
     private static SoundInstance worldzero$activeFallSound;
     private static SoundInstance worldzero$activeWarningSound;
     private static final Map<SoundSource, Float> WORLDZERO_ORIGINAL_VOLUMES = new EnumMap<>(SoundSource.class);
@@ -65,6 +69,7 @@ public final class WorldZeroFallClientController {
         switch (action) {
             case WorldZeroFallClientPacket.WORLDZERO_ACTION_BEGIN -> {
                 worldzero$reset();
+                worldzero$activateFallPresentation();
                 worldzero$warningRequested = true;
                 worldzero$warningStartDelayTicks = 2;
             }
@@ -98,6 +103,14 @@ public final class WorldZeroFallClientController {
         return worldzero$fallOverlayActive;
     }
 
+    public static boolean worldzero$isRenderDistanceForced() {
+        return worldzero$renderDistanceLocked;
+    }
+
+    public static int worldzero$getForcedEffectiveRenderDistance() {
+        return WORLDZERO_EFFECTIVE_RENDER_DISTANCE;
+    }
+
     public static void worldzero$onFakeRespawnPressed() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft != null && minecraft.screen instanceof WorldZeroFakeDeathScreen) {
@@ -120,6 +133,10 @@ public final class WorldZeroFallClientController {
         }
 
         Minecraft minecraft = Minecraft.getInstance();
+        if (worldzero$renderDistanceLocked && minecraft != null) {
+            worldzero$enforceRenderDistanceLock(minecraft);
+        }
+
         if (worldzero$fallOverlayActive && minecraft != null) {
             if (minecraft.screen != null) {
                 minecraft.setScreen(null);
@@ -225,6 +242,7 @@ public final class WorldZeroFallClientController {
         worldzero$stopWarningSound();
         worldzero$removeWarningChatLine();
         worldzero$restoreVolumes();
+        worldzero$restoreRenderDistance();
         worldzero$activeFallSound = null;
     }
 
@@ -238,6 +256,7 @@ public final class WorldZeroFallClientController {
         worldzero$stopWarningSound();
         worldzero$removeWarningChatLine();
         worldzero$restoreVolumes();
+        worldzero$restoreRenderDistance();
         worldzero$activeFallSound = null;
     }
 
@@ -314,6 +333,56 @@ public final class WorldZeroFallClientController {
 
         if (!minecraft.mouseHandler.isMouseGrabbed()) {
             minecraft.mouseHandler.grabMouse();
+        }
+    }
+
+    private static void worldzero$activateFallPresentation() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.options == null) {
+            return;
+        }
+
+        if (!worldzero$renderDistanceLocked) {
+            worldzero$previousRenderDistance = minecraft.options.renderDistance().get();
+        }
+
+        worldzero$renderDistanceLocked = true;
+        worldzero$enforceRenderDistanceLock(minecraft);
+    }
+
+    private static void worldzero$enforceRenderDistanceLock(Minecraft minecraft) {
+        if (minecraft == null || minecraft.options == null) {
+            return;
+        }
+
+        if (minecraft.options.renderDistance().get() == WORLDZERO_LOCKED_RENDER_DISTANCE_OPTION) {
+            return;
+        }
+
+        minecraft.options.renderDistance().set(WORLDZERO_LOCKED_RENDER_DISTANCE_OPTION);
+        if (minecraft.levelRenderer != null) {
+            minecraft.levelRenderer.allChanged();
+        }
+    }
+
+    private static void worldzero$restoreRenderDistance() {
+        if (!worldzero$renderDistanceLocked) {
+            return;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        int restoreDistance = worldzero$previousRenderDistance;
+        worldzero$renderDistanceLocked = false;
+        worldzero$previousRenderDistance = -1;
+        if (minecraft == null || minecraft.options == null || restoreDistance < 0) {
+            return;
+        }
+
+        if (minecraft.options.renderDistance().get() != restoreDistance) {
+            minecraft.options.renderDistance().set(restoreDistance);
+            if (minecraft.levelRenderer != null) {
+                minecraft.levelRenderer.allChanged();
+            }
         }
     }
 

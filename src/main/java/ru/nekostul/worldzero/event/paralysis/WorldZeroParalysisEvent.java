@@ -30,6 +30,7 @@ import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.achievement.WorldZeroAdvancementTriggers;
 
 import javax.annotation.Nullable;
 import java.util.Map;
@@ -477,6 +478,9 @@ public final class WorldZeroParalysisEvent {
         if (player.isSleeping()) {
             player.stopSleepInBed(false, true);
         }
+
+        WorldZeroAdvancementTriggers.grantParalysis(player);
+
         worldzero$clearState(level.getServer(), state, player);
     }
 

@@ -198,6 +198,7 @@ public final class WorldZeroEchoPhaseOneSpawner {
             echo.moveTo(spawnX, spawnY, spawnZ, player.getYRot() + 180.0F, 0.0F);
             echo.setCustomName(net.minecraft.network.chat.Component.literal(player.getGameProfile().getName()));
             echo.setCustomNameVisible(false);
+            echo.worldzero$configureHeIsCloseTracking(player.getUUID());
             if (ruleBreakEvent) {
                 echo.worldzero$configureRuleBreakEvent(
                         player.getUUID(),

@@ -15,9 +15,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.JukeboxBlock;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.entity.JukeboxBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.AABB;
@@ -28,9 +31,12 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.achievement.WorldZeroAdvancementTriggers;
 
 import javax.annotation.Nullable;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
 
@@ -63,6 +69,7 @@ public final class WorldZeroFootstepsEvent {
     );
     private static final String WORLDZERO_SAVE_ID = "worldzero_footsteps_event";
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SESSION_STATES = new WeakHashMap<>();
+    private static final Set<UUID> WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS = new HashSet<>();
 
     private WorldZeroFootstepsEvent() {
     }
@@ -76,6 +83,8 @@ public final class WorldZeroFootstepsEvent {
         if (!(event.level instanceof ServerLevel level) || level.isClientSide() || level.dimension() != Level.OVERWORLD) {
             return;
         }
+
+        worldzero$checkBlankDiscInJukeboxes(level);
 
         MinecraftServer server = level.getServer();
         SessionState sessionState = WORLDZERO_SESSION_STATES.computeIfAbsent(server, ignored -> new SessionState());
@@ -114,6 +123,7 @@ public final class WorldZeroFootstepsEvent {
     @SubscribeEvent
     public static void worldzero$onServerStopped(ServerStoppedEvent event) {
         WORLDZERO_SESSION_STATES.remove(event.getServer());
+        WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS.clear();
     }
 
     public static boolean worldzero$triggerFootstepsNow(ServerPlayer player) {
@@ -820,6 +830,39 @@ public final class WorldZeroFootstepsEvent {
 
     private static FootstepsSaveData worldzero$getSaveData(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(FootstepsSaveData::load, FootstepsSaveData::new, WORLDZERO_SAVE_ID);
+    }
+
+    private static void worldzero$checkBlankDiscInJukeboxes(ServerLevel level) {
+        for (ServerPlayer player : level.players()) {
+            BlockPos playerPos = player.blockPosition();
+            int minChunkX = (playerPos.getX() >> 4) - 10;
+            int maxChunkX = (playerPos.getX() >> 4) + 10;
+            int minChunkZ = (playerPos.getZ() >> 4) - 10;
+            int maxChunkZ = (playerPos.getZ() >> 4) + 10;
+
+            for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+                for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                    var chunk = level.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+                    if (chunk instanceof net.minecraft.world.level.chunk.LevelChunk levelChunk) {
+                        levelChunk.getBlockEntities().forEach((pos, blockEntity) -> {
+                            if (blockEntity instanceof JukeboxBlockEntity) {
+                                var nbt = blockEntity.saveWithFullMetadata();
+                                if (nbt.contains("RecordItem")) {
+                                    var recordTag = nbt.getCompound("RecordItem");
+                                    if (recordTag.contains("id") && recordTag.getString("id").contains("blank_disc")) {
+                                        UUID playerId = player.getUUID();
+                                        if (!WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS.contains(playerId)) {
+                                            WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS.add(playerId);
+                                            WorldZeroAdvancementTriggers.grantForgottenDisc(player);
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
     }
 
     private enum Phase {

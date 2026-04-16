@@ -10,5 +10,11 @@
   "worldzero.error.lan_cheats_message": "Internal Exception: java.io.IOException:\nlogin tunnel closed during local publish sequence\nfield lanCheatsNonce is marked internal",
   "worldzero.error.command_once_anomaly": "Internal Exception: java.lang.IllegalAccessError:\npermission mirror returned operatorLevel=4 for profile='local'\ntrace dump: /runtime/authority-map.bin is marked [do-not-serialize]",
   "worldzero.error.command_cheats_disabled": "Cheats are not enabled in this level",
-  "message.worldzero.paralysis.bed_occupied": "This bed is already occupied by you."
+  "message.worldzero.paralysis.bed_occupied": "This bed is already occupied by you.",
+  "advancements.worldzero.he_is_close": "He Is Close",
+  "advancements.worldzero.he_is_close.desc": "Look at yourself for 15 seconds",
+  "advancements.worldzero.paralysis": "Paralysis",
+  "advancements.worldzero.paralysis.desc": "Fall asleep and wake up in another body",
+  "advancements.worldzero.forgotten_disc": "Forgotten Disc",
+  "advancements.worldzero.forgotten_disc.desc": "Play a disc without a name"
 }

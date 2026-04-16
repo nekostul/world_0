@@ -28,6 +28,6 @@ public abstract class KeyboardHandlerMixin {
     private static boolean worldzero$isKeyboardBlocked() {
         return WorldZeroFreezeClientController.isFreezeActive()
                 || WorldZeroFallClientController.worldzero$isFallPauseBlocked()
-                || WorldZeroParalysisClientController.worldzero$isInputBlocked();
+                || WorldZeroParalysisClientController.worldzero$isKeyboardBlocked();
     }
 }

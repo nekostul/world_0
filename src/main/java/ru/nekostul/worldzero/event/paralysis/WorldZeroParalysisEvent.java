@@ -1,8 +1,10 @@
 package ru.nekostul.worldzero;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -12,12 +14,19 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.player.AttackEntityEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent.EntityInteract;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent.EntityInteractSpecific;
+import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -41,8 +50,14 @@ public final class WorldZeroParalysisEvent {
     private static final int WORLDZERO_SLEEP_START_MAX_TICKS = 40;
     private static final int WORLDZERO_BED_SEARCH_RADIUS = 12;
     private static final double WORLDZERO_BLACK_ECHO_FRONT_DISTANCE_BLOCKS = 3.0D;
+    private static final double WORLDZERO_BLACK_ECHO_WATCH_MIN_DISTANCE_BLOCKS = 10.0D;
+    private static final double WORLDZERO_BLACK_ECHO_WATCH_MAX_DISTANCE_BLOCKS = 14.0D;
     private static final double WORLDZERO_BED_ECHO_LENGTH_OFFSET_BLOCKS = 0.80D;
     private static final double WORLDZERO_BED_ECHO_HEIGHT_BLOCKS = 0.76D;
+    private static final int WORLDZERO_BUSY_BED_MESSAGE_COOLDOWN_TICKS = 5 * 20;
+    private static final Component WORLDZERO_BUSY_BED_MESSAGE = Component.literal(
+            "Ты не можешь лечь. В кровати уже кто-то есть."
+    ).withStyle(ChatFormatting.GRAY);
     private static final String WORLDZERO_SAVE_ID = "worldzero_paralysis_event";
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SESSION_STATES = new WeakHashMap<>();
 
@@ -93,6 +108,86 @@ public final class WorldZeroParalysisEvent {
     @SubscribeEvent
     public static void worldzero$onServerStopped(ServerStoppedEvent event) {
         WORLDZERO_SESSION_STATES.remove(event.getServer());
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        SessionState state = worldzero$getRestrictedState(player);
+        if (state == null) {
+            return;
+        }
+
+        event.setCanceled(true);
+        BlockPos bedPos = worldzero$resolveBedBase(player.serverLevel(), event.getPos());
+        if (bedPos != null && bedPos.equals(state.worldzero$bedPos)) {
+            worldzero$sendBusyBedMessage(player, state);
+        }
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        if (event.getEntity() instanceof ServerPlayer player && worldzero$getRestrictedState(player) != null) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onEntityInteract(EntityInteract event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        SessionState state = worldzero$getRestrictedState(player);
+        if (state == null) {
+            return;
+        }
+
+        event.setCanceled(true);
+        if (worldzero$isBedEchoTarget(state, event.getTarget())) {
+            worldzero$sendBusyBedMessage(player, state);
+        }
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onEntityInteractSpecific(EntityInteractSpecific event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        SessionState state = worldzero$getRestrictedState(player);
+        if (state == null) {
+            return;
+        }
+
+        event.setCanceled(true);
+        if (worldzero$isBedEchoTarget(state, event.getTarget())) {
+            worldzero$sendBusyBedMessage(player, state);
+        }
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
+        if (event.getEntity() instanceof ServerPlayer player && worldzero$getRestrictedState(player) != null) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onAttackEntity(AttackEntityEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player && worldzero$getRestrictedState(player) != null) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onBlockPlace(BlockEvent.EntityPlaceEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player && worldzero$getRestrictedState(player) != null) {
+            event.setCanceled(true);
+        }
     }
 
     public static void worldzero$scheduleAfterFall(ServerPlayer player) {
@@ -174,28 +269,51 @@ public final class WorldZeroParalysisEvent {
 
         state.worldzero$targetPlayerId = player.getUUID();
         state.worldzero$bedPos = bedPos.immutable();
-        if (player.isSleeping()) {
+        WorldZeroHouseDetector.DetectedHouse containingHouse = WorldZeroHouseDetector.worldzero$findContainingHouse(player);
+        if (containingHouse != null && containingHouse.doorPos() != null) {
+            BlockPos openedDoorPos = worldzero$openSilentDoor(level, containingHouse.doorPos());
+            if (openedDoorPos != null) {
+                state.worldzero$openedDoorPos = openedDoorPos;
+            }
+        }
+        boolean sleepingAtStart = player.isSleeping();
+        if (sleepingAtStart) {
             player.stopSleepInBed(false, true);
+            float wakeYaw = worldzero$wakeAwayFromBedYaw(level, bedPos, player);
+            float wakePitch = 0.0F;
+            player.setYRot(wakeYaw);
+            player.setYHeadRot(wakeYaw);
+            player.setYBodyRot(wakeYaw);
+            player.setXRot(wakePitch);
+            player.yRotO = wakeYaw;
+            player.xRotO = wakePitch;
         }
 
         state.worldzero$lockedX = player.getX();
         state.worldzero$lockedY = player.getY();
         state.worldzero$lockedZ = player.getZ();
-        Vec3 wakeLookTarget = worldzero$bedEchoBasePos(level, bedPos);
-        double deltaX = wakeLookTarget.x - player.getX();
-        double deltaY = (wakeLookTarget.y + 0.35D) - player.getEyeY();
-        double deltaZ = wakeLookTarget.z - player.getZ();
-        double horizontalDistance = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
-        float targetYaw = (float) (Mth.atan2(deltaZ, deltaX) * (180.0D / Math.PI)) - 90.0F;
-        float targetPitch = (float) (-(Mth.atan2(deltaY, horizontalDistance) * (180.0D / Math.PI)));
-        state.worldzero$lockedYaw = targetYaw + 28.0F;
-        state.worldzero$lockedPitch = targetPitch;
+        state.worldzero$lockedYaw = player.getYRot();
+        state.worldzero$lockedPitch = player.getXRot();
         state.worldzero$phase = Phase.INITIAL_FREEZE;
         state.worldzero$phaseStartTick = level.getGameTime();
         state.worldzero$phaseEndTick = level.getGameTime() + WORLDZERO_INITIAL_FREEZE_TICKS;
         state.worldzero$echoId = null;
         state.worldzero$blackEchoId = null;
-        WorldZeroNetwork.sendFreezeStart(player, WORLDZERO_INITIAL_FREEZE_TICKS);
+        state.worldzero$watchBlackEchoId = null;
+        WorldZeroNetwork.sendFreezeStart(
+                player,
+                WORLDZERO_INITIAL_FREEZE_TICKS,
+                -1,
+                state.worldzero$lockedYaw,
+                state.worldzero$lockedPitch
+        );
+        WorldZeroNetwork.sendParalysisClientAction(
+                player,
+                WorldZeroParalysisClientPacket.WORLDZERO_ACTION_PLAY_CREAK,
+                BlockPos.ZERO,
+                -1,
+                0
+        );
 
         if (saveData != null) {
             saveData.setDirty();
@@ -239,6 +357,8 @@ public final class WorldZeroParalysisEvent {
         state.worldzero$phase = Phase.CAMERA_ALIGN;
         state.worldzero$phaseStartTick = level.getGameTime();
         state.worldzero$phaseEndTick = level.getGameTime() + WORLDZERO_CAMERA_ALIGN_TIMEOUT_TICKS;
+        Entity distantBlackEcho = worldzero$spawnDistantBlackEcho(level, player);
+        state.worldzero$watchBlackEchoId = distantBlackEcho != null ? distantBlackEcho.getUUID() : null;
         WorldZeroNetwork.sendParalysisClientAction(
                 player,
                 WorldZeroParalysisClientPacket.WORLDZERO_ACTION_START_BED_VIEW,
@@ -294,6 +414,11 @@ public final class WorldZeroParalysisEvent {
             return;
         }
 
+        Entity watchBlackEcho = worldzero$findEntity(level.getServer(), state.worldzero$watchBlackEchoId);
+        if (watchBlackEcho != null) {
+            watchBlackEcho.discard();
+        }
+        state.worldzero$watchBlackEchoId = null;
         Entity blackEcho = worldzero$spawnFrontBlackEcho(level, player);
         state.worldzero$blackEchoId = blackEcho != null ? blackEcho.getUUID() : null;
         state.worldzero$phase = Phase.FAKE_FALL_FREEZE;
@@ -344,6 +469,10 @@ public final class WorldZeroParalysisEvent {
             return;
         }
 
+        if (state.worldzero$openedDoorPos != null) {
+            worldzero$closeSilentDoor(level, state.worldzero$openedDoorPos);
+            state.worldzero$openedDoorPos = null;
+        }
         worldzero$setMorning(level);
         if (player.isSleeping()) {
             player.stopSleepInBed(false, true);
@@ -548,6 +677,154 @@ public final class WorldZeroParalysisEvent {
         }
     }
 
+    private static float worldzero$wakeAwayFromBedYaw(ServerLevel level, BlockPos bedPos, ServerPlayer player) {
+        Vec3 bedCenter = Vec3.atCenterOf(bedPos);
+        double deltaX = player.getX() - bedCenter.x;
+        double deltaZ = player.getZ() - bedCenter.z;
+        if (deltaX * deltaX + deltaZ * deltaZ < 0.0001D) {
+            BlockState bedState = level.getBlockState(bedPos);
+            Direction bedFacing = bedState.hasProperty(BedBlock.FACING)
+                    ? bedState.getValue(BedBlock.FACING)
+                    : Direction.SOUTH;
+            return bedFacing.getOpposite().toYRot();
+        }
+
+        return (float) (Mth.atan2(deltaZ, deltaX) * (180.0D / Math.PI)) - 90.0F;
+    }
+
+    @Nullable
+    private static SessionState worldzero$getRestrictedState(ServerPlayer player) {
+        if (player == null || player.level().isClientSide()) {
+            return null;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return null;
+        }
+
+        SessionState state = WORLDZERO_SESSION_STATES.get(server);
+        if (state == null
+                || state.worldzero$targetPlayerId == null
+                || !state.worldzero$targetPlayerId.equals(player.getUUID())) {
+            return null;
+        }
+
+        return switch (state.worldzero$phase) {
+            case CAMERA_ALIGN, BED_WATCH, BREATH_ONLY -> state;
+            default -> null;
+        };
+    }
+
+    private static void worldzero$sendBusyBedMessage(ServerPlayer player, SessionState state) {
+        long gameTime = player.serverLevel().getGameTime();
+        if (gameTime - state.worldzero$lastBusyBedMessageTick < WORLDZERO_BUSY_BED_MESSAGE_COOLDOWN_TICKS) {
+            return;
+        }
+
+        state.worldzero$lastBusyBedMessageTick = gameTime;
+        player.displayClientMessage(worldzero$busyBedMessage(), false);
+    }
+
+    private static Component worldzero$busyBedMessage() {
+        return Component.translatable("message.worldzero.paralysis.bed_occupied");
+    }
+
+    private static boolean worldzero$isBedEchoTarget(SessionState state, Entity target) {
+        return state.worldzero$echoId != null
+                && target != null
+                && state.worldzero$echoId.equals(target.getUUID());
+    }
+
+    @Nullable
+    private static BlockPos worldzero$openSilentDoor(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (!state.is(BlockTags.DOORS) || !state.hasProperty(DoorBlock.HALF) || !state.hasProperty(DoorBlock.OPEN)) {
+            return null;
+        }
+
+        BlockPos lowerPos = state.getValue(DoorBlock.HALF) == DoubleBlockHalf.LOWER ? pos : pos.below();
+        BlockPos upperPos = lowerPos.above();
+        BlockState lowerState = level.getBlockState(lowerPos);
+        BlockState upperState = level.getBlockState(upperPos);
+        if (!lowerState.is(BlockTags.DOORS)
+                || !upperState.is(BlockTags.DOORS)
+                || !lowerState.hasProperty(DoorBlock.OPEN)
+                || !upperState.hasProperty(DoorBlock.OPEN)) {
+            return null;
+        }
+
+        if (!lowerState.getValue(DoorBlock.OPEN)) {
+            level.setBlock(lowerPos, lowerState.setValue(DoorBlock.OPEN, true), 18);
+            level.setBlock(upperPos, upperState.setValue(DoorBlock.OPEN, true), 18);
+        }
+
+        return lowerPos.immutable();
+    }
+
+    private static void worldzero$closeSilentDoor(ServerLevel level, BlockPos lowerPos) {
+        BlockState lowerState = level.getBlockState(lowerPos);
+        BlockState upperState = level.getBlockState(lowerPos.above());
+        if (!lowerState.is(BlockTags.DOORS)
+                || !upperState.is(BlockTags.DOORS)
+                || !lowerState.hasProperty(DoorBlock.OPEN)
+                || !upperState.hasProperty(DoorBlock.OPEN)) {
+            return;
+        }
+
+        if (lowerState.getValue(DoorBlock.OPEN)) {
+            level.setBlock(lowerPos, lowerState.setValue(DoorBlock.OPEN, false), 18);
+            level.setBlock(lowerPos.above(), upperState.setValue(DoorBlock.OPEN, false), 18);
+        }
+    }
+
+    @Nullable
+    private static Entity worldzero$spawnDistantBlackEcho(ServerLevel level, ServerPlayer player) {
+        Vec3 center = player.position();
+        int playerFeetY = Mth.floor(player.getY());
+        double startAngle = level.random.nextDouble() * (Math.PI * 2.0D);
+
+        for (int attempt = 0; attempt < 24; attempt++) {
+            double angle = startAngle + ((Math.PI * 2.0D) / 24.0D) * attempt;
+            double distance = Mth.nextDouble(
+                    level.random,
+                    WORLDZERO_BLACK_ECHO_WATCH_MIN_DISTANCE_BLOCKS,
+                    WORLDZERO_BLACK_ECHO_WATCH_MAX_DISTANCE_BLOCKS
+            );
+            double candidateX = center.x + Math.cos(angle) * distance;
+            double candidateZ = center.z + Math.sin(angle) * distance;
+            int baseX = Mth.floor(candidateX);
+            int baseZ = Mth.floor(candidateZ);
+
+            for (int y = playerFeetY + 2; y >= playerFeetY - 6; y--) {
+                BlockPos spawnPos = new BlockPos(baseX, y, baseZ);
+                if (!worldzero$isValidEchoSpawn(level, spawnPos)) {
+                    continue;
+                }
+
+                WorldZeroEchoEntity blackEcho = WorldZeroEntities.WORLDZERO_BLACK_ECHO.get().create(level);
+                if (blackEcho == null) {
+                    return null;
+                }
+
+                double spawnX = spawnPos.getX() + 0.5D;
+                double spawnY = spawnPos.getY();
+                double spawnZ = spawnPos.getZ() + 0.5D;
+                double deltaX = player.getX() - spawnX;
+                double deltaZ = player.getZ() - spawnZ;
+                float yaw = (float) (Mth.atan2(deltaZ, deltaX) * (180.0D / Math.PI)) - 90.0F;
+                blackEcho.moveTo(spawnX, spawnY, spawnZ, yaw, 0.0F);
+                blackEcho.setSilent(true);
+                blackEcho.setDeltaMovement(0.0D, 0.0D, 0.0D);
+                blackEcho.worldzero$setParalysisBedActive(true);
+                level.addFreshEntity(blackEcho);
+                return blackEcho;
+            }
+        }
+
+        return null;
+    }
+
     @Nullable
     private static Entity worldzero$spawnFrontBlackEcho(ServerLevel level, ServerPlayer player) {
         Vec3 look = player.getViewVector(1.0F);
@@ -659,6 +936,18 @@ public final class WorldZeroParalysisEvent {
             blackEcho.discard();
         }
 
+        Entity watchBlackEcho = worldzero$findEntity(server, state.worldzero$watchBlackEchoId);
+        if (watchBlackEcho != null) {
+            watchBlackEcho.discard();
+        }
+
+        if (state.worldzero$openedDoorPos != null) {
+            ServerLevel level = server.getLevel(Level.OVERWORLD);
+            if (level != null) {
+                worldzero$closeSilentDoor(level, state.worldzero$openedDoorPos);
+            }
+        }
+
         if (player != null) {
             WorldZeroNetwork.sendParalysisClientAction(
                     player,
@@ -674,8 +963,11 @@ public final class WorldZeroParalysisEvent {
         state.worldzero$bedPos = null;
         state.worldzero$echoId = null;
         state.worldzero$blackEchoId = null;
+        state.worldzero$watchBlackEchoId = null;
+        state.worldzero$openedDoorPos = null;
         state.worldzero$phaseStartTick = -1L;
         state.worldzero$phaseEndTick = -1L;
+        state.worldzero$lastBusyBedMessageTick = Long.MIN_VALUE;
     }
 
     private static ParalysisSaveData worldzero$getSaveData(ServerLevel level) {
@@ -698,8 +990,11 @@ public final class WorldZeroParalysisEvent {
         private BlockPos worldzero$bedPos;
         private UUID worldzero$echoId;
         private UUID worldzero$blackEchoId;
+        private UUID worldzero$watchBlackEchoId;
+        private BlockPos worldzero$openedDoorPos;
         private long worldzero$phaseStartTick = -1L;
         private long worldzero$phaseEndTick = -1L;
+        private long worldzero$lastBusyBedMessageTick = Long.MIN_VALUE;
         private double worldzero$lockedX;
         private double worldzero$lockedY;
         private double worldzero$lockedZ;

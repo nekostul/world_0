@@ -1,14 +1,18 @@
 package ru.nekostul.worldzero.mixin;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.client.resources.sounds.TickableSoundInstance;
 import net.minecraft.client.sounds.SoundEngine;
 import net.minecraft.sounds.SoundSource;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.nekostul.worldzero.WorldZeroFreezeClientController;
+import ru.nekostul.worldzero.WorldZeroParalysisClientController;
 
 @Mixin(SoundEngine.class)
 public abstract class SoundEngineMixin {
@@ -24,6 +28,11 @@ public abstract class SoundEngineMixin {
             SoundSource source,
             CallbackInfoReturnable<Float> callbackInfo
     ) {
+        if (WorldZeroParalysisClientController.worldzero$isSoundIsolationActive() && source != SoundSource.PLAYERS) {
+            callbackInfo.setReturnValue(0.0F);
+            return;
+        }
+
         if (WorldZeroFreezeClientController.isFreezeActive()) {
             if (source != SoundSource.PLAYERS) {
                 callbackInfo.setReturnValue(0.0F);
@@ -70,5 +79,36 @@ public abstract class SoundEngineMixin {
         // Cubic easing keeps ambient reduction almost imperceptible in the early phase.
         double easedProgress = progress * progress * progress;
         return (float) (1.0D - easedProgress);
+    }
+
+    @Inject(method = "play", at = @At("HEAD"), cancellable = true)
+    private void worldzero$filterParalysisSounds(SoundInstance soundInstance, CallbackInfo callbackInfo) {
+        if (WorldZeroParalysisClientController.worldzero$isSoundIsolationActive()
+                && !WorldZeroParalysisClientController.worldzero$isAllowedParalysisSound(soundInstance)) {
+            callbackInfo.cancel();
+        }
+    }
+
+    @Inject(method = "playDelayed", at = @At("HEAD"), cancellable = true)
+    private void worldzero$filterDelayedParalysisSounds(
+            SoundInstance soundInstance,
+            int delay,
+            CallbackInfo callbackInfo
+    ) {
+        if (WorldZeroParalysisClientController.worldzero$isSoundIsolationActive()
+                && !WorldZeroParalysisClientController.worldzero$isAllowedParalysisSound(soundInstance)) {
+            callbackInfo.cancel();
+        }
+    }
+
+    @Inject(method = "queueTickingSound", at = @At("HEAD"), cancellable = true)
+    private void worldzero$filterTickingParalysisSounds(
+            TickableSoundInstance soundInstance,
+            CallbackInfo callbackInfo
+    ) {
+        if (WorldZeroParalysisClientController.worldzero$isSoundIsolationActive()
+                && !WorldZeroParalysisClientController.worldzero$isAllowedParalysisSound(soundInstance)) {
+            callbackInfo.cancel();
+        }
     }
 }

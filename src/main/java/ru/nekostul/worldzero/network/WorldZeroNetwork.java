@@ -66,13 +66,23 @@ public final class WorldZeroNetwork {
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks) {
-        sendFreezeStart(player, durationTicks, -1);
+        sendFreezeStart(player, durationTicks, -1, Float.NaN, Float.NaN);
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks, int focusEntityId) {
+        sendFreezeStart(player, durationTicks, focusEntityId, Float.NaN, Float.NaN);
+    }
+
+    public static void sendFreezeStart(
+            ServerPlayer player,
+            int durationTicks,
+            int focusEntityId,
+            float forcedYaw,
+            float forcedPitch
+    ) {
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
-                new WorldZeroFreezeStartPacket(durationTicks, focusEntityId)
+                new WorldZeroFreezeStartPacket(durationTicks, focusEntityId, forcedYaw, forcedPitch)
         );
     }
 

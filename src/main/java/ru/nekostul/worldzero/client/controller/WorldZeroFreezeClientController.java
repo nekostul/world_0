@@ -24,15 +24,21 @@ public final class WorldZeroFreezeClientController {
     private static float worldzero$lockedYaw;
     private static float worldzero$lockedPitch;
     private static int worldzero$focusEntityId = -1;
+    private static float worldzero$forcedYaw = Float.NaN;
+    private static float worldzero$forcedPitch = Float.NaN;
 
     private WorldZeroFreezeClientController() {
     }
 
     public static void startFreeze(int durationTicks) {
-        startFreeze(durationTicks, -1);
+        startFreeze(durationTicks, -1, Float.NaN, Float.NaN);
     }
 
     public static void startFreeze(int durationTicks, int focusEntityId) {
+        startFreeze(durationTicks, focusEntityId, Float.NaN, Float.NaN);
+    }
+
+    public static void startFreeze(int durationTicks, int focusEntityId, float forcedYaw, float forcedPitch) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null) {
             return;
@@ -42,6 +48,8 @@ public final class WorldZeroFreezeClientController {
         worldzero$fallbackTicksRemaining = WORLDZERO_FREEZE_FALLBACK_TICKS;
         worldzero$capturedPlayerState = false;
         worldzero$focusEntityId = focusEntityId;
+        worldzero$forcedYaw = forcedYaw;
+        worldzero$forcedPitch = forcedPitch;
 
         if (minecraft.getSoundManager() != null) {
             minecraft.getSoundManager().stop();
@@ -73,8 +81,8 @@ public final class WorldZeroFreezeClientController {
             worldzero$lockedX = player.getX();
             worldzero$lockedY = player.getY();
             worldzero$lockedZ = player.getZ();
-            worldzero$lockedYaw = player.getYRot();
-            worldzero$lockedPitch = player.getXRot();
+            worldzero$lockedYaw = Float.isNaN(worldzero$forcedYaw) ? player.getYRot() : worldzero$forcedYaw;
+            worldzero$lockedPitch = Float.isNaN(worldzero$forcedPitch) ? player.getXRot() : worldzero$forcedPitch;
             worldzero$capturedPlayerState = true;
         }
 
@@ -154,5 +162,7 @@ public final class WorldZeroFreezeClientController {
         worldzero$fallbackTicksRemaining = 0;
         worldzero$capturedPlayerState = false;
         worldzero$focusEntityId = -1;
+        worldzero$forcedYaw = Float.NaN;
+        worldzero$forcedPitch = Float.NaN;
     }
 }

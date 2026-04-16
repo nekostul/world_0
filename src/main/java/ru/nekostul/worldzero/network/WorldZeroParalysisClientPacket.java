@@ -9,12 +9,13 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 public final class WorldZeroParalysisClientPacket {
-    public static final byte WORLDZERO_ACTION_START_BED_VIEW = 0;
-    public static final byte WORLDZERO_ACTION_ECHO_GONE = 1;
-    public static final byte WORLDZERO_ACTION_START_WARNING = 2;
-    public static final byte WORLDZERO_ACTION_RETURN_TO_BED = 3;
-    public static final byte WORLDZERO_ACTION_START_FADE = 4;
-    public static final byte WORLDZERO_ACTION_CLEAR = 5;
+    public static final byte WORLDZERO_ACTION_PLAY_CREAK = 0;
+    public static final byte WORLDZERO_ACTION_START_BED_VIEW = 1;
+    public static final byte WORLDZERO_ACTION_ECHO_GONE = 2;
+    public static final byte WORLDZERO_ACTION_START_WARNING = 3;
+    public static final byte WORLDZERO_ACTION_RETURN_TO_BED = 4;
+    public static final byte WORLDZERO_ACTION_START_FADE = 5;
+    public static final byte WORLDZERO_ACTION_CLEAR = 6;
 
     private final byte worldzero$action;
     private final BlockPos worldzero$targetPos;

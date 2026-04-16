@@ -13,7 +13,7 @@ import ru.nekostul.worldzero.WorldZeroParalysisClientController;
 public abstract class MouseHandlerMixin {
     @Inject(method = "turnPlayer", at = @At("HEAD"), cancellable = true)
     private void worldzero$blockCameraDuringFreeze(CallbackInfo callbackInfo) {
-        if (worldzero$isMouseBlocked()) {
+        if (worldzero$isMouseLookBlocked()) {
             callbackInfo.cancel();
         }
     }
@@ -26,7 +26,8 @@ public abstract class MouseHandlerMixin {
             int modifiers,
             CallbackInfo callbackInfo
     ) {
-        if (worldzero$isMouseBlocked()) {
+        WorldZeroParalysisClientController.worldzero$handleMousePress(button, action);
+        if (worldzero$isMousePressBlocked()) {
             callbackInfo.cancel();
         }
     }
@@ -38,14 +39,26 @@ public abstract class MouseHandlerMixin {
             double yOffset,
             CallbackInfo callbackInfo
     ) {
-        if (worldzero$isMouseBlocked()) {
+        if (worldzero$isMouseScrollBlocked()) {
             callbackInfo.cancel();
         }
     }
 
-    private static boolean worldzero$isMouseBlocked() {
+    private static boolean worldzero$isMouseLookBlocked() {
         return WorldZeroFreezeClientController.isFreezeActive()
                 || WorldZeroFallClientController.worldzero$isFallPauseBlocked()
-                || WorldZeroParalysisClientController.worldzero$isInputBlocked();
+                || WorldZeroParalysisClientController.worldzero$isMouseLookBlocked();
+    }
+
+    private static boolean worldzero$isMousePressBlocked() {
+        return WorldZeroFreezeClientController.isFreezeActive()
+                || WorldZeroFallClientController.worldzero$isFallPauseBlocked()
+                || WorldZeroParalysisClientController.worldzero$isMousePressBlocked();
+    }
+
+    private static boolean worldzero$isMouseScrollBlocked() {
+        return WorldZeroFreezeClientController.isFreezeActive()
+                || WorldZeroFallClientController.worldzero$isFallPauseBlocked()
+                || WorldZeroParalysisClientController.worldzero$isMouseScrollBlocked();
     }
 }

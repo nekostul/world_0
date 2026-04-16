@@ -12,9 +12,12 @@
     "LevelChunkMixin",
     "MouseHandlerMixin",
     "NaturalSpawnerMixin",
+    "OptionsMixin",
     "ParticleEngineMixin",
     "ShareToLanScreenMixin",
     "SoundEngineMixin",
+    "SplashManagerMixin",
+    "SplashRendererAccessor",
     "WorldSelectionListAccessor",
     "WorldSelectionListEntryMixin",
     "WorldOpenFlowsMixin"

@@ -57,6 +57,10 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerParalysis(context.getSource())))
                         .then(Commands.literal("trigger_footsteps")
                                 .executes(context -> worldzero$triggerFootsteps(context.getSource())))
+                        .then(Commands.literal("trigger_memory")
+                                .executes(context -> worldzero$triggerMemory(context.getSource())))
+                        .then(Commands.literal("trigger_last_block")
+                                .executes(context -> worldzero$triggerLastBlock(context.getSource())))
                         .then(Commands.literal("clean_disc")
                                 .executes(context -> worldzero$cleanDisc(context.getSource())))
                         .then(Commands.literal("trigger_house")
@@ -191,6 +195,34 @@ public final class WorldZeroDevEntityCommands {
                 triggered
                         ? "[WORLD_0][DEV] paralysis event force-triggered"
                         : "[WORLD_0][DEV] paralysis event trigger failed (already active, invalid player, or no bed found)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerMemory(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroWorldMemoryEvent.worldzero$triggerMemoryNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] world-memory anomaly force-triggered"
+                        : "[WORLD_0][DEV] world-memory trigger failed (active event, no nearby house, or no valid anomaly target)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerLastBlock(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroLastBlockEvent.worldzero$triggerLastBlockNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] last-block appearance force-triggered"
+                        : "[WORLD_0][DEV] last-block trigger failed (look at a solid block with open space behind it, or another echo/event is active)"
         ), false);
         return triggered ? 1 : 0;
     }

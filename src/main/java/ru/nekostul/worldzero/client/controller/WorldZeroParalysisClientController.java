@@ -47,6 +47,14 @@ public final class WorldZeroParalysisClientController {
             WorldZeroMod.MOD_ID,
             "warning"
     );
+    private static final ResourceLocation WORLDZERO_OPEN_DOOR_SOUND_ID = new ResourceLocation(
+            WorldZeroMod.MOD_ID,
+            "open_door"
+    );
+    private static final ResourceLocation WORLDZERO_CLOSE_DOOR_SOUND_ID = new ResourceLocation(
+            WorldZeroMod.MOD_ID,
+            "close_door"
+    );
     private static boolean worldzero$movementBlocked;
     private static boolean worldzero$bedViewActive;
     private static boolean worldzero$renderDistanceLocked;
@@ -126,7 +134,9 @@ public final class WorldZeroParalysisClientController {
         ResourceLocation soundId = soundInstance.getLocation();
         return WORLDZERO_CREAK_SOUND_ID.equals(soundId)
                 || WORLDZERO_BREATH_SOUND_ID.equals(soundId)
-                || WORLDZERO_WARNING_SOUND_ID.equals(soundId);
+                || WORLDZERO_WARNING_SOUND_ID.equals(soundId)
+                || WORLDZERO_OPEN_DOOR_SOUND_ID.equals(soundId)
+                || WORLDZERO_CLOSE_DOOR_SOUND_ID.equals(soundId);
     }
 
     @SubscribeEvent

@@ -37,5 +37,27 @@
         "stream": true
       }
     ]
+  },
+  "fake_c418": {
+    "sounds": [
+      {
+        "name": "worldzero:fake_c418",
+        "stream": true
+      }
+    ]
+  },
+  "open_door": {
+    "sounds": [
+      {
+        "name": "worldzero:open_door"
+      }
+    ]
+  },
+  "close_door": {
+    "sounds": [
+      {
+        "name": "worldzero:close_door"
+      }
+    ]
   }
 }

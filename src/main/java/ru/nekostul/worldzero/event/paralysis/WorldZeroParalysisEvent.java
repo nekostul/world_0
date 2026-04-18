@@ -95,6 +95,10 @@ public final class WorldZeroParalysisEvent {
             return;
         }
 
+        if (WorldZeroAmbientSoundEvent.worldzero$isMajorEventStartBlocked(level)) {
+            return;
+        }
+
         StartTarget target = worldzero$pickSleepingTarget(level);
         if (target == null) {
             return;
@@ -301,6 +305,7 @@ public final class WorldZeroParalysisEvent {
         state.worldzero$echoId = null;
         state.worldzero$blackEchoId = null;
         state.worldzero$watchBlackEchoId = null;
+        WorldZeroAmbientSoundEvent.worldzero$notifyMajorEventStarted(level);
         WorldZeroNetwork.sendFreezeStart(
                 player,
                 WORLDZERO_INITIAL_FREEZE_TICKS,

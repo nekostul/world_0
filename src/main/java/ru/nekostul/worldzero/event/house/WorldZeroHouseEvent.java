@@ -150,6 +150,10 @@ public final class WorldZeroHouseEvent {
             return;
         }
 
+        if (WorldZeroAmbientSoundEvent.worldzero$isMajorEventStartBlocked(player.serverLevel())) {
+            return;
+        }
+
         double distanceToHouse = Math.sqrt(detectedHouse.worldzero$horizontalDistanceToBoundsSqr(
                 player.getX(),
                 player.getZ()
@@ -357,6 +361,7 @@ public final class WorldZeroHouseEvent {
         playerState.worldzero$blackEchoDismissed = false;
         playerState.worldzero$armedForApproach = false;
         playerState.worldzero$wasInsideTriggerBand = false;
+        WorldZeroAmbientSoundEvent.worldzero$notifyMajorEventStarted(level);
         return true;
     }
 
@@ -439,6 +444,7 @@ public final class WorldZeroHouseEvent {
         playerState.worldzero$wasInsideTriggerBand = false;
         playerState.worldzero$rememberedHouse = null;
         playerState.worldzero$rememberedHouseUntilTick = 0L;
+        WorldZeroAmbientSoundEvent.worldzero$notifyMajorEventStarted(level);
         worldzero$savePersistentPlayerState(level, player.getUUID(), playerState);
         return true;
     }

@@ -101,6 +101,10 @@ public final class WorldZeroFootstepsEvent {
             return;
         }
 
+        if (WorldZeroAmbientSoundEvent.worldzero$isMajorEventStartBlocked(level)) {
+            return;
+        }
+
         FootstepsSaveData saveData = worldzero$getSaveData(level);
         if (saveData.worldzero$completed) {
             return;
@@ -266,6 +270,7 @@ public final class WorldZeroFootstepsEvent {
         state.worldzero$sourceZ = player.getZ();
         state.worldzero$reactionStartYaw = player.getYRot();
         state.worldzero$reactionStartPitch = player.getXRot();
+        WorldZeroAmbientSoundEvent.worldzero$notifyMajorEventStarted(level);
 
         if (saveData != null) {
             saveData.worldzero$completed = true;

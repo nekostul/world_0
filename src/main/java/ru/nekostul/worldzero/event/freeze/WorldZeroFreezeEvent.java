@@ -80,6 +80,10 @@ public final class WorldZeroFreezeEvent {
             return;
         }
 
+        if (WorldZeroAmbientSoundEvent.worldzero$isMajorEventStartBlocked(level)) {
+            return;
+        }
+
         FreezeSaveData saveData = worldzero$getSaveData(level);
         if (saveData.worldzero$completed) {
             return;
@@ -177,6 +181,7 @@ public final class WorldZeroFreezeEvent {
         state.worldzero$lockedZ = targetPlayer.getZ();
         state.worldzero$lockedYaw = targetPlayer.getYRot();
         state.worldzero$lockedPitch = targetPlayer.getXRot();
+        WorldZeroAmbientSoundEvent.worldzero$notifyMajorEventStarted(level);
 
         if (saveData != null) {
             saveData.worldzero$completed = true;

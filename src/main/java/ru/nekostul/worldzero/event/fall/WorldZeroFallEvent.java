@@ -77,6 +77,10 @@ public final class WorldZeroFallEvent {
             return;
         }
 
+        if (WorldZeroAmbientSoundEvent.worldzero$isMajorEventStartBlocked(level)) {
+            return;
+        }
+
         FallSaveData saveData = worldzero$getSaveData(level);
         if (saveData.worldzero$completed) {
             return;
@@ -242,6 +246,7 @@ public final class WorldZeroFallEvent {
         state.worldzero$respawnY = respawnPos.y;
         state.worldzero$respawnZ = respawnPos.z;
         state.worldzero$debugForced = debugForced;
+        WorldZeroAmbientSoundEvent.worldzero$notifyMajorEventStarted(level);
 
         if (saveData != null) {
             saveData.worldzero$completed = true;

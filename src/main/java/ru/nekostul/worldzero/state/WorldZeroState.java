@@ -327,7 +327,7 @@ public final class WorldZeroState {
                 levelName,
                 GameType.SURVIVAL,
                 false,
-                Difficulty.NORMAL,
+                Difficulty.HARD,
                 false,
                 new GameRules(),
                 WorldDataConfiguration.DEFAULT,

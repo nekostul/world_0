@@ -1,13 +1,18 @@
 package ru.nekostul.worldzero.mixin;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.tabs.Tab;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.nekostul.worldzero.WorldZeroDevCheats;
@@ -17,6 +22,22 @@ import java.util.Optional;
 
 @Mixin(CreateWorldScreen.class)
 public abstract class CreateWorldScreenMixin {
+    @ModifyArg(
+            method = "init",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/components/tabs/TabNavigationBar$Builder;addTabs([Lnet/minecraft/client/gui/components/tabs/Tab;)Lnet/minecraft/client/gui/components/tabs/TabNavigationBar$Builder;"
+            ),
+            index = 0
+    )
+    private Tab[] worldzero$keepOnlyGameTab(Tab[] tabs) {
+        if (WorldZeroDevCheats.isAllowedForCurrentClient() || tabs.length == 0) {
+            return tabs;
+        }
+
+        return new Tab[]{tabs[0]};
+    }
+
     @Redirect(
             method = "createNewWorldDirectory",
             at = @At(
@@ -103,23 +124,19 @@ public abstract class CreateWorldScreenMixin {
     }
 
     @Inject(method = "createLevelSettings", at = @At("RETURN"), cancellable = true)
-    private void worldzero$forceCheatsOff(CallbackInfoReturnable<LevelSettings> callbackInfo) {
+    private void worldzero$forceAllowedCreationSettings(CallbackInfoReturnable<LevelSettings> callbackInfo) {
         if (WorldZeroDevCheats.isAllowedForCurrentClient()) {
             return;
         }
 
         LevelSettings levelSettings = callbackInfo.getReturnValue();
-        if (!levelSettings.allowCommands()) {
-            return;
-        }
-
         callbackInfo.setReturnValue(new LevelSettings(
                 levelSettings.levelName(),
-                levelSettings.gameType(),
-                levelSettings.hardcore(),
-                levelSettings.difficulty(),
+                GameType.SURVIVAL,
                 false,
-                levelSettings.gameRules().copy(),
+                Difficulty.HARD,
+                false,
+                new GameRules(),
                 levelSettings.getDataConfiguration(),
                 levelSettings.getLifecycle()
         ));

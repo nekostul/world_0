@@ -33,6 +33,7 @@ import net.minecraftforge.fml.common.Mod;
 import ru.nekostul.worldzero.achievement.WorldZeroAdvancementTriggers;
 
 import javax.annotation.Nullable;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,6 +50,8 @@ public final class WorldZeroParalysisEvent {
     private static final int WORLDZERO_RETURN_TO_BED_TICKS = 2 * 20;
     private static final int WORLDZERO_CAMERA_ALIGN_TIMEOUT_TICKS = 15 * 20;
     private static final int WORLDZERO_SLEEP_START_MAX_TICKS = 40;
+    private static final int WORLDZERO_KORIDOR_SLEEP_FADE_TICKS = 3 * 20;
+    private static final int WORLDZERO_KORIDOR_SLEEP_COUNT_BEFORE_TRIGGER = 3;
     private static final int WORLDZERO_BED_SEARCH_RADIUS = 12;
     private static final double WORLDZERO_BLACK_ECHO_FRONT_DISTANCE_BLOCKS = 3.0D;
     private static final double WORLDZERO_BLACK_ECHO_WATCH_MIN_DISTANCE_BLOCKS = 10.0D;
@@ -82,31 +85,23 @@ public final class WorldZeroParalysisEvent {
             return;
         }
 
-        if (worldzero$hasConflictingEvent(server)) {
-            return;
-        }
-
+        boolean conflictingEvent = worldzero$hasConflictingEvent(server);
         ParalysisSaveData saveData = worldzero$getSaveData(level);
-        if (saveData.worldzero$completed || saveData.worldzero$scheduledTick < 0L) {
-            return;
+        if (!conflictingEvent
+                && !saveData.worldzero$completed
+                && saveData.worldzero$scheduledTick >= 0L
+                && level.getGameTime() >= saveData.worldzero$scheduledTick
+                && level.isNight()
+                && !WorldZeroAmbientSoundEvent.worldzero$isMajorEventStartBlocked(level)) {
+            StartTarget target = worldzero$pickSleepingTarget(level);
+            if (target != null && worldzero$startEvent(level, state, saveData, target.player(), target.bedPos())) {
+                saveData.worldzero$completed = true;
+                saveData.setDirty();
+            }
         }
 
-        if (level.getGameTime() < saveData.worldzero$scheduledTick || !level.isNight()) {
-            return;
-        }
-
-        if (WorldZeroAmbientSoundEvent.worldzero$isMajorEventStartBlocked(level)) {
-            return;
-        }
-
-        StartTarget target = worldzero$pickSleepingTarget(level);
-        if (target == null) {
-            return;
-        }
-
-        if (worldzero$startEvent(level, state, saveData, target.player(), target.bedPos())) {
-            saveData.worldzero$completed = true;
-            saveData.setDirty();
+        if (state.worldzero$phase == Phase.INACTIVE) {
+            worldzero$tickKoridorSleepProgress(level, state, saveData);
         }
     }
 
@@ -485,8 +480,75 @@ public final class WorldZeroParalysisEvent {
         }
 
         WorldZeroAdvancementTriggers.grantParalysis(player);
+        worldzero$unlockKoridorDream(level, player);
 
         worldzero$clearState(level.getServer(), state, player);
+    }
+
+    private static void worldzero$tickKoridorSleepProgress(
+            ServerLevel level,
+            SessionState state,
+            ParalysisSaveData saveData
+    ) {
+        if (worldzero$hasConflictingEvent(level.getServer())) {
+            return;
+        }
+
+        if (saveData.worldzero$postParalysisSleepCounts.isEmpty()) {
+            state.worldzero$koridorSleepTrackers.clear();
+            return;
+        }
+
+        for (ServerPlayer player : level.players()) {
+            UUID playerId = player.getUUID();
+            int sleepCount = saveData.worldzero$postParalysisSleepCounts.getOrDefault(playerId, -1);
+            KoridorSleepTracker tracker = state.worldzero$koridorSleepTrackers.computeIfAbsent(
+                    playerId,
+                    ignored -> new KoridorSleepTracker()
+            );
+
+            if (sleepCount < 0 || !player.isAlive() || player.isSpectator()) {
+                tracker.worldzero$reset();
+                continue;
+            }
+
+            if (!player.isSleeping()) {
+                tracker.worldzero$reset();
+                continue;
+            }
+
+            if (!tracker.worldzero$currentSleepTracked && player.getSleepTimer() > 0) {
+                tracker.worldzero$currentSleepTracked = true;
+                if (sleepCount >= WORLDZERO_KORIDOR_SLEEP_COUNT_BEFORE_TRIGGER) {
+                    tracker.worldzero$koridorTeleportPending = true;
+                } else {
+                    saveData.worldzero$postParalysisSleepCounts.put(playerId, sleepCount + 1);
+                    saveData.setDirty();
+                }
+            }
+
+            if (tracker.worldzero$koridorTeleportPending
+                    && player.getSleepTimer() >= WORLDZERO_KORIDOR_SLEEP_FADE_TICKS
+                    && WorldZeroKoridorDimension.worldzero$startSleepDream(player)) {
+                saveData.worldzero$postParalysisSleepCounts.remove(playerId);
+                saveData.setDirty();
+                tracker.worldzero$reset();
+            }
+        }
+
+        state.worldzero$koridorSleepTrackers.entrySet().removeIf(
+                entry -> !saveData.worldzero$postParalysisSleepCounts.containsKey(entry.getKey())
+        );
+    }
+
+    private static void worldzero$unlockKoridorDream(ServerLevel level, ServerPlayer player) {
+        if (player == null) {
+            return;
+        }
+
+        ParalysisSaveData saveData = worldzero$getSaveData(level);
+        saveData.worldzero$postParalysisSleepCounts.put(player.getUUID(), 0);
+        saveData.setDirty();
     }
 
     private static void worldzero$applyPositionLock(ServerPlayer player, SessionState state, boolean restoreRotation) {
@@ -1009,16 +1071,38 @@ public final class WorldZeroParalysisEvent {
         private double worldzero$lockedZ;
         private float worldzero$lockedYaw;
         private float worldzero$lockedPitch;
+        private final Map<UUID, KoridorSleepTracker> worldzero$koridorSleepTrackers = new HashMap<>();
+    }
+
+    private static final class KoridorSleepTracker {
+        private boolean worldzero$currentSleepTracked;
+        private boolean worldzero$koridorTeleportPending;
+
+        private void worldzero$reset() {
+            this.worldzero$currentSleepTracked = false;
+            this.worldzero$koridorTeleportPending = false;
+        }
     }
 
     private static final class ParalysisSaveData extends SavedData {
         private long worldzero$scheduledTick = -1L;
         private boolean worldzero$completed;
+        private final Map<UUID, Integer> worldzero$postParalysisSleepCounts = new HashMap<>();
 
         public static ParalysisSaveData load(CompoundTag tag) {
             ParalysisSaveData saveData = new ParalysisSaveData();
             saveData.worldzero$scheduledTick = tag.getLong("scheduled_tick");
             saveData.worldzero$completed = tag.getBoolean("completed");
+            CompoundTag sleepCountsTag = tag.getCompound("post_paralysis_sleep_counts");
+            for (String key : sleepCountsTag.getAllKeys()) {
+                try {
+                    saveData.worldzero$postParalysisSleepCounts.put(
+                            UUID.fromString(key),
+                            sleepCountsTag.getInt(key)
+                    );
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
             return saveData;
         }
 
@@ -1026,6 +1110,11 @@ public final class WorldZeroParalysisEvent {
         public CompoundTag save(CompoundTag tag) {
             tag.putLong("scheduled_tick", this.worldzero$scheduledTick);
             tag.putBoolean("completed", this.worldzero$completed);
+            CompoundTag sleepCountsTag = new CompoundTag();
+            for (Map.Entry<UUID, Integer> entry : this.worldzero$postParalysisSleepCounts.entrySet()) {
+                sleepCountsTag.putInt(entry.getKey().toString(), entry.getValue());
+            }
+            tag.put("post_paralysis_sleep_counts", sleepCountsTag);
             return tag;
         }
     }

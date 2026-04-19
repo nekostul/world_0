@@ -35,6 +35,10 @@ public class WorldZeroEchoEntity extends Monster {
     private static final int WORLDZERO_FREEZE_PASS_MIN_TICKS = 20;
     private static final int WORLDZERO_FREEZE_PASS_MAX_TICKS = 40;
     private static final int WORLDZERO_FREEZE_PASS_FOOTSTEP_INTERVAL_TICKS = 4;
+    private static final double WORLDZERO_KORIDOR_PASS_SPEED_MIN = 0.20D;
+    private static final double WORLDZERO_KORIDOR_PASS_SPEED_MAX = 0.80D;
+    private static final int WORLDZERO_KORIDOR_PASS_MIN_TICKS = 8;
+    private static final int WORLDZERO_KORIDOR_PASS_MAX_TICKS = 40;
     private static final int WORLDZERO_HE_IS_CLOSE_REQUIRED_TICKS = 15 * 20;
     private static final double WORLDZERO_HE_IS_CLOSE_LOOK_DOT_THRESHOLD = 0.975D;
     private double worldzero$echoDespawnDistanceSqr = 8.0D * 8.0D;
@@ -48,6 +52,11 @@ public class WorldZeroEchoEntity extends Monster {
     private double worldzero$freezePassDirectionZ;
     private double worldzero$freezePassSpeed;
     private int worldzero$freezePassTicksRemaining;
+    private boolean worldzero$koridorPassActive;
+    private double worldzero$koridorPassDirectionX;
+    private double worldzero$koridorPassDirectionZ;
+    private double worldzero$koridorPassSpeed;
+    private int worldzero$koridorPassTicksRemaining;
     private boolean worldzero$windowWatchActive;
     private UUID worldzero$windowWatchTargetPlayerId;
     private int worldzero$windowWatchTicksRemaining;
@@ -94,6 +103,11 @@ public class WorldZeroEchoEntity extends Monster {
     public void tick() {
         super.tick();
         if (this.level().isClientSide()) {
+            return;
+        }
+
+        if (this.getType() == WorldZeroEntities.WORLDZERO_ECHO.get() && this.worldzero$koridorPassActive) {
+            this.worldzero$tickKoridorPass();
             return;
         }
 
@@ -217,6 +231,30 @@ public class WorldZeroEchoEntity extends Monster {
                 WORLDZERO_FREEZE_PASS_MAX_TICKS
         );
         this.worldzero$freezePassActive = true;
+    }
+
+    public void worldzero$configureKoridorPass(double directionX, double directionZ, double speed, int durationTicks) {
+        double directionLength = Math.sqrt(directionX * directionX + directionZ * directionZ);
+        if (directionLength < 0.0001D) {
+            this.worldzero$koridorPassDirectionX = 1.0D;
+            this.worldzero$koridorPassDirectionZ = 0.0D;
+        } else {
+            this.worldzero$koridorPassDirectionX = directionX / directionLength;
+            this.worldzero$koridorPassDirectionZ = directionZ / directionLength;
+        }
+
+        this.worldzero$koridorPassSpeed = Mth.clamp(speed, WORLDZERO_KORIDOR_PASS_SPEED_MIN, WORLDZERO_KORIDOR_PASS_SPEED_MAX);
+        this.worldzero$koridorPassTicksRemaining = Mth.clamp(
+                durationTicks,
+                WORLDZERO_KORIDOR_PASS_MIN_TICKS,
+                WORLDZERO_KORIDOR_PASS_MAX_TICKS
+        );
+        this.worldzero$koridorPassActive = true;
+
+        float yaw = (float) (Mth.atan2(this.worldzero$koridorPassDirectionZ, this.worldzero$koridorPassDirectionX) * (180.0D / Math.PI)) - 90.0F;
+        this.setYRot(yaw);
+        this.yHeadRot = yaw;
+        this.yBodyRot = yaw;
     }
 
     public void worldzero$configureWindowWatch(UUID targetPlayerId, int durationTicks) {
@@ -419,6 +457,29 @@ public class WorldZeroEchoEntity extends Monster {
         }
 
         if (this.worldzero$freezePassTicksRemaining <= 0) {
+            this.discard();
+        }
+    }
+
+    private void worldzero$tickKoridorPass() {
+        if (this.worldzero$koridorPassTicksRemaining <= 0) {
+            this.discard();
+            return;
+        }
+
+        double nextX = this.getX() + this.worldzero$koridorPassDirectionX * this.worldzero$koridorPassSpeed;
+        double nextZ = this.getZ() + this.worldzero$koridorPassDirectionZ * this.worldzero$koridorPassSpeed;
+        float yaw = (float) (Mth.atan2(this.worldzero$koridorPassDirectionZ, this.worldzero$koridorPassDirectionX) * (180.0D / Math.PI)) - 90.0F;
+
+        this.setPos(nextX, this.getY(), nextZ);
+        this.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        this.setSprinting(true);
+        this.setYRot(yaw);
+        this.yHeadRot = yaw;
+        this.yBodyRot = yaw;
+
+        this.worldzero$koridorPassTicksRemaining--;
+        if (this.worldzero$koridorPassTicksRemaining <= 0) {
             this.discard();
         }
     }

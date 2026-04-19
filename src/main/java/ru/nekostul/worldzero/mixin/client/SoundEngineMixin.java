@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.nekostul.worldzero.WorldZeroFreezeClientController;
+import ru.nekostul.worldzero.WorldZeroKoridorClientController;
 import ru.nekostul.worldzero.WorldZeroParalysisClientController;
 
 @Mixin(SoundEngine.class)
@@ -38,6 +39,11 @@ public abstract class SoundEngineMixin {
                 callbackInfo.setReturnValue(0.0F);
                 return;
             }
+        }
+
+        if (WorldZeroKoridorClientController.worldzero$isVolumeForced()) {
+            callbackInfo.setReturnValue(instanceVolume);
+            return;
         }
 
         if (source != SoundSource.AMBIENT) {

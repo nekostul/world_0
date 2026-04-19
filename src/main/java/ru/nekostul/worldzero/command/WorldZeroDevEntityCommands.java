@@ -61,6 +61,8 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerMemory(context.getSource())))
                         .then(Commands.literal("trigger_last_block")
                                 .executes(context -> worldzero$triggerLastBlock(context.getSource())))
+                        .then(Commands.literal("trigger_koridor_run")
+                                .executes(context -> worldzero$triggerKoridorRun(context.getSource())))
                         .then(Commands.literal("tp_koridor")
                                 .executes(context -> worldzero$teleportToKoridor(context.getSource())))
                         .then(Commands.literal("return_from_koridor")
@@ -239,6 +241,20 @@ public final class WorldZeroDevEntityCommands {
                         : "[WORLD_0][DEV] blank disc playback status was already clean"
         ), false);
         return changed ? 1 : 0;
+    }
+
+    private static int worldzero$triggerKoridorRun(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroKoridorDimension.worldzero$triggerEchoRunNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] koridor echo run force-triggered"
+                        : "[WORLD_0][DEV] koridor echo run failed (be in koridor, look forward, and keep distant closed doors in view)"
+        ), false);
+        return triggered ? 1 : 0;
     }
 
     private static int worldzero$teleportToKoridor(CommandSourceStack source) {

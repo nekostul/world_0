@@ -84,6 +84,13 @@ public final class WorldZeroNetwork {
                 WorldZeroBlankDiscErrorPacket::decode,
                 WorldZeroBlankDiscErrorPacket::handle
         );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroKoridorDoorSoundPacket.class,
+                WorldZeroKoridorDoorSoundPacket::encode,
+                WorldZeroKoridorDoorSoundPacket::decode,
+                WorldZeroKoridorDoorSoundPacket::handle
+        );
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks) {
@@ -151,6 +158,13 @@ public final class WorldZeroNetwork {
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new WorldZeroBlankDiscErrorPacket()
+        );
+    }
+
+    public static void sendKoridorDoorSound(ServerPlayer player, ResourceLocation soundId, double x, double y, double z) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroKoridorDoorSoundPacket(soundId, x, y, z)
         );
     }
 }

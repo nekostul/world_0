@@ -3,6 +3,7 @@ package ru.nekostul.worldzero;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 public final class WorldZeroDevCheats {
     private static final String WORLDZERO_DEV_NICK = "Dev";
@@ -29,6 +30,14 @@ public final class WorldZeroDevCheats {
         }
 
         ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return false;
+        }
+
+        return isAllowedForPlayer(player);
+    }
+
+    public static boolean isAllowedForPlayer(Player player) {
         if (player == null) {
             return false;
         }

@@ -61,6 +61,10 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerMemory(context.getSource())))
                         .then(Commands.literal("trigger_last_block")
                                 .executes(context -> worldzero$triggerLastBlock(context.getSource())))
+                        .then(Commands.literal("tp_koridor")
+                                .executes(context -> worldzero$teleportToKoridor(context.getSource())))
+                        .then(Commands.literal("return_from_koridor")
+                                .executes(context -> worldzero$returnFromKoridor(context.getSource())))
                         .then(Commands.literal("clean_disc")
                                 .executes(context -> worldzero$cleanDisc(context.getSource())))
                         .then(Commands.literal("trigger_house")
@@ -235,6 +239,34 @@ public final class WorldZeroDevEntityCommands {
                         : "[WORLD_0][DEV] blank disc playback status was already clean"
         ), false);
         return changed ? 1 : 0;
+    }
+
+    private static int worldzero$teleportToKoridor(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean teleported = WorldZeroKoridorDimension.worldzero$teleportPlayerToKoridor(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                teleported
+                        ? "[WORLD_0][DEV] teleported to koridor dimension"
+                        : "[WORLD_0][DEV] koridor teleport failed (dimension or structure is unavailable)"
+        ), false);
+        return teleported ? 1 : 0;
+    }
+
+    private static int worldzero$returnFromKoridor(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean teleported = WorldZeroKoridorDimension.worldzero$returnPlayerFromKoridor(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                teleported
+                        ? "[WORLD_0][DEV] returned from koridor dimension"
+                        : "[WORLD_0][DEV] koridor return failed (no saved return point or target dimension is unavailable)"
+        ), false);
+        return teleported ? 1 : 0;
     }
 
     private static int worldzero$triggerHouse(CommandSourceStack source) {

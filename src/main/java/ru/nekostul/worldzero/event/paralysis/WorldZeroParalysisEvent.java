@@ -3,6 +3,7 @@ package ru.nekostul.worldzero;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -10,8 +11,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
+import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.DoorBlock;
@@ -47,11 +51,30 @@ public final class WorldZeroParalysisEvent {
     private static final int WORLDZERO_ECHO_VISIBLE_TICKS = 6 * 20;
     private static final int WORLDZERO_BREATH_LINGER_TICKS = 2 * 20;
     private static final int WORLDZERO_FAKE_FALL_FREEZE_TICKS = 2 * 20;
-    private static final int WORLDZERO_RETURN_TO_BED_TICKS = 2 * 20;
+    private static final int WORLDZERO_RETURN_TO_BED_KNOCK_TICKS = 65;
+    private static final int WORLDZERO_RETURN_TO_BED_DOOR_DELAY_TICKS = 20;
+    private static final int WORLDZERO_RETURN_TO_BED_FOOTSTEP_INTERVAL_TICKS = 8;
+    private static final int WORLDZERO_RETURN_TO_BED_FOOTSTEP_COUNT = 5;
+    private static final int WORLDZERO_RETURN_TO_BED_CHEST_CLOSE_DELAY_TICKS = 20;
+    private static final int WORLDZERO_KORIDOR_SLEEP_FADE_TICKS = 3 * 20;
+    private static final int WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DELAY_TICKS = 4;
+    private static final int WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DURATION_TICKS = 10;
+    private static final int WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS =
+            WORLDZERO_RETURN_TO_BED_FOOTSTEP_INTERVAL_TICKS * (WORLDZERO_RETURN_TO_BED_FOOTSTEP_COUNT - 1);
+    private static final int WORLDZERO_RETURN_TO_BED_GLASS_BREAK_START_TICKS = WORLDZERO_RETURN_TO_BED_KNOCK_TICKS
+            + WORLDZERO_RETURN_TO_BED_DOOR_DELAY_TICKS
+            + WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS
+            + WORLDZERO_RETURN_TO_BED_CHEST_CLOSE_DELAY_TICKS
+            + WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS
+            + WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DELAY_TICKS;
+    private static final int WORLDZERO_RETURN_TO_BED_SLEEP_START_TICKS = WORLDZERO_RETURN_TO_BED_GLASS_BREAK_START_TICKS
+            + WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DURATION_TICKS
+            + 4;
+    private static final int WORLDZERO_RETURN_TO_BED_TICKS = WORLDZERO_RETURN_TO_BED_SLEEP_START_TICKS + WORLDZERO_KORIDOR_SLEEP_FADE_TICKS;
+    private static final int WORLDZERO_RETURN_TO_BED_GLASS_BREAKER_ID = 193204001;
     private static final int WORLDZERO_CAMERA_ALIGN_TIMEOUT_TICKS = 15 * 20;
     private static final int WORLDZERO_SLEEP_START_MAX_TICKS = 40;
-    private static final int WORLDZERO_KORIDOR_SLEEP_FADE_TICKS = 3 * 20;
-    private static final int WORLDZERO_KORIDOR_SLEEP_COUNT_BEFORE_TRIGGER = 3;
+    private static final int WORLDZERO_KORIDOR_SLEEP_COUNT_BEFORE_TRIGGER = 0;
     private static final int WORLDZERO_BED_SEARCH_RADIUS = 12;
     private static final double WORLDZERO_BLACK_ECHO_FRONT_DISTANCE_BLOCKS = 3.0D;
     private static final double WORLDZERO_BLACK_ECHO_WATCH_MIN_DISTANCE_BLOCKS = 10.0D;
@@ -451,7 +474,16 @@ public final class WorldZeroParalysisEvent {
         }
         state.worldzero$blackEchoId = null;
         WorldZeroNetwork.sendFreezeEnd(player);
-        worldzero$tryReturnPlayerToBed(level, state, player);
+        if (state.worldzero$openedDoorPos != null) {
+            worldzero$closeSilentDoor(level, state.worldzero$openedDoorPos);
+            state.worldzero$returnDoorOpened = false;
+        }
+        state.worldzero$returnGlassBroken = false;
+        state.worldzero$returnSleepStarted = false;
+        state.worldzero$returnDiamondPlaced = false;
+        state.worldzero$returnChestPos = worldzero$findNearestChest(level, state.worldzero$bedPos);
+        state.worldzero$returnGlassPos = worldzero$findNearestGlass(level, state.worldzero$bedPos);
+        worldzero$holdPlayerInBedPose(level, state, player);
         WorldZeroNetwork.sendParalysisClientAction(
                 player,
                 WorldZeroParalysisClientPacket.WORLDZERO_ACTION_RETURN_TO_BED,
@@ -465,7 +497,31 @@ public final class WorldZeroParalysisEvent {
     }
 
     private static void worldzero$tickReturnToBed(ServerLevel level, SessionState state, ServerPlayer player) {
-        worldzero$tryReturnPlayerToBed(level, state, player);
+        long elapsedTicks = level.getGameTime() - state.worldzero$phaseStartTick;
+        if (elapsedTicks < WORLDZERO_RETURN_TO_BED_SLEEP_START_TICKS) {
+            worldzero$holdPlayerInBedPose(level, state, player);
+        } else {
+            worldzero$tryReturnPlayerToBed(level, state, player);
+            state.worldzero$returnSleepStarted = state.worldzero$returnSleepStarted || player.isSleeping();
+        }
+
+        if (!state.worldzero$returnDoorOpened
+                && elapsedTicks >= WORLDZERO_RETURN_TO_BED_KNOCK_TICKS + WORLDZERO_RETURN_TO_BED_DOOR_DELAY_TICKS
+                && state.worldzero$openedDoorPos != null
+                && worldzero$openSilentDoor(level, state.worldzero$openedDoorPos) != null) {
+            state.worldzero$returnDoorOpened = true;
+        }
+
+        if (!state.worldzero$returnDiamondPlaced
+                && elapsedTicks >= WORLDZERO_RETURN_TO_BED_KNOCK_TICKS
+                + WORLDZERO_RETURN_TO_BED_DOOR_DELAY_TICKS
+                + WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS
+                && worldzero$insertDiamondIntoChest(level, state.worldzero$returnChestPos)) {
+            state.worldzero$returnDiamondPlaced = true;
+        }
+
+        worldzero$updateReturnToBedGlassVisual(level, state, elapsedTicks);
+
         if (level.getGameTime() < state.worldzero$phaseEndTick) {
             return;
         }
@@ -483,6 +539,38 @@ public final class WorldZeroParalysisEvent {
         worldzero$unlockKoridorDream(level, player);
 
         worldzero$clearState(level.getServer(), state, player);
+    }
+
+    private static void worldzero$updateReturnToBedGlassVisual(ServerLevel level, SessionState state, long elapsedTicks) {
+        BlockPos glassPos = state.worldzero$returnGlassPos;
+        if (glassPos == null) {
+            return;
+        }
+
+        if (!worldzero$isGlassLikeBlock(level.getBlockState(glassPos))) {
+            level.destroyBlockProgress(WORLDZERO_RETURN_TO_BED_GLASS_BREAKER_ID, glassPos, -1);
+            state.worldzero$returnGlassPos = null;
+            state.worldzero$returnGlassBroken = true;
+            return;
+        }
+
+        long crackTicks = elapsedTicks - WORLDZERO_RETURN_TO_BED_GLASS_BREAK_START_TICKS;
+        if (crackTicks < 0L) {
+            return;
+        }
+
+        if (crackTicks >= WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DURATION_TICKS) {
+            level.destroyBlockProgress(WORLDZERO_RETURN_TO_BED_GLASS_BREAKER_ID, glassPos, -1);
+            state.worldzero$returnGlassBroken = true;
+            return;
+        }
+
+        int stage = Mth.clamp(
+                (int) (((crackTicks + 1L) * 10L) / WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DURATION_TICKS) - 1,
+                0,
+                9
+        );
+        level.destroyBlockProgress(WORLDZERO_RETURN_TO_BED_GLASS_BREAKER_ID, glassPos, stage);
     }
 
     private static void worldzero$tickKoridorSleepProgress(
@@ -748,6 +836,23 @@ public final class WorldZeroParalysisEvent {
         }
     }
 
+    private static void worldzero$holdPlayerInBedPose(ServerLevel level, SessionState state, ServerPlayer player) {
+        Vec3 bedPos = worldzero$bedEchoBasePos(level, state.worldzero$bedPos);
+        BlockState bedState = level.getBlockState(state.worldzero$bedPos);
+        Direction bedFacing = bedState.hasProperty(BedBlock.FACING) ? bedState.getValue(BedBlock.FACING) : Direction.SOUTH;
+        float bedYaw = bedFacing.toYRot();
+
+        player.teleportTo(bedPos.x, Math.max(level.getMinBuildHeight(), state.worldzero$bedPos.getY() + 0.2D), bedPos.z);
+        player.setSleepingPos(state.worldzero$bedPos);
+        player.setPose(Pose.SLEEPING);
+        player.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        player.setYRot(bedYaw);
+        player.setYHeadRot(bedYaw);
+        player.setYBodyRot(bedYaw);
+        player.setXRot(0.0F);
+        player.fallDistance = 0.0F;
+    }
+
     private static float worldzero$wakeAwayFromBedYaw(ServerLevel level, BlockPos bedPos, ServerPlayer player) {
         Vec3 bedCenter = Vec3.atCenterOf(bedPos);
         double deltaX = player.getX() - bedCenter.x;
@@ -782,7 +887,7 @@ public final class WorldZeroParalysisEvent {
         }
 
         return switch (state.worldzero$phase) {
-            case CAMERA_ALIGN, BED_WATCH, BREATH_ONLY -> state;
+            case CAMERA_ALIGN, BED_WATCH, BREATH_ONLY, RETURN_TO_BED -> state;
             default -> null;
         };
     }
@@ -847,6 +952,120 @@ public final class WorldZeroParalysisEvent {
             level.setBlock(lowerPos, lowerState.setValue(DoorBlock.OPEN, false), 18);
             level.setBlock(lowerPos.above(), upperState.setValue(DoorBlock.OPEN, false), 18);
         }
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findNearestGlass(ServerLevel level, BlockPos center) {
+        if (center == null) {
+            return null;
+        }
+
+        BlockPos bestPos = null;
+        double bestDistanceSqr = Double.MAX_VALUE;
+        for (int x = center.getX() - WORLDZERO_BED_SEARCH_RADIUS; x <= center.getX() + WORLDZERO_BED_SEARCH_RADIUS; x++) {
+            for (int y = center.getY() - 4; y <= center.getY() + 4; y++) {
+                for (int z = center.getZ() - WORLDZERO_BED_SEARCH_RADIUS; z <= center.getZ() + WORLDZERO_BED_SEARCH_RADIUS; z++) {
+                    BlockPos candidatePos = new BlockPos(x, y, z);
+                    BlockState candidateState = level.getBlockState(candidatePos);
+                    if (!worldzero$isGlassLikeBlock(candidateState)) {
+                        continue;
+                    }
+
+                    double distanceSqr = center.distSqr(candidatePos);
+                    if (distanceSqr < bestDistanceSqr) {
+                        bestDistanceSqr = distanceSqr;
+                        bestPos = candidatePos.immutable();
+                    }
+                }
+            }
+        }
+
+        return bestPos;
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findNearestChest(ServerLevel level, @Nullable BlockPos center) {
+        if (center == null) {
+            return null;
+        }
+
+        BlockPos bestPos = null;
+        double bestDistanceSqr = Double.MAX_VALUE;
+        for (int x = center.getX() - WORLDZERO_BED_SEARCH_RADIUS; x <= center.getX() + WORLDZERO_BED_SEARCH_RADIUS; x++) {
+            for (int y = center.getY() - 4; y <= center.getY() + 4; y++) {
+                for (int z = center.getZ() - WORLDZERO_BED_SEARCH_RADIUS; z <= center.getZ() + WORLDZERO_BED_SEARCH_RADIUS; z++) {
+                    BlockPos candidatePos = new BlockPos(x, y, z);
+                    BlockState candidateState = level.getBlockState(candidatePos);
+                    if (!worldzero$isChestLikeBlock(candidateState)) {
+                        continue;
+                    }
+
+                    double distanceSqr = center.distSqr(candidatePos);
+                    if (distanceSqr < bestDistanceSqr) {
+                        bestDistanceSqr = distanceSqr;
+                        bestPos = candidatePos.immutable();
+                    }
+                }
+            }
+        }
+
+        return bestPos;
+    }
+
+    private static boolean worldzero$isGlassLikeBlock(BlockState state) {
+        if (state.isAir()) {
+            return false;
+        }
+
+        String blockPath = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+        return blockPath.contains("glass") || blockPath.contains("pane");
+    }
+
+    private static boolean worldzero$isChestLikeBlock(BlockState state) {
+        if (state.isAir()) {
+            return false;
+        }
+
+        String blockPath = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+        return blockPath.contains("chest") && !blockPath.contains("ender_chest");
+    }
+
+    private static boolean worldzero$insertDiamondIntoChest(ServerLevel level, @Nullable BlockPos chestPos) {
+        if (chestPos == null) {
+            return false;
+        }
+
+        if (!(level.getBlockEntity(chestPos) instanceof Container container)) {
+            return false;
+        }
+
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            ItemStack stack = container.getItem(slot);
+            if (!stack.is(Items.DIAMOND)) {
+                continue;
+            }
+
+            int maxCount = Math.min(stack.getMaxStackSize(), container.getMaxStackSize());
+            if (stack.getCount() >= maxCount) {
+                continue;
+            }
+
+            stack.grow(1);
+            container.setChanged();
+            return true;
+        }
+
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            if (!container.getItem(slot).isEmpty()) {
+                continue;
+            }
+
+            container.setItem(slot, new ItemStack(Items.DIAMOND, 1));
+            container.setChanged();
+            return true;
+        }
+
+        return false;
     }
 
     @Nullable
@@ -1020,6 +1239,10 @@ public final class WorldZeroParalysisEvent {
         }
 
         if (player != null) {
+            if (!player.isSleeping()) {
+                player.clearSleepingPos();
+                player.setPose(Pose.STANDING);
+            }
             WorldZeroNetwork.sendParalysisClientAction(
                     player,
                     WorldZeroParalysisClientPacket.WORLDZERO_ACTION_CLEAR,
@@ -1039,6 +1262,18 @@ public final class WorldZeroParalysisEvent {
         state.worldzero$phaseStartTick = -1L;
         state.worldzero$phaseEndTick = -1L;
         state.worldzero$lastBusyBedMessageTick = Long.MIN_VALUE;
+        state.worldzero$returnDoorOpened = false;
+        state.worldzero$returnGlassBroken = false;
+        state.worldzero$returnSleepStarted = false;
+        state.worldzero$returnDiamondPlaced = false;
+        state.worldzero$returnChestPos = null;
+        if (state.worldzero$returnGlassPos != null) {
+            ServerLevel level = server.getLevel(Level.OVERWORLD);
+            if (level != null) {
+                level.destroyBlockProgress(WORLDZERO_RETURN_TO_BED_GLASS_BREAKER_ID, state.worldzero$returnGlassPos, -1);
+            }
+        }
+        state.worldzero$returnGlassPos = null;
     }
 
     private static ParalysisSaveData worldzero$getSaveData(ServerLevel level) {
@@ -1066,6 +1301,12 @@ public final class WorldZeroParalysisEvent {
         private long worldzero$phaseStartTick = -1L;
         private long worldzero$phaseEndTick = -1L;
         private long worldzero$lastBusyBedMessageTick = Long.MIN_VALUE;
+        private boolean worldzero$returnDoorOpened;
+        private boolean worldzero$returnGlassBroken;
+        private boolean worldzero$returnSleepStarted;
+        private boolean worldzero$returnDiamondPlaced;
+        private BlockPos worldzero$returnChestPos;
+        private BlockPos worldzero$returnGlassPos;
         private double worldzero$lockedX;
         private double worldzero$lockedY;
         private double worldzero$lockedZ;

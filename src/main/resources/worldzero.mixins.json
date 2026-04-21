@@ -9,6 +9,7 @@
     "ClientPacketListenerMixin",
     "CreateWorldScreenMixin",
     "EntityTurnMixin",
+    "InBedChatScreenMixin",
     "KeyboardHandlerMixin",
     "LevelChunkMixin",
     "MinecraftMixin",

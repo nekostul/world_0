@@ -30,6 +30,13 @@
       }
     ]
   },
+  "knock": {
+    "sounds": [
+      {
+        "name": "worldzero:knock"
+      }
+    ]
+  },
   "fake_disc11": {
     "sounds": [
       {
@@ -42,6 +49,14 @@
     "sounds": [
       {
         "name": "worldzero:fake_c418",
+        "stream": true
+      }
+    ]
+  },
+  "c418mine": {
+    "sounds": [
+      {
+        "name": "worldzero:c418mine",
         "stream": true
       }
     ]

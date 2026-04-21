@@ -83,12 +83,15 @@ public final class WorldZeroKoridorDimension {
     private static final double WORLDZERO_ECHO_RUN_DOOR_OPEN_DISTANCE_SQR = 1.75D * 1.75D;
     private static final double WORLDZERO_ECHO_RUN_DOOR_CLOSE_DISTANCE_SQR = 1.05D * 1.05D;
     private static final long WORLDZERO_SLEEP_DREAM_DURATION_TICKS = 3L * 60L * 20L;
-    private static final long WORLDZERO_SLEEP_DREAM_CHASE_MAX_TICKS = 5L * 20L;
+    private static final long WORLDZERO_SLEEP_DREAM_CHASE_MAX_TICKS = 10L * 20L;
     private static final double WORLDZERO_SLEEP_DREAM_WAKE_DISTANCE_SQR = 5.0D * 5.0D;
     private static final double WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SPEED = 0.20D;
     private static final int WORLDZERO_SLEEP_DREAM_BLACK_ECHO_MIN_FORWARD_BLOCKS = 14;
     private static final int WORLDZERO_SLEEP_DREAM_BLACK_ECHO_MAX_FORWARD_BLOCKS = 22;
     private static final int WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SCAN_HALF_WIDTH = 5;
+    private static final int WORLDZERO_SLEEP_DREAM_BLACK_ECHO_CENTER_SCAN_HALF_WIDTH = 2;
+    private static final int WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SCAN_Y_DOWN = 2;
+    private static final int WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SCAN_Y_UP = 2;
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SERVER_STATES = new WeakHashMap<>();
 
     private WorldZeroKoridorDimension() {
@@ -377,6 +380,49 @@ public final class WorldZeroKoridorDimension {
         return candidate != null && worldzero$startEchoRun(level, sessionState, candidate, false);
     }
 
+    public static boolean worldzero$triggerDreamChaseNow(ServerPlayer player) {
+        if (player == null || !player.isAlive() || player.isSpectator()) {
+            return false;
+        }
+
+        ServerLevel level = player.serverLevel();
+        if (level.dimension() != WORLDZERO_KORIDOR_LEVEL) {
+            return false;
+        }
+
+        MinecraftServer server = level.getServer();
+        if (server == null) {
+            return false;
+        }
+
+        TemplateInfo templateInfo = worldzero$getTemplateInfo(level);
+        if (templateInfo == null) {
+            return false;
+        }
+
+        SessionState sessionState = WORLDZERO_SERVER_STATES.computeIfAbsent(server, ignored -> new SessionState());
+        long segmentIndex = worldzero$getSegmentIndex(player.blockPosition().getZ(), templateInfo.worldzero$segmentLength);
+        if (!worldzero$ensureSegmentsAround(level, segmentIndex, templateInfo)) {
+            return false;
+        }
+
+        ActiveDream activeDream = sessionState.worldzero$activeDream;
+        if (activeDream != null && !player.getUUID().equals(activeDream.worldzero$playerId)) {
+            return false;
+        }
+
+        if (activeDream == null) {
+            activeDream = new ActiveDream(player.getUUID(), level.getGameTime());
+            sessionState.worldzero$activeDream = activeDream;
+        }
+
+        if (activeDream.worldzero$chaseStartTick >= 0L) {
+            return worldzero$getEcho(level, activeDream.worldzero$blackEchoId) != null;
+        }
+
+        return worldzero$startDreamChase(level, activeDream, player);
+    }
+
     private static void worldzero$initializeEchoRunSchedule(ServerLevel level) {
         KoridorSaveData saveData = worldzero$getSaveData(level);
         if (saveData.worldzero$echoRunCompleted || saveData.worldzero$echoRunTriggerTick >= 0L) {
@@ -471,13 +517,9 @@ public final class WorldZeroKoridorDimension {
                 return;
             }
 
-            WorldZeroEchoEntity blackEcho = worldzero$spawnDreamBlackEcho(level, player);
-            if (blackEcho == null) {
+            if (!worldzero$startDreamChase(level, activeDream, player)) {
                 return;
             }
-
-            activeDream.worldzero$blackEchoId = blackEcho.getUUID();
-            activeDream.worldzero$chaseStartTick = level.getGameTime();
             return;
         }
 
@@ -645,18 +687,58 @@ public final class WorldZeroKoridorDimension {
 
     @Nullable
     private static Vec3 worldzero$findDreamBlackEchoSpawn(ServerLevel level, ServerPlayer player) {
-        int stepZ = player.getLookAngle().z >= 0.0D ? 1 : -1;
+        TemplateInfo templateInfo = worldzero$getTemplateInfo(level);
         BlockPos playerPos = player.blockPosition();
+        int preferredStepZ = player.getLookAngle().z >= 0.0D ? 1 : -1;
+        int centerX = templateInfo != null ? worldzero$getSpawnBlockPos(templateInfo).getX() : playerPos.getX();
+        Vec3 centerCandidate = worldzero$findDreamBlackEchoSpawnNearX(level, playerPos, preferredStepZ, centerX, WORLDZERO_SLEEP_DREAM_BLACK_ECHO_CENTER_SCAN_HALF_WIDTH);
+        if (centerCandidate != null) {
+            return centerCandidate;
+        }
+
+        centerCandidate = worldzero$findDreamBlackEchoSpawnNearX(level, playerPos, -preferredStepZ, centerX, WORLDZERO_SLEEP_DREAM_BLACK_ECHO_CENTER_SCAN_HALF_WIDTH);
+        if (centerCandidate != null) {
+            return centerCandidate;
+        }
+
+        Vec3 wideCandidate = worldzero$findDreamBlackEchoSpawnNearX(level, playerPos, preferredStepZ, playerPos.getX(), WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SCAN_HALF_WIDTH);
+        if (wideCandidate != null) {
+            return wideCandidate;
+        }
+
+        return worldzero$findDreamBlackEchoSpawnNearX(level, playerPos, -preferredStepZ, playerPos.getX(), WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SCAN_HALF_WIDTH);
+    }
+
+    @Nullable
+    private static Vec3 worldzero$findDreamBlackEchoSpawnNearX(
+            ServerLevel level,
+            BlockPos playerPos,
+            int stepZ,
+            int centerX,
+            int halfWidth
+    ) {
         for (int forward = WORLDZERO_SLEEP_DREAM_BLACK_ECHO_MAX_FORWARD_BLOCKS;
              forward >= WORLDZERO_SLEEP_DREAM_BLACK_ECHO_MIN_FORWARD_BLOCKS;
              forward--) {
             int z = playerPos.getZ() + stepZ * forward;
-            for (int dx = -WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SCAN_HALF_WIDTH;
-                 dx <= WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SCAN_HALF_WIDTH;
-                 dx++) {
-                BlockPos spawnPos = new BlockPos(playerPos.getX() + dx, playerPos.getY(), z);
-                if (worldzero$isBlackEchoSpawnPositionValid(level, spawnPos)) {
-                    return new Vec3(spawnPos.getX() + 0.5D, spawnPos.getY(), spawnPos.getZ() + 0.5D);
+            for (int yOffset = 0; yOffset <= WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SCAN_Y_DOWN + WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SCAN_Y_UP; yOffset++) {
+                int signedYOffset = yOffset == 0 ? 0 : ((yOffset + 1) / 2) * (yOffset % 2 == 0 ? -1 : 1);
+                if (signedYOffset < -WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SCAN_Y_DOWN
+                        || signedYOffset > WORLDZERO_SLEEP_DREAM_BLACK_ECHO_SCAN_Y_UP) {
+                    continue;
+                }
+
+                int y = playerPos.getY() + signedYOffset;
+                for (int dx = 0; dx <= halfWidth * 2; dx++) {
+                    int signedDx = dx == 0 ? 0 : ((dx + 1) / 2) * (dx % 2 == 0 ? -1 : 1);
+                    if (Math.abs(signedDx) > halfWidth) {
+                        continue;
+                    }
+
+                    BlockPos spawnPos = new BlockPos(centerX + signedDx, y, z);
+                    if (worldzero$isBlackEchoSpawnPositionValid(level, spawnPos)) {
+                        return new Vec3(spawnPos.getX() + 0.5D, spawnPos.getY(), spawnPos.getZ() + 0.5D);
+                    }
                 }
             }
         }
@@ -702,6 +784,23 @@ public final class WorldZeroKoridorDimension {
         blackEcho.setYRot(yaw);
         blackEcho.yHeadRot = yaw;
         blackEcho.yBodyRot = yaw;
+    }
+
+    private static boolean worldzero$startDreamChase(ServerLevel level, ActiveDream activeDream, ServerPlayer player) {
+        WorldZeroEchoEntity existingBlackEcho = worldzero$getEcho(level, activeDream.worldzero$blackEchoId);
+        if (existingBlackEcho != null) {
+            activeDream.worldzero$chaseStartTick = level.getGameTime();
+            return true;
+        }
+
+        WorldZeroEchoEntity blackEcho = worldzero$spawnDreamBlackEcho(level, player);
+        if (blackEcho == null) {
+            return false;
+        }
+
+        activeDream.worldzero$blackEchoId = blackEcho.getUUID();
+        activeDream.worldzero$chaseStartTick = level.getGameTime();
+        return true;
     }
 
     private static void worldzero$wakePlayerFromDream(

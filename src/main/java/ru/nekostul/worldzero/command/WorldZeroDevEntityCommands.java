@@ -63,10 +63,16 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerLastBlock(context.getSource())))
                         .then(Commands.literal("trigger_koridor_run")
                                 .executes(context -> worldzero$triggerKoridorRun(context.getSource())))
+                        .then(Commands.literal("trigger_koridor_chase")
+                                .executes(context -> worldzero$triggerKoridorChase(context.getSource())))
                         .then(Commands.literal("tp_koridor")
                                 .executes(context -> worldzero$teleportToKoridor(context.getSource())))
                         .then(Commands.literal("return_from_koridor")
                                 .executes(context -> worldzero$returnFromKoridor(context.getSource())))
+                        .then(Commands.literal("tp_house")
+                                .executes(context -> worldzero$teleportToHouse(context.getSource())))
+                        .then(Commands.literal("return_from_house")
+                                .executes(context -> worldzero$returnFromHouse(context.getSource())))
                         .then(Commands.literal("clean_disc")
                                 .executes(context -> worldzero$cleanDisc(context.getSource())))
                         .then(Commands.literal("trigger_house")
@@ -257,6 +263,20 @@ public final class WorldZeroDevEntityCommands {
         return triggered ? 1 : 0;
     }
 
+    private static int worldzero$triggerKoridorChase(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroKoridorDimension.worldzero$triggerDreamChaseNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] koridor black_echo chase force-triggered"
+                        : "[WORLD_0][DEV] koridor black_echo chase failed (be in koridor and keep a distant corridor segment loaded)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
     private static int worldzero$teleportToKoridor(CommandSourceStack source) {
         if (source.getPlayer() == null) {
             return 0;
@@ -281,6 +301,34 @@ public final class WorldZeroDevEntityCommands {
                 teleported
                         ? "[WORLD_0][DEV] returned from koridor dimension"
                         : "[WORLD_0][DEV] koridor return failed (no saved return point or target dimension is unavailable)"
+        ), false);
+        return teleported ? 1 : 0;
+    }
+
+    private static int worldzero$teleportToHouse(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean teleported = WorldZeroHouseDimension.worldzero$teleportPlayerToHouse(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                teleported
+                        ? "[WORLD_0][DEV] teleported to house dimension"
+                        : "[WORLD_0][DEV] house teleport failed (dimension, structure, or active return state is unavailable)"
+        ), false);
+        return teleported ? 1 : 0;
+    }
+
+    private static int worldzero$returnFromHouse(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean teleported = WorldZeroHouseDimension.worldzero$returnPlayerFromHouse(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                teleported
+                        ? "[WORLD_0][DEV] returned from house dimension"
+                        : "[WORLD_0][DEV] house return failed (no saved return point or target dimension is unavailable)"
         ), false);
         return teleported ? 1 : 0;
     }

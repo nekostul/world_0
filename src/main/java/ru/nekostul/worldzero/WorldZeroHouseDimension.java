@@ -202,7 +202,7 @@ public final class WorldZeroHouseDimension {
 
         BlockState state = event.getLevel().getBlockState(event.getPos());
         BlockEntity blockEntity = event.getLevel().getBlockEntity(event.getPos());
-        if (state.is(BlockTags.TRAPDOORS) || blockEntity instanceof SignBlockEntity) {
+        if (state.is(BlockTags.TRAPDOORS) || state.is(BlockTags.BEDS) || blockEntity instanceof SignBlockEntity) {
             event.setCanceled(true);
         }
     }

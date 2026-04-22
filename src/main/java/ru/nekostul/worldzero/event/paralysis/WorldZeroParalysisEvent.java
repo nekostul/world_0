@@ -62,15 +62,22 @@ public final class WorldZeroParalysisEvent {
     private static final int WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DURATION_TICKS = 10;
     private static final int WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS =
             WORLDZERO_RETURN_TO_BED_FOOTSTEP_INTERVAL_TICKS * (WORLDZERO_RETURN_TO_BED_FOOTSTEP_COUNT - 1);
-    private static final int WORLDZERO_RETURN_TO_BED_GLASS_BREAK_START_TICKS = WORLDZERO_RETURN_TO_BED_KNOCK_TICKS
-            + WORLDZERO_RETURN_TO_BED_DOOR_DELAY_TICKS
-            + WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS
-            + WORLDZERO_RETURN_TO_BED_CHEST_CLOSE_DELAY_TICKS
+    private static final int WORLDZERO_RETURN_TO_BED_DOOR_APPROACH_START_TICKS = WORLDZERO_RETURN_TO_BED_KNOCK_TICKS
+            + WORLDZERO_RETURN_TO_BED_DOOR_DELAY_TICKS;
+    private static final int WORLDZERO_RETURN_TO_BED_DOOR_OPEN_TICKS = WORLDZERO_RETURN_TO_BED_DOOR_APPROACH_START_TICKS
+            + WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS;
+    private static final int WORLDZERO_RETURN_TO_BED_CHEST_REACHED_TICKS = WORLDZERO_RETURN_TO_BED_DOOR_OPEN_TICKS
+            + WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS;
+    private static final int WORLDZERO_RETURN_TO_BED_CHEST_CLOSE_TICKS = WORLDZERO_RETURN_TO_BED_CHEST_REACHED_TICKS
+            + WORLDZERO_RETURN_TO_BED_CHEST_CLOSE_DELAY_TICKS;
+    private static final int WORLDZERO_RETURN_TO_BED_GLASS_BREAK_START_TICKS = WORLDZERO_RETURN_TO_BED_CHEST_CLOSE_TICKS
             + WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS
             + WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DELAY_TICKS;
-    private static final int WORLDZERO_RETURN_TO_BED_SLEEP_START_TICKS = WORLDZERO_RETURN_TO_BED_GLASS_BREAK_START_TICKS
-            + WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DURATION_TICKS
-            + 4;
+    private static final int WORLDZERO_RETURN_TO_BED_EXIT_START_TICKS = WORLDZERO_RETURN_TO_BED_GLASS_BREAK_START_TICKS
+            + WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DURATION_TICKS;
+    private static final int WORLDZERO_RETURN_TO_BED_DOOR_CLOSE_TICKS = WORLDZERO_RETURN_TO_BED_EXIT_START_TICKS
+            + WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS;
+    private static final int WORLDZERO_RETURN_TO_BED_SLEEP_START_TICKS = WORLDZERO_RETURN_TO_BED_DOOR_CLOSE_TICKS + 4;
     private static final int WORLDZERO_RETURN_TO_BED_TICKS = WORLDZERO_RETURN_TO_BED_SLEEP_START_TICKS + WORLDZERO_KORIDOR_SLEEP_FADE_TICKS;
     private static final int WORLDZERO_RETURN_TO_BED_GLASS_BREAKER_ID = 193204001;
     private static final int WORLDZERO_CAMERA_ALIGN_TIMEOUT_TICKS = 15 * 20;
@@ -507,18 +514,24 @@ public final class WorldZeroParalysisEvent {
         }
 
         if (!state.worldzero$returnDoorOpened
-                && elapsedTicks >= WORLDZERO_RETURN_TO_BED_KNOCK_TICKS + WORLDZERO_RETURN_TO_BED_DOOR_DELAY_TICKS
+                && elapsedTicks >= WORLDZERO_RETURN_TO_BED_DOOR_OPEN_TICKS
                 && state.worldzero$openedDoorPos != null
                 && worldzero$openSilentDoor(level, state.worldzero$openedDoorPos) != null) {
             state.worldzero$returnDoorOpened = true;
         }
 
         if (!state.worldzero$returnDiamondPlaced
-                && elapsedTicks >= WORLDZERO_RETURN_TO_BED_KNOCK_TICKS
-                + WORLDZERO_RETURN_TO_BED_DOOR_DELAY_TICKS
-                + WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS
+                && elapsedTicks >= WORLDZERO_RETURN_TO_BED_CHEST_REACHED_TICKS
                 && worldzero$insertDiamondIntoChest(level, state.worldzero$returnChestPos)) {
             state.worldzero$returnDiamondPlaced = true;
+        }
+
+        if (state.worldzero$returnDoorOpened
+                && elapsedTicks >= WORLDZERO_RETURN_TO_BED_DOOR_CLOSE_TICKS
+                && state.worldzero$openedDoorPos != null) {
+            worldzero$closeSilentDoor(level, state.worldzero$openedDoorPos);
+            state.worldzero$openedDoorPos = null;
+            state.worldzero$returnDoorOpened = false;
         }
 
         worldzero$updateReturnToBedGlassVisual(level, state, elapsedTicks);
@@ -900,7 +913,7 @@ public final class WorldZeroParalysisEvent {
         }
 
         state.worldzero$lastBusyBedMessageTick = gameTime;
-        player.displayClientMessage(worldzero$busyBedMessage(), false);
+        player.displayClientMessage(worldzero$busyBedMessage(), true);
     }
 
     private static Component worldzero$busyBedMessage() {

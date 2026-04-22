@@ -77,6 +77,10 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerHouseFarmDemo(context.getSource())))
                         .then(Commands.literal("return_from_house")
                                 .executes(context -> worldzero$returnFromHouse(context.getSource())))
+                        .then(Commands.literal("tp_house_bad")
+                                .executes(context -> worldzero$teleportToHouseBad(context.getSource())))
+                        .then(Commands.literal("return_from_house_bad")
+                                .executes(context -> worldzero$returnFromHouseBad(context.getSource())))
                         .then(Commands.literal("clean_disc")
                                 .executes(context -> worldzero$cleanDisc(context.getSource())))
                         .then(Commands.literal("trigger_house")
@@ -333,6 +337,34 @@ public final class WorldZeroDevEntityCommands {
                 teleported
                         ? "[WORLD_0][DEV] returned from house dimension"
                         : "[WORLD_0][DEV] house return failed (no saved return point or target dimension is unavailable)"
+        ), false);
+        return teleported ? 1 : 0;
+    }
+
+    private static int worldzero$teleportToHouseBad(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean teleported = WorldZeroHouseBadDimension.worldzero$teleportPlayerToHouseBad(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                teleported
+                        ? "[WORLD_0][DEV] teleported to house_bad dimension"
+                        : "[WORLD_0][DEV] house_bad teleport failed (dimension, structure, or active return state is unavailable)"
+        ), false);
+        return teleported ? 1 : 0;
+    }
+
+    private static int worldzero$returnFromHouseBad(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean teleported = WorldZeroHouseBadDimension.worldzero$returnPlayerFromHouseBad(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                teleported
+                        ? "[WORLD_0][DEV] returned from house_bad dimension"
+                        : "[WORLD_0][DEV] house_bad return failed (no saved return point or target dimension is unavailable)"
         ), false);
         return teleported ? 1 : 0;
     }

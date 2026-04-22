@@ -87,7 +87,7 @@ public final class WorldZeroHouseClientController {
     @SubscribeEvent
     public static void worldzero$onRenderBlockHighlight(RenderHighlightEvent.Block event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (!worldzero$isHouseLevel(minecraft) || minecraft == null || minecraft.level == null) {
+        if (!worldzero$isBarrierProtectedLevel(minecraft) || minecraft == null || minecraft.level == null) {
             return;
         }
 
@@ -146,5 +146,13 @@ public final class WorldZeroHouseClientController {
                 && minecraft.player != null
                 && minecraft.level != null
                 && minecraft.level.dimension() == WorldZeroHouseDimension.WORLDZERO_HOUSE_LEVEL;
+    }
+
+    private static boolean worldzero$isBarrierProtectedLevel(@Nullable Minecraft minecraft) {
+        return minecraft != null
+                && minecraft.player != null
+                && minecraft.level != null
+                && (minecraft.level.dimension() == WorldZeroHouseDimension.WORLDZERO_HOUSE_LEVEL
+                || minecraft.level.dimension() == WorldZeroHouseBadDimension.WORLDZERO_HOUSE_BAD_LEVEL);
     }
 }

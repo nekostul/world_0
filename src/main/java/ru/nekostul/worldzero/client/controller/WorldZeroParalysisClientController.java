@@ -1,15 +1,14 @@
 package ru.nekostul.worldzero;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Options;
-import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.screens.InBedChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
@@ -34,11 +33,9 @@ import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import ru.nekostul.worldzero.mixin.ChatComponentAccessor;
 
 import javax.annotation.Nullable;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
@@ -55,6 +52,9 @@ public final class WorldZeroParalysisClientController {
     private static final int WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DURATION_TICKS = 10;
     private static final int WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS =
             WORLDZERO_RETURN_TO_BED_FOOTSTEP_INTERVAL_TICKS * (WORLDZERO_RETURN_TO_BED_FOOTSTEP_COUNT - 1);
+    private static final int WORLDZERO_RETURN_TO_BED_DOOR_APPROACH_START_TICKS = WORLDZERO_RETURN_TO_BED_KNOCK_TICKS
+            + WORLDZERO_RETURN_TO_BED_DOOR_DELAY_TICKS;
+    private static final int WORLDZERO_RETURN_TO_BED_OUTSIDE_STEP_DISTANCE = 4;
     private static final ResourceLocation WORLDZERO_CREAK_SOUND_ID = new ResourceLocation(
             WorldZeroMod.MOD_ID,
             "creak"
@@ -78,6 +78,14 @@ public final class WorldZeroParalysisClientController {
     private static final ResourceLocation WORLDZERO_IRON_DOOR_OPEN_SOUND_ID = new ResourceLocation(
             "minecraft",
             "block.iron_door.open"
+    );
+    private static final ResourceLocation WORLDZERO_WOODEN_DOOR_CLOSE_SOUND_ID = new ResourceLocation(
+            "minecraft",
+            "block.wooden_door.close"
+    );
+    private static final ResourceLocation WORLDZERO_IRON_DOOR_CLOSE_SOUND_ID = new ResourceLocation(
+            "minecraft",
+            "block.iron_door.close"
     );
     private static final ResourceLocation WORLDZERO_CHEST_OPEN_SOUND_ID = new ResourceLocation(
             "minecraft",
@@ -470,7 +478,7 @@ public final class WorldZeroParalysisClientController {
         worldzero$busyBedMessageCooldownTicks = WORLDZERO_BUSY_BED_MESSAGE_COOLDOWN_TICKS;
         minecraft.player.displayClientMessage(
                 net.minecraft.network.chat.Component.translatable("message.worldzero.paralysis.bed_occupied"),
-                false
+                true
         );
     }
 
@@ -529,7 +537,7 @@ public final class WorldZeroParalysisClientController {
         }
 
         if (!worldzero$returnBedIntrusionPlayed
-                && worldzero$returnBedSequenceTicks >= WORLDZERO_RETURN_TO_BED_KNOCK_TICKS + WORLDZERO_RETURN_TO_BED_DOOR_DELAY_TICKS) {
+                && worldzero$returnBedSequenceTicks >= WORLDZERO_RETURN_TO_BED_DOOR_APPROACH_START_TICKS) {
             worldzero$returnBedIntrusionPlayed = true;
             worldzero$playReturnBedIntrusion(minecraft);
         }
@@ -540,35 +548,31 @@ public final class WorldZeroParalysisClientController {
         BlockPos bedPos = worldzero$returnBedPos != null ? worldzero$returnBedPos : worldzero$getSequenceCenter(minecraft);
         BlockPos chestPos = worldzero$findNearestChestPos(minecraft, bedPos);
         BlockPos glassPos = worldzero$findNearestGlassPos(minecraft, bedPos);
+        BlockPos outsideDoorPos = worldzero$getReturnBedOutsideAnchor(minecraft, doorPos, bedPos);
         BlockPos targetPos = glassPos != null ? glassPos : bedPos;
-        ResourceLocation doorSoundId = worldzero$getDoorOpenSoundId(minecraft, doorPos);
+        ResourceLocation doorOpenSoundId = worldzero$getDoorSoundId(minecraft, doorPos, true);
+        ResourceLocation doorCloseSoundId = worldzero$getDoorSoundId(minecraft, doorPos, false);
         ResourceLocation chestOpenSoundId = worldzero$getChestSoundId(minecraft, chestPos, true);
         ResourceLocation chestCloseSoundId = worldzero$getChestSoundId(minecraft, chestPos, false);
-        ResourceLocation stepSoundId = worldzero$getReturnBedStepSoundId(minecraft, bedPos);
         ResourceLocation glassSoundId = worldzero$getGlassBreakSoundId(minecraft, glassPos);
-        int chestSegmentEndDelay = WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS + WORLDZERO_RETURN_TO_BED_CHEST_CLOSE_DELAY_TICKS;
+        int currentDelay = 0;
+        BlockPos currentPos = doorPos != null ? doorPos : bedPos;
 
-        worldzero$playOneShotSound(
-                doorSoundId,
+        worldzero$playDelayedFootsteps(minecraft, outsideDoorPos, currentPos, currentDelay);
+        currentDelay += WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS;
+
+        worldzero$playDelayedOneShotSound(
+                doorOpenSoundId,
                 SoundSource.PLAYERS,
                 0.65F,
                 1.0F,
-                doorPos != null ? doorPos : bedPos
+                currentPos,
+                currentDelay
         );
 
         if (chestPos != null) {
-            for (int stepIndex = 0; stepIndex < WORLDZERO_RETURN_TO_BED_FOOTSTEP_COUNT; stepIndex++) {
-                int delay = WORLDZERO_RETURN_TO_BED_FOOTSTEP_INTERVAL_TICKS * stepIndex;
-                BlockPos stepPos = worldzero$getIntrusionStepPos(doorPos, chestPos, stepIndex + 1, WORLDZERO_RETURN_TO_BED_FOOTSTEP_COUNT);
-                worldzero$playDelayedOneShotSound(
-                        stepSoundId,
-                        SoundSource.PLAYERS,
-                        0.38F,
-                        0.94F + minecraft.level.random.nextFloat() * 0.12F,
-                        stepPos,
-                        delay
-                );
-            }
+            worldzero$playDelayedFootsteps(minecraft, currentPos, chestPos, currentDelay);
+            currentDelay += WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS;
 
             worldzero$playDelayedOneShotSound(
                     chestOpenSoundId,
@@ -576,31 +580,24 @@ public final class WorldZeroParalysisClientController {
                     0.70F,
                     1.0F,
                     chestPos,
-                    WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS
+                    currentDelay
             );
+            currentDelay += WORLDZERO_RETURN_TO_BED_CHEST_CLOSE_DELAY_TICKS;
             worldzero$playDelayedOneShotSound(
                     chestCloseSoundId,
                     SoundSource.PLAYERS,
                     0.70F,
                     1.0F,
                     chestPos,
-                    chestSegmentEndDelay
+                    currentDelay
             );
+            currentPos = chestPos;
         }
 
-        BlockPos glassStartPos = chestPos != null ? chestPos : (doorPos != null ? doorPos : bedPos);
-        for (int stepIndex = 0; stepIndex < WORLDZERO_RETURN_TO_BED_FOOTSTEP_COUNT; stepIndex++) {
-            int delay = chestSegmentEndDelay + WORLDZERO_RETURN_TO_BED_FOOTSTEP_INTERVAL_TICKS * stepIndex;
-            BlockPos stepPos = worldzero$getIntrusionStepPos(glassStartPos, targetPos, stepIndex + 1, WORLDZERO_RETURN_TO_BED_FOOTSTEP_COUNT);
-            worldzero$playDelayedOneShotSound(
-                    stepSoundId,
-                    SoundSource.PLAYERS,
-                    0.38F,
-                    0.94F + minecraft.level.random.nextFloat() * 0.12F,
-                    stepPos,
-                    delay
-            );
-        }
+        worldzero$playDelayedFootsteps(minecraft, currentPos, targetPos, currentDelay);
+        currentDelay += WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS
+                + WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DELAY_TICKS
+                + WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DURATION_TICKS;
 
         worldzero$playDelayedOneShotSound(
                 glassSoundId,
@@ -608,10 +605,19 @@ public final class WorldZeroParalysisClientController {
                 0.75F,
                 0.98F + minecraft.level.random.nextFloat() * 0.08F,
                 targetPos,
-                chestSegmentEndDelay
-                        + WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS
-                        + WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DELAY_TICKS
-                        + WORLDZERO_RETURN_TO_BED_GLASS_BREAK_DURATION_TICKS
+                currentDelay
+        );
+
+        worldzero$playDelayedFootsteps(minecraft, targetPos, outsideDoorPos, currentDelay);
+        currentDelay += WORLDZERO_RETURN_TO_BED_FOOTSTEP_SPAN_TICKS;
+
+        worldzero$playDelayedOneShotSound(
+                doorCloseSoundId,
+                SoundSource.PLAYERS,
+                0.65F,
+                1.0F,
+                doorPos != null ? doorPos : bedPos,
+                currentDelay
         );
     }
 
@@ -730,17 +736,21 @@ public final class WorldZeroParalysisClientController {
         return bestPos;
     }
 
-    private static ResourceLocation worldzero$getDoorOpenSoundId(Minecraft minecraft, @Nullable BlockPos doorPos) {
+    private static ResourceLocation worldzero$getDoorSoundId(Minecraft minecraft, @Nullable BlockPos doorPos, boolean open) {
         if (minecraft.level == null || doorPos == null) {
-            return WORLDZERO_WOODEN_DOOR_OPEN_SOUND_ID;
+            return open ? WORLDZERO_WOODEN_DOOR_OPEN_SOUND_ID : WORLDZERO_WOODEN_DOOR_CLOSE_SOUND_ID;
         }
 
         BlockState doorState = minecraft.level.getBlockState(doorPos);
         if (!doorState.is(BlockTags.DOORS)) {
-            return WORLDZERO_WOODEN_DOOR_OPEN_SOUND_ID;
+            return open ? WORLDZERO_WOODEN_DOOR_OPEN_SOUND_ID : WORLDZERO_WOODEN_DOOR_CLOSE_SOUND_ID;
         }
 
-        return doorState.is(Blocks.IRON_DOOR) ? WORLDZERO_IRON_DOOR_OPEN_SOUND_ID : WORLDZERO_WOODEN_DOOR_OPEN_SOUND_ID;
+        if (doorState.is(Blocks.IRON_DOOR)) {
+            return open ? WORLDZERO_IRON_DOOR_OPEN_SOUND_ID : WORLDZERO_IRON_DOOR_CLOSE_SOUND_ID;
+        }
+
+        return open ? WORLDZERO_WOODEN_DOOR_OPEN_SOUND_ID : WORLDZERO_WOODEN_DOOR_CLOSE_SOUND_ID;
     }
 
     private static ResourceLocation worldzero$getChestSoundId(Minecraft minecraft, @Nullable BlockPos chestPos, boolean open) {
@@ -756,12 +766,21 @@ public final class WorldZeroParalysisClientController {
         return open ? WORLDZERO_CHEST_OPEN_SOUND_ID : WORLDZERO_CHEST_CLOSE_SOUND_ID;
     }
 
-    private static ResourceLocation worldzero$getReturnBedStepSoundId(Minecraft minecraft, BlockPos bedPos) {
-        if (minecraft.level == null) {
+    private static ResourceLocation worldzero$getReturnBedStepSoundId(Minecraft minecraft, @Nullable BlockPos stepPos) {
+        if (minecraft.level == null || stepPos == null) {
             return WORLDZERO_STONE_STEP_SOUND_ID;
         }
 
-        BlockPos floorPos = bedPos.below();
+        BlockPos floorPos = stepPos.below();
+        for (int depth = 0; depth < 3; depth++) {
+            BlockPos candidatePos = stepPos.below(1 + depth);
+            BlockState candidateState = minecraft.level.getBlockState(candidatePos);
+            if (!candidateState.getCollisionShape(minecraft.level, candidatePos).isEmpty()) {
+                floorPos = candidatePos;
+                break;
+            }
+        }
+
         BlockState floorState = minecraft.level.getBlockState(floorPos);
         SoundType soundType = floorState.getSoundType(minecraft.level, floorPos, minecraft.player);
         return worldzero$getSoundId(soundType.getStepSound(), WORLDZERO_STONE_STEP_SOUND_ID);
@@ -787,20 +806,91 @@ public final class WorldZeroParalysisClientController {
     }
 
     private static BlockPos worldzero$getIntrusionStepPos(
-            @Nullable BlockPos doorPos,
-            BlockPos bedPos,
+            @Nullable BlockPos startPos,
+            BlockPos endPos,
             int stepIndex,
             int totalSteps
     ) {
-        if (doorPos == null) {
-            return bedPos;
+        if (startPos == null) {
+            return endPos;
         }
 
         double progress = (double) stepIndex / (double) (totalSteps + 1);
-        double x = Mth.lerp(progress, doorPos.getX() + 0.5D, bedPos.getX() + 0.5D);
-        double y = Mth.lerp(progress, doorPos.getY(), bedPos.getY());
-        double z = Mth.lerp(progress, doorPos.getZ() + 0.5D, bedPos.getZ() + 0.5D);
+        double x = Mth.lerp(progress, startPos.getX() + 0.5D, endPos.getX() + 0.5D);
+        double y = Mth.lerp(progress, startPos.getY(), endPos.getY());
+        double z = Mth.lerp(progress, startPos.getZ() + 0.5D, endPos.getZ() + 0.5D);
         return BlockPos.containing(x, y, z);
+    }
+
+    private static void worldzero$playDelayedFootsteps(
+            Minecraft minecraft,
+            @Nullable BlockPos startPos,
+            BlockPos endPos,
+            int startDelay
+    ) {
+        for (int stepIndex = 0; stepIndex < WORLDZERO_RETURN_TO_BED_FOOTSTEP_COUNT; stepIndex++) {
+            int delay = startDelay + WORLDZERO_RETURN_TO_BED_FOOTSTEP_INTERVAL_TICKS * stepIndex;
+            BlockPos stepPos = worldzero$getIntrusionStepPos(startPos, endPos, stepIndex + 1, WORLDZERO_RETURN_TO_BED_FOOTSTEP_COUNT);
+            ResourceLocation stepSoundId = worldzero$getReturnBedStepSoundId(minecraft, stepPos);
+            worldzero$playDelayedOneShotSound(
+                    stepSoundId,
+                    SoundSource.PLAYERS,
+                    0.38F,
+                    0.94F + minecraft.level.random.nextFloat() * 0.12F,
+                    stepPos,
+                    delay
+            );
+        }
+    }
+
+    private static BlockPos worldzero$getReturnBedOutsideAnchor(
+            Minecraft minecraft,
+            @Nullable BlockPos doorPos,
+            @Nullable BlockPos bedPos
+    ) {
+        if (doorPos == null) {
+            return bedPos != null ? bedPos : worldzero$getSequenceCenter(minecraft);
+        }
+
+        Direction outsideDirection = worldzero$getReturnBedOutsideDirection(doorPos, bedPos);
+        BlockPos bestPos = doorPos.immutable();
+        for (int distance = 1; distance <= WORLDZERO_RETURN_TO_BED_OUTSIDE_STEP_DISTANCE; distance++) {
+            BlockPos candidatePos = doorPos.relative(outsideDirection, distance);
+            if (!worldzero$hasReturnBedFootstepSurface(minecraft, candidatePos)) {
+                break;
+            }
+            bestPos = candidatePos.immutable();
+        }
+        return bestPos;
+    }
+
+    private static Direction worldzero$getReturnBedOutsideDirection(BlockPos doorPos, @Nullable BlockPos bedPos) {
+        if (bedPos == null) {
+            return Direction.SOUTH;
+        }
+
+        int deltaX = doorPos.getX() - bedPos.getX();
+        int deltaZ = doorPos.getZ() - bedPos.getZ();
+        if (Math.abs(deltaX) >= Math.abs(deltaZ)) {
+            return deltaX >= 0 ? Direction.EAST : Direction.WEST;
+        }
+
+        return deltaZ >= 0 ? Direction.SOUTH : Direction.NORTH;
+    }
+
+    private static boolean worldzero$hasReturnBedFootstepSurface(Minecraft minecraft, BlockPos pos) {
+        if (minecraft.level == null) {
+            return false;
+        }
+
+        for (int depth = 1; depth <= 3; depth++) {
+            BlockPos candidatePos = pos.below(depth);
+            BlockState candidateState = minecraft.level.getBlockState(candidatePos);
+            if (!candidateState.getCollisionShape(minecraft.level, candidatePos).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean worldzero$isGlassLikeBlock(BlockState state) {
@@ -879,24 +969,6 @@ public final class WorldZeroParalysisClientController {
         }
     }
 
-    private static void worldzero$removeBusyBedMessages() {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft == null || minecraft.gui == null) {
-            return;
-        }
-
-        String localizedMessage = net.minecraft.network.chat.Component
-                .translatable("message.worldzero.paralysis.bed_occupied")
-                .getString();
-        ChatComponent chat = minecraft.gui.getChat();
-        ChatComponentAccessor accessor = (ChatComponentAccessor) (Object) chat;
-        List<GuiMessage> allMessages = accessor.worldzero$getAllMessages();
-        boolean removed = allMessages.removeIf(message -> localizedMessage.equals(message.content().getString()));
-        if (removed) {
-            accessor.worldzero$refreshTrimmedMessage();
-        }
-    }
-
     private static void worldzero$clearState() {
         worldzero$movementBlocked = false;
         worldzero$bedViewActive = false;
@@ -918,7 +990,6 @@ public final class WorldZeroParalysisClientController {
             worldzero$activeBreathSound.worldzero$stopNow();
             worldzero$activeBreathSound = null;
         }
-        worldzero$removeBusyBedMessages();
         WorldZeroSleepFadeOverlay.worldzero$clearForcedFade();
     }
 

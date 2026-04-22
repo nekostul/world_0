@@ -19,6 +19,9 @@ import javax.annotation.Nullable;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class WorldZeroHouseClientController {
+    public static final byte WORLDZERO_MODE_DEFAULT = 0;
+    public static final byte WORLDZERO_MODE_MUSIC = 1;
+    public static final byte WORLDZERO_MODE_SILENT = 2;
     private static final ResourceLocation WORLDZERO_C418MINE_SOUND_ID = new ResourceLocation(
             WorldZeroMod.MOD_ID,
             "c418mine"
@@ -26,9 +29,17 @@ public final class WorldZeroHouseClientController {
 
     private static boolean worldzero$houseActive;
     private static boolean worldzero$finishSignalSent;
+    private static byte worldzero$pendingHouseMode = WORLDZERO_MODE_DEFAULT;
     private static SoundInstance worldzero$activeHouseSound;
 
     private WorldZeroHouseClientController() {
+    }
+
+    public static void handleModePacket(byte mode) {
+        worldzero$pendingHouseMode = mode;
+        if (mode == WORLDZERO_MODE_SILENT) {
+            worldzero$stopActiveHouseSound();
+        }
     }
 
     @SubscribeEvent
@@ -92,6 +103,11 @@ public final class WorldZeroHouseClientController {
 
         worldzero$houseActive = true;
         worldzero$finishSignalSent = false;
+        if (worldzero$pendingHouseMode == WORLDZERO_MODE_SILENT) {
+            worldzero$activeHouseSound = null;
+            return;
+        }
+
         SoundInstance soundInstance = new SimpleSoundInstance(
                 WORLDZERO_C418MINE_SOUND_ID,
                 SoundSource.RECORDS,
@@ -111,14 +127,18 @@ public final class WorldZeroHouseClientController {
     }
 
     private static void worldzero$clearState() {
+        worldzero$stopActiveHouseSound();
+        worldzero$houseActive = false;
+        worldzero$finishSignalSent = false;
+        worldzero$pendingHouseMode = WORLDZERO_MODE_DEFAULT;
+    }
+
+    private static void worldzero$stopActiveHouseSound() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft != null && minecraft.getSoundManager() != null && worldzero$activeHouseSound != null) {
             minecraft.getSoundManager().stop(worldzero$activeHouseSound);
         }
-
         worldzero$activeHouseSound = null;
-        worldzero$houseActive = false;
-        worldzero$finishSignalSent = false;
     }
 
     private static boolean worldzero$isHouseLevel(@Nullable Minecraft minecraft) {

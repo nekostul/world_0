@@ -6,6 +6,7 @@ import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -14,6 +15,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.Container;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
@@ -21,10 +23,13 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.ChestType;
@@ -33,8 +38,11 @@ import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.living.LivingFallEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
@@ -73,6 +81,7 @@ public final class WorldZeroHouseDimension {
     private static final int WORLDZERO_SCAN_RADIUS_VERTICAL = 8;
     private static final int WORLDZERO_BARRIER_PADDING = 1;
     private static final int WORLDZERO_BARRIER_HEIGHT_PADDING = 2;
+    private static final int WORLDZERO_RESTORATION_SCENE_TIMEOUT_TICKS = 20 * 45;
     private static final ChestLootEntry[] WORLDZERO_PRIMARY_CHEST_LOOT = new ChestLootEntry[]{
             new ChestLootEntry(Items.DIAMOND, 27),
             new ChestLootEntry(Items.DIAMOND, 11),
@@ -125,6 +134,29 @@ public final class WorldZeroHouseDimension {
     };
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SERVER_STATES = new WeakHashMap<>();
 
+    private enum HouseVisitMode {
+        NORMAL((byte) 1, WorldZeroHouseClientController.WORLDZERO_MODE_MUSIC),
+        RESTORATION((byte) 2, WorldZeroHouseClientController.WORLDZERO_MODE_SILENT);
+
+        private final byte worldzero$saveId;
+        private final byte worldzero$clientMode;
+
+        HouseVisitMode(byte saveId, byte clientMode) {
+            this.worldzero$saveId = saveId;
+            this.worldzero$clientMode = clientMode;
+        }
+
+        @Nullable
+        private static HouseVisitMode worldzero$fromSaveId(byte saveId) {
+            for (HouseVisitMode value : values()) {
+                if (value.worldzero$saveId == saveId) {
+                    return value;
+                }
+            }
+            return null;
+        }
+    }
+
     private WorldZeroHouseDimension() {
     }
 
@@ -134,19 +166,32 @@ public final class WorldZeroHouseDimension {
             return;
         }
 
-        if (!(event.level instanceof ServerLevel level) || level.dimension() != Level.OVERWORLD) {
+        if (!(event.level instanceof ServerLevel level)) {
             return;
         }
 
         MinecraftServer server = level.getServer();
-        if (server == null || WorldZeroParalysisEvent.worldzero$isParalysisActive(server)) {
+        if (server == null) {
+            return;
+        }
+
+        if (level.dimension() == WORLDZERO_HOUSE_LEVEL) {
+            worldzero$tickRestorationScenes(level, server);
+            return;
+        }
+
+        if (level.dimension() != Level.OVERWORLD) {
+            return;
+        }
+
+        if (WorldZeroParalysisEvent.worldzero$isParalysisActive(server)) {
             return;
         }
 
         HouseSaveData saveData = worldzero$getSaveData(server);
         SessionState sessionState = WORLDZERO_SERVER_STATES.computeIfAbsent(server, ignored -> new SessionState());
 
-        for (ServerPlayer player : level.players()) {
+        for (ServerPlayer player : new ArrayList<>(level.players())) {
             if (player.serverLevel() != level) {
                 continue;
             }
@@ -156,8 +201,10 @@ public final class WorldZeroHouseDimension {
                     playerId,
                     ignored -> new SleepTracker()
             );
+            boolean restorationReady = worldzero$hasRestorationDamage(saveData, playerId)
+                    && saveData.worldzero$restorationPendingPlayers.contains(playerId);
 
-            if (!player.isAlive() || player.isSpectator() || saveData.worldzero$completedPlayers.contains(playerId)) {
+            if (!player.isAlive() || player.isSpectator()) {
                 tracker.worldzero$reset();
                 continue;
             }
@@ -170,12 +217,29 @@ public final class WorldZeroHouseDimension {
             int sleepCount = saveData.worldzero$sleepCounts.getOrDefault(playerId, 0);
             if (!tracker.worldzero$currentSleepTracked && player.getSleepTimer() > 0) {
                 tracker.worldzero$currentSleepTracked = true;
-                if (sleepCount >= WORLDZERO_SLEEP_COUNT_BEFORE_TRIGGER) {
+                if (restorationReady) {
+                    tracker.worldzero$restorationTeleportPending = true;
+                } else if (saveData.worldzero$completedPlayers.contains(playerId)) {
+                    tracker.worldzero$houseTeleportPending = false;
+                } else if (sleepCount >= WORLDZERO_SLEEP_COUNT_BEFORE_TRIGGER) {
                     tracker.worldzero$houseTeleportPending = true;
                 } else {
                     saveData.worldzero$sleepCounts.put(playerId, sleepCount + 1);
                     saveData.setDirty();
                 }
+            }
+
+            if (tracker.worldzero$restorationTeleportPending
+                    && player.getSleepTimer() >= WORLDZERO_SLEEP_FADE_TICKS
+                    && worldzero$startRestorationDream(player)) {
+                saveData.worldzero$restorationPendingPlayers.remove(playerId);
+                saveData.setDirty();
+                tracker.worldzero$reset();
+                continue;
+            }
+
+            if (saveData.worldzero$completedPlayers.contains(playerId)) {
+                continue;
             }
 
             if (tracker.worldzero$houseTeleportPending
@@ -235,12 +299,88 @@ public final class WorldZeroHouseDimension {
         }
     }
 
+    @SubscribeEvent
+    public static void worldzero$onFarmlandTrample(BlockEvent.FarmlandTrampleEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || !(event.getLevel() instanceof ServerLevel level)) {
+            return;
+        }
+
+        if (player.level().dimension() != WORLDZERO_HOUSE_LEVEL) {
+            return;
+        }
+
+        if (!worldzero$isFieldDamageAllowed(player, event.getPos(), event.getState())) {
+            event.setCanceled(true);
+            return;
+        }
+
+        worldzero$recordTrampleDamage(player, level, event.getPos(), event.getState());
+        SessionState sessionState = WORLDZERO_SERVER_STATES.computeIfAbsent(player.getServer(), ignored -> new SessionState());
+        sessionState.worldzero$lastTrampleMarkers.put(
+                player.getUUID(),
+                new TrampleMarker(level.getGameTime(), event.getPos())
+        );
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onLivingFall(LivingFallEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || event.getDistance() <= 0.5F) {
+            return;
+        }
+
+        if (player.level().dimension() != WORLDZERO_HOUSE_LEVEL || !(player.level() instanceof ServerLevel level)) {
+            return;
+        }
+
+        SessionState sessionState = WORLDZERO_SERVER_STATES.computeIfAbsent(player.getServer(), ignored -> new SessionState());
+
+        BlockPos[] candidates = new BlockPos[]{
+                player.blockPosition(),
+                player.blockPosition().below()
+        };
+        for (BlockPos candidate : candidates) {
+            BlockState state = level.getBlockState(candidate);
+            if (!(state.getBlock() instanceof FarmBlock)) {
+                continue;
+            }
+            if (!worldzero$isFieldDamageAllowed(player, candidate, state)) {
+                return;
+            }
+            TrampleMarker marker = sessionState.worldzero$lastTrampleMarkers.get(player.getUUID());
+            if (marker != null
+                    && marker.worldzero$gameTime == level.getGameTime()
+                    && marker.worldzero$pos.equals(candidate)) {
+                return;
+            }
+            worldzero$applyFallbackTrampleDamage(player, level, candidate, state);
+            return;
+        }
+    }
+
     public static boolean worldzero$startSleepDream(ServerPlayer player) {
         if (player == null || !player.isAlive() || player.isSpectator() || player.level().dimension() != Level.OVERWORLD) {
             return false;
         }
 
-        return worldzero$teleportPlayerToHouseInternal(player, true);
+        return worldzero$teleportPlayerToHouseInternal(player, true, HouseVisitMode.NORMAL);
+    }
+
+    public static boolean worldzero$startRestorationDream(ServerPlayer player) {
+        if (player == null || !player.isAlive() || player.isSpectator() || player.level().dimension() != Level.OVERWORLD) {
+            return false;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return false;
+        }
+
+        HouseSaveData saveData = worldzero$getSaveData(server);
+        if (!worldzero$hasRestorationDamage(saveData, player.getUUID())) {
+            return false;
+        }
+
+        return worldzero$teleportPlayerToHouseInternal(player, true, HouseVisitMode.RESTORATION);
     }
 
     public static boolean worldzero$teleportPlayerToHouse(ServerPlayer player) {
@@ -248,10 +388,47 @@ public final class WorldZeroHouseDimension {
             return false;
         }
 
-        return worldzero$teleportPlayerToHouseInternal(player, false);
+        return worldzero$teleportPlayerToHouseInternal(player, false, HouseVisitMode.NORMAL);
+    }
+
+    public static boolean worldzero$triggerRestorationDreamNow(ServerPlayer player) {
+        if (player == null || !player.isAlive() || player.isSpectator() || player.level().dimension() != Level.OVERWORLD) {
+            return false;
+        }
+
+        return worldzero$startRestorationDream(player);
+    }
+
+    public static boolean worldzero$triggerRestorationDreamDemoNow(ServerPlayer player) {
+        if (player == null || !player.isAlive() || player.isSpectator() || player.level().dimension() != Level.OVERWORLD) {
+            return false;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return false;
+        }
+
+        HouseSaveData saveData = worldzero$getSaveData(server);
+        if (!worldzero$hasRestorationDamage(saveData, player.getUUID())
+                && !worldzero$seedDebugRestorationDamage(server, saveData, player.getUUID())) {
+            return false;
+        }
+
+        saveData.worldzero$restorationPendingPlayers.add(player.getUUID());
+        saveData.setDirty();
+        return worldzero$startRestorationDream(player);
     }
 
     public static boolean worldzero$returnPlayerFromHouse(ServerPlayer player) {
+        return worldzero$returnPlayerFromHouseInternal(player, false);
+    }
+
+    private static boolean worldzero$finishRestorationDream(ServerPlayer player) {
+        return worldzero$returnPlayerFromHouseInternal(player, true);
+    }
+
+    private static boolean worldzero$returnPlayerFromHouseInternal(ServerPlayer player, boolean clearRestorationDamage) {
         if (player == null) {
             return false;
         }
@@ -264,6 +441,7 @@ public final class WorldZeroHouseDimension {
         HouseSaveData saveData = worldzero$getSaveData(server);
         ReturnPoint returnPoint = saveData.worldzero$returnPoints.remove(player.getUUID());
         PlayerInventorySnapshot inventorySnapshot = saveData.worldzero$inventorySnapshots.remove(player.getUUID());
+        HouseVisitMode visitMode = saveData.worldzero$visitModes.remove(player.getUUID());
         if (returnPoint == null && inventorySnapshot == null && player.serverLevel().dimension() != WORLDZERO_HOUSE_LEVEL) {
             return false;
         }
@@ -315,6 +493,18 @@ public final class WorldZeroHouseDimension {
             player.stopSleepInBed(false, true);
         }
 
+        ServerLevel currentLevel = player.serverLevel();
+        SessionState sessionState = WORLDZERO_SERVER_STATES.get(server);
+        if (sessionState != null) {
+            RestorationSceneState sceneState = sessionState.worldzero$restorationScenes.remove(player.getUUID());
+            if (sceneState != null && currentLevel.dimension() == WORLDZERO_HOUSE_LEVEL) {
+                Entity echo = currentLevel.getEntity(sceneState.worldzero$echoEntityId);
+                if (echo != null) {
+                    echo.discard();
+                }
+            }
+        }
+
         player.teleportTo(targetLevel, targetX, targetY, targetZ, targetYaw, targetPitch);
         player.clearSleepingPos();
         player.setPose(Pose.STANDING);
@@ -323,6 +513,21 @@ public final class WorldZeroHouseDimension {
 
         if (inventorySnapshot != null) {
             worldzero$restorePlayerInventory(player, inventorySnapshot);
+        }
+
+        if (visitMode == HouseVisitMode.RESTORATION) {
+            WorldZeroNetwork.sendFreezeEnd(player);
+            if (clearRestorationDamage) {
+                saveData.worldzero$restorationEntries.remove(player.getUUID());
+                saveData.worldzero$restorationPendingPlayers.remove(player.getUUID());
+                saveData.setDirty();
+            } else if (worldzero$hasRestorationDamage(saveData, player.getUUID())) {
+                saveData.worldzero$restorationPendingPlayers.add(player.getUUID());
+                saveData.setDirty();
+            }
+        } else if (visitMode == HouseVisitMode.NORMAL && worldzero$hasRestorationDamage(saveData, player.getUUID())) {
+            saveData.worldzero$restorationPendingPlayers.add(player.getUUID());
+            saveData.setDirty();
         }
 
         if (returnPoint != null && returnPoint.worldzero$setMorningOnReturn && targetLevel.dimension() == Level.OVERWORLD) {
@@ -337,10 +542,24 @@ public final class WorldZeroHouseDimension {
             return;
         }
 
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return;
+        }
+
+        HouseSaveData saveData = worldzero$getSaveData(server);
+        if (saveData.worldzero$visitModes.get(player.getUUID()) != HouseVisitMode.NORMAL) {
+            return;
+        }
+
         worldzero$returnPlayerFromHouse(player);
     }
 
-    private static boolean worldzero$teleportPlayerToHouseInternal(ServerPlayer player, boolean fromSleep) {
+    private static boolean worldzero$teleportPlayerToHouseInternal(
+            ServerPlayer player,
+            boolean fromSleep,
+            HouseVisitMode visitMode
+    ) {
         MinecraftServer server = player.getServer();
         if (server == null) {
             return false;
@@ -362,9 +581,29 @@ public final class WorldZeroHouseDimension {
             return false;
         }
 
+        List<RestorationEntry> restorationEntries = visitMode == HouseVisitMode.RESTORATION
+                ? worldzero$getRestorationEntries(saveData, player.getUUID())
+                : java.util.Collections.emptyList();
+        RestorationDreamPlan restorationPlan = null;
+        if (visitMode == HouseVisitMode.RESTORATION) {
+            if (restorationEntries.isEmpty()) {
+                return false;
+            }
+            worldzero$applyRestorationDamageState(houseLevel, restorationEntries);
+            restorationPlan = worldzero$createRestorationDreamPlan(houseLevel, templateInfo, restorationEntries);
+            if (restorationPlan == null) {
+                return false;
+            }
+        }
+
         BlockPos bedPos = worldzero$findPrimaryBedPos(houseLevel, templateInfo);
-        BlockPos spawnPos = worldzero$findSpawnPosNearBed(houseLevel, bedPos, templateInfo);
-        float spawnYaw = worldzero$getHouseSpawnYaw(houseLevel, bedPos);
+        BlockPos spawnPos = restorationPlan != null
+                ? restorationPlan.worldzero$playerPos
+                : worldzero$findSpawnPosNearBed(houseLevel, bedPos, templateInfo);
+        float spawnYaw = restorationPlan != null
+                ? restorationPlan.worldzero$playerYaw
+                : worldzero$getHouseSpawnYaw(houseLevel, bedPos);
+        float spawnPitch = restorationPlan != null ? restorationPlan.worldzero$playerPitch : 0.0F;
 
         ReturnPoint returnPoint = new ReturnPoint(
                 player.serverLevel().dimension(),
@@ -383,14 +622,19 @@ public final class WorldZeroHouseDimension {
 
         saveData.worldzero$returnPoints.put(player.getUUID(), returnPoint);
         saveData.worldzero$inventorySnapshots.put(player.getUUID(), inventorySnapshot);
+        saveData.worldzero$visitModes.put(player.getUUID(), visitMode);
         saveData.setDirty();
 
         worldzero$clearPlayerInventory(player);
+        WorldZeroNetwork.sendHouseClientMode(player, visitMode.worldzero$clientMode);
 
         houseLevel.getChunkAt(spawnPos);
-        player.teleportTo(houseLevel, spawnPos.getX() + 0.5D, spawnPos.getY(), spawnPos.getZ() + 0.5D, spawnYaw, 0.0F);
+        player.teleportTo(houseLevel, spawnPos.getX() + 0.5D, spawnPos.getY(), spawnPos.getZ() + 0.5D, spawnYaw, spawnPitch);
         player.setDeltaMovement(0.0D, 0.0D, 0.0D);
         player.fallDistance = 0.0F;
+        if (restorationPlan != null && !worldzero$startRestorationScene(player, houseLevel, restorationPlan)) {
+            return worldzero$returnPlayerFromHouseInternal(player, false);
+        }
         return true;
     }
 
@@ -821,6 +1065,428 @@ public final class WorldZeroHouseDimension {
         return new AABB(origin, max);
     }
 
+    private static void worldzero$tickRestorationScenes(ServerLevel level, MinecraftServer server) {
+        SessionState sessionState = WORLDZERO_SERVER_STATES.get(server);
+        if (sessionState == null || sessionState.worldzero$restorationScenes.isEmpty()) {
+            return;
+        }
+
+        List<UUID> playersToWake = new ArrayList<>();
+        List<UUID> playersToDrop = new ArrayList<>();
+        for (Map.Entry<UUID, RestorationSceneState> entry : sessionState.worldzero$restorationScenes.entrySet()) {
+            UUID playerId = entry.getKey();
+            RestorationSceneState sceneState = entry.getValue();
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null || !player.isAlive() || player.isSpectator()) {
+                playersToDrop.add(playerId);
+                continue;
+            }
+
+            if (player.serverLevel() != level || player.level().dimension() != WORLDZERO_HOUSE_LEVEL) {
+                playersToDrop.add(playerId);
+                continue;
+            }
+
+            player.setDeltaMovement(0.0D, 0.0D, 0.0D);
+            player.fallDistance = 0.0F;
+            sceneState.worldzero$timeoutTicks--;
+            if (sceneState.worldzero$timeoutTicks <= 0) {
+                playersToWake.add(playerId);
+                continue;
+            }
+
+            Entity echo = level.getEntity(sceneState.worldzero$echoEntityId);
+            if (echo == null || !echo.isAlive()) {
+                if (sceneState.worldzero$spawnGraceTicks > 0) {
+                    sceneState.worldzero$spawnGraceTicks--;
+                }
+                continue;
+            }
+            sceneState.worldzero$spawnGraceTicks = 0;
+            if (echo instanceof WorldZeroHouseEchoEntity houseEcho
+                    && houseEcho.worldzero$isFarmRestorationReadyToWake()) {
+                playersToWake.add(playerId);
+            }
+        }
+
+        for (UUID playerId : playersToDrop) {
+            sessionState.worldzero$restorationScenes.remove(playerId);
+        }
+
+        for (UUID playerId : playersToWake) {
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null) {
+                worldzero$finishRestorationDream(player);
+            } else {
+                sessionState.worldzero$restorationScenes.remove(playerId);
+            }
+        }
+    }
+
+    private static boolean worldzero$startRestorationScene(
+            ServerPlayer player,
+            ServerLevel houseLevel,
+            RestorationDreamPlan plan
+    ) {
+        WorldZeroHouseEchoEntity echo = WorldZeroEntities.WORLDZERO_HOUSE_ECHO.get().create(houseLevel);
+        if (echo == null) {
+            return false;
+        }
+
+        echo.moveTo(
+                plan.worldzero$echoSpawnPos.getX() + 0.5D,
+                plan.worldzero$echoSpawnPos.getY(),
+                plan.worldzero$echoSpawnPos.getZ() + 0.5D,
+                plan.worldzero$playerYaw,
+                0.0F
+        );
+        echo.worldzero$configureFarmRestoration(
+                player.getUUID(),
+                plan.worldzero$tillTargets,
+                plan.worldzero$plantTargets
+        );
+        houseLevel.addFreshEntity(echo);
+
+        int timeoutTicks = worldzero$getRestorationSceneTimeoutTicks(plan);
+        SessionState sessionState = WORLDZERO_SERVER_STATES.computeIfAbsent(player.getServer(), ignored -> new SessionState());
+        sessionState.worldzero$restorationScenes.put(
+                player.getUUID(),
+                new RestorationSceneState(echo.getId(), timeoutTicks)
+        );
+        WorldZeroNetwork.sendFreezeStart(
+                player,
+                timeoutTicks,
+                -1,
+                plan.worldzero$playerYaw,
+                plan.worldzero$playerPitch
+        );
+        return true;
+    }
+
+    private static int worldzero$getRestorationSceneTimeoutTicks(RestorationDreamPlan plan) {
+        int actionCount = plan.worldzero$tillTargets.size() + plan.worldzero$plantTargets.size();
+        return Math.max(WORLDZERO_RESTORATION_SCENE_TIMEOUT_TICKS, 20 * 10 + actionCount * 30);
+    }
+
+    private static void worldzero$applyRestorationDamageState(ServerLevel level, List<RestorationEntry> entries) {
+        for (RestorationEntry entry : entries) {
+            if (entry.worldzero$plantBroken) {
+                level.setBlock(
+                        entry.worldzero$getPlantPos(),
+                        Blocks.AIR.defaultBlockState(),
+                        Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE
+                );
+            }
+            if (entry.worldzero$groundBroken) {
+                level.setBlock(
+                        entry.worldzero$groundPos,
+                        Blocks.DIRT.defaultBlockState(),
+                        Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE
+                );
+            }
+        }
+    }
+
+    @Nullable
+    private static RestorationDreamPlan worldzero$createRestorationDreamPlan(
+            ServerLevel level,
+            TemplateInfo templateInfo,
+            List<RestorationEntry> entries
+    ) {
+        if (entries.isEmpty()) {
+            return null;
+        }
+
+        BlockPos viewCenter = worldzero$getRestorationCenter(entries);
+        BlockPos playerPos = worldzero$findRestorationViewPos(level, templateInfo, viewCenter);
+        if (playerPos == null) {
+            return null;
+        }
+
+        Vec3 lookTarget = Vec3.atCenterOf(viewCenter);
+        float[] yawPitch = worldzero$computeLookRotation(playerPos, lookTarget);
+
+        List<WorldZeroHouseEchoEntity.FarmTillTarget> tillTargets = new ArrayList<>();
+        List<WorldZeroHouseEchoEntity.FarmPlantTarget> plantTargets = new ArrayList<>();
+        worldzero$appendRestorationLineTargets(entries, playerPos, tillTargets, plantTargets);
+
+        if (tillTargets.isEmpty() && plantTargets.isEmpty()) {
+            return null;
+        }
+
+        BlockPos firstTarget = !tillTargets.isEmpty()
+                ? tillTargets.get(0).worldzero$pos
+                : plantTargets.get(0).worldzero$soilPos;
+        BlockPos echoSpawnPos = worldzero$findRestorationEchoSpawn(level, playerPos, firstTarget);
+        if (echoSpawnPos == null) {
+            return null;
+        }
+
+        return new RestorationDreamPlan(playerPos, echoSpawnPos, yawPitch[0], yawPitch[1], tillTargets, plantTargets);
+    }
+
+    private static void worldzero$appendRestorationLineTargets(
+            List<RestorationEntry> entries,
+            BlockPos playerPos,
+            List<WorldZeroHouseEchoEntity.FarmTillTarget> tillTargets,
+            List<WorldZeroHouseEchoEntity.FarmPlantTarget> plantTargets
+    ) {
+        if (entries.isEmpty()) {
+            return;
+        }
+
+        int minX = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxZ = Integer.MIN_VALUE;
+        for (RestorationEntry entry : entries) {
+            minX = Math.min(minX, entry.worldzero$groundPos.getX());
+            maxX = Math.max(maxX, entry.worldzero$groundPos.getX());
+            minZ = Math.min(minZ, entry.worldzero$groundPos.getZ());
+            maxZ = Math.max(maxZ, entry.worldzero$groundPos.getZ());
+        }
+
+        boolean rowsAlongX = (maxX - minX) >= (maxZ - minZ);
+        Map<Integer, List<RestorationEntry>> lineEntries = new HashMap<>();
+        for (RestorationEntry entry : entries) {
+            int lineKey = rowsAlongX ? entry.worldzero$groundPos.getZ() : entry.worldzero$groundPos.getX();
+            lineEntries.computeIfAbsent(lineKey, ignored -> new ArrayList<>()).add(entry);
+        }
+
+        List<Map.Entry<Integer, List<RestorationEntry>>> orderedLines = new ArrayList<>(lineEntries.entrySet());
+        orderedLines.sort(Comparator
+                .comparingDouble((Map.Entry<Integer, List<RestorationEntry>> lineEntry) -> worldzero$getClosestEntryDistanceSq(
+                        lineEntry.getValue(),
+                        playerPos
+                ))
+                .thenComparingInt(Map.Entry::getKey));
+
+        for (int lineOrder = 0; lineOrder < orderedLines.size(); lineOrder++) {
+            List<RestorationEntry> line = orderedLines.get(lineOrder).getValue();
+            line.sort(worldzero$getRestorationLineComparator(playerPos, rowsAlongX, line));
+
+            for (RestorationEntry entry : line) {
+                if (entry.worldzero$groundBroken) {
+                    tillTargets.add(new WorldZeroHouseEchoEntity.FarmTillTarget(
+                            entry.worldzero$groundPos,
+                            entry.worldzero$groundState,
+                            lineOrder
+                    ));
+                }
+            }
+
+            for (RestorationEntry entry : line) {
+                if (!entry.worldzero$plantBroken || entry.worldzero$plantState == null || entry.worldzero$plantState.isAir()) {
+                    continue;
+                }
+                ItemStack heldItem = worldzero$getPlantItemForState(entry.worldzero$plantState);
+                if (heldItem.isEmpty()) {
+                    continue;
+                }
+                plantTargets.add(new WorldZeroHouseEchoEntity.FarmPlantTarget(
+                        entry.worldzero$groundPos,
+                        entry.worldzero$getPlantPos(),
+                        entry.worldzero$groundState,
+                        worldzero$getRestoredPlantState(entry.worldzero$plantState),
+                        heldItem,
+                        lineOrder
+                ));
+            }
+        }
+    }
+
+    private static double worldzero$getClosestEntryDistanceSq(List<RestorationEntry> entries, BlockPos playerPos) {
+        double closestDistanceSq = Double.MAX_VALUE;
+        for (RestorationEntry entry : entries) {
+            closestDistanceSq = Math.min(closestDistanceSq, entry.worldzero$groundPos.distSqr(playerPos));
+        }
+        return closestDistanceSq;
+    }
+
+    private static Comparator<RestorationEntry> worldzero$getRestorationLineComparator(
+            BlockPos playerPos,
+            boolean rowsAlongX,
+            List<RestorationEntry> line
+    ) {
+        double averageAxis = 0.0D;
+        for (RestorationEntry entry : line) {
+            averageAxis += rowsAlongX ? entry.worldzero$groundPos.getX() : entry.worldzero$groundPos.getZ();
+        }
+        averageAxis /= Math.max(1, line.size());
+
+        int playerAxis = rowsAlongX ? playerPos.getX() : playerPos.getZ();
+        boolean descending = playerAxis > averageAxis;
+
+        Comparator<RestorationEntry> comparator = Comparator.comparingInt(
+                entry -> rowsAlongX ? entry.worldzero$groundPos.getX() : entry.worldzero$groundPos.getZ()
+        );
+        if (descending) {
+            comparator = comparator.reversed();
+        }
+        return comparator.thenComparingInt(entry -> rowsAlongX ? entry.worldzero$groundPos.getZ() : entry.worldzero$groundPos.getX());
+    }
+
+    private static BlockPos worldzero$getRestorationCenter(List<RestorationEntry> entries) {
+        long sumX = 0L;
+        long sumY = 0L;
+        long sumZ = 0L;
+        for (RestorationEntry entry : entries) {
+            sumX += entry.worldzero$groundPos.getX();
+            sumY += entry.worldzero$groundPos.getY();
+            sumZ += entry.worldzero$groundPos.getZ();
+        }
+        int size = Math.max(1, entries.size());
+        return new BlockPos(
+                Math.round((float) sumX / size),
+                Math.round((float) sumY / size),
+                Math.round((float) sumZ / size)
+        );
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findRestorationViewPos(
+            ServerLevel level,
+            TemplateInfo templateInfo,
+            BlockPos center
+    ) {
+        BlockPos origin = WORLDZERO_BASE_ORIGIN;
+        int minX = origin.getX();
+        int maxX = origin.getX() + templateInfo.worldzero$size.getX() - 1;
+        int minY = origin.getY();
+        int maxY = origin.getY() + templateInfo.worldzero$size.getY() - 2;
+        int minZ = origin.getZ();
+        int maxZ = origin.getZ() + templateInfo.worldzero$size.getZ() - 1;
+        Vec3 lookTarget = Vec3.atCenterOf(center);
+        int[][] directions = new int[][]{
+                {1, 0},
+                {-1, 0},
+                {0, 1},
+                {0, -1},
+                {1, 1},
+                {1, -1},
+                {-1, 1},
+                {-1, -1}
+        };
+
+        for (int radius = 5; radius <= 12; radius++) {
+            for (int[] direction : directions) {
+                int candidateX = center.getX() + direction[0] * radius;
+                int candidateZ = center.getZ() + direction[1] * radius;
+                if (candidateX < minX || candidateX > maxX || candidateZ < minZ || candidateZ > maxZ) {
+                    continue;
+                }
+
+                for (int y = center.getY() + 1; y >= minY; y--) {
+                    if (y > maxY) {
+                        continue;
+                    }
+
+                    BlockPos candidate = new BlockPos(candidateX, y, candidateZ);
+                    if (!worldzero$isStandable(level, candidate)) {
+                        continue;
+                    }
+                    if (!worldzero$hasClearView(level, candidate, lookTarget)) {
+                        continue;
+                    }
+                    return candidate.immutable();
+                }
+            }
+        }
+
+        return worldzero$findSpawnPosNearBed(level, worldzero$findPrimaryBedPos(level, templateInfo), templateInfo);
+    }
+
+    private static boolean worldzero$hasClearView(ServerLevel level, BlockPos fromPos, Vec3 target) {
+        Vec3 eyePos = new Vec3(fromPos.getX() + 0.5D, fromPos.getY() + 1.62D, fromPos.getZ() + 0.5D);
+        HitResult hitResult = level.clip(new ClipContext(
+                eyePos,
+                target,
+                ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE,
+                null
+        ));
+        if (hitResult.getType() == HitResult.Type.MISS) {
+            return true;
+        }
+
+        BlockPos targetPos = BlockPos.containing(target);
+        return hitResult instanceof net.minecraft.world.phys.BlockHitResult blockHitResult
+                && blockHitResult.getBlockPos().closerThan(targetPos, 1.5D);
+    }
+
+    private static float[] worldzero$computeLookRotation(BlockPos fromPos, Vec3 target) {
+        double deltaX = target.x - (fromPos.getX() + 0.5D);
+        double deltaY = target.y - (fromPos.getY() + 1.62D);
+        double deltaZ = target.z - (fromPos.getZ() + 0.5D);
+        double horizontalDistance = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
+        float yaw = (float) (Math.atan2(deltaZ, deltaX) * (180.0D / Math.PI)) - 90.0F;
+        float pitch = (float) (-(Math.atan2(deltaY, horizontalDistance) * (180.0D / Math.PI)));
+        return new float[]{yaw, pitch};
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findRestorationEchoSpawn(ServerLevel level, BlockPos playerPos, BlockPos firstTarget) {
+        int deltaX = Integer.compare(firstTarget.getX(), playerPos.getX());
+        int deltaZ = Integer.compare(firstTarget.getZ(), playerPos.getZ());
+        if (deltaX == 0 && deltaZ == 0) {
+            deltaZ = 1;
+        }
+
+        for (int distance = 2; distance <= 5; distance++) {
+            for (int lateral = -1; lateral <= 1; lateral++) {
+                int x = firstTarget.getX() + deltaX * distance + (deltaZ == 0 ? lateral : 0);
+                int z = firstTarget.getZ() + deltaZ * distance + (deltaX == 0 ? lateral : 0);
+                BlockPos candidate = new BlockPos(x, firstTarget.getY() + 1, z);
+                if (worldzero$isStandable(level, candidate)) {
+                    return candidate.immutable();
+                }
+            }
+        }
+
+        for (int radius = 1; radius <= 4; radius++) {
+            for (Direction direction : Direction.Plane.HORIZONTAL) {
+                BlockPos candidate = firstTarget.relative(direction, radius).above();
+                if (worldzero$isStandable(level, candidate)) {
+                    return candidate.immutable();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static ItemStack worldzero$getPlantItemForState(BlockState plantState) {
+        Block block = plantState.getBlock();
+        if (block == Blocks.WHEAT) {
+            return new ItemStack(Items.WHEAT_SEEDS);
+        }
+        if (block == Blocks.CARROTS) {
+            return new ItemStack(Items.CARROT);
+        }
+        if (block == Blocks.POTATOES) {
+            return new ItemStack(Items.POTATO);
+        }
+        if (block == Blocks.BEETROOTS) {
+            return new ItemStack(Items.BEETROOT_SEEDS);
+        }
+        if (block == Blocks.PUMPKIN_STEM || block == Blocks.ATTACHED_PUMPKIN_STEM) {
+            return new ItemStack(Items.PUMPKIN_SEEDS);
+        }
+        if (block == Blocks.MELON_STEM || block == Blocks.ATTACHED_MELON_STEM) {
+            return new ItemStack(Items.MELON_SEEDS);
+        }
+
+        Item item = block.asItem();
+        return item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
+    }
+
+    private static BlockState worldzero$getRestoredPlantState(BlockState originalPlantState) {
+        if (originalPlantState.isAir()) {
+            return originalPlantState;
+        }
+        return originalPlantState.getBlock().defaultBlockState();
+    }
+
     private static void worldzero$clearPlayerInventory(ServerPlayer player) {
         player.getInventory().clearContent();
         player.getInventory().selected = 0;
@@ -875,17 +1541,223 @@ public final class WorldZeroHouseDimension {
         return player != null && player.level().dimension() == WORLDZERO_HOUSE_LEVEL;
     }
 
+    private static boolean worldzero$isFieldDamageAllowed(
+            @Nullable Player player,
+            @Nullable BlockPos pos,
+            @Nullable BlockState state
+    ) {
+        if (!(player instanceof ServerPlayer serverPlayer) || pos == null || state == null) {
+            return false;
+        }
+
+        MinecraftServer server = serverPlayer.getServer();
+        if (server == null) {
+            return false;
+        }
+
+        HouseSaveData saveData = worldzero$getSaveData(server);
+        if (saveData.worldzero$visitModes.get(serverPlayer.getUUID()) != HouseVisitMode.NORMAL) {
+            return false;
+        }
+
+        if (state.getBlock() instanceof FarmBlock) {
+            return true;
+        }
+
+        if (worldzero$isRestorablePlantState(state)) {
+            BlockState belowState = serverPlayer.serverLevel().getBlockState(pos.below());
+            return belowState.getBlock() instanceof FarmBlock
+                    || saveData.worldzero$restorationEntries.getOrDefault(serverPlayer.getUUID(), java.util.Collections.emptyMap())
+                    .containsKey(pos.below().asLong());
+        }
+
+        return false;
+    }
+
+    private static boolean worldzero$isRestorablePlantState(BlockState state) {
+        if (state.isAir()) {
+            return false;
+        }
+
+        Block block = state.getBlock();
+        return block instanceof CropBlock
+                || block == Blocks.PUMPKIN_STEM
+                || block == Blocks.ATTACHED_PUMPKIN_STEM
+                || block == Blocks.MELON_STEM
+                || block == Blocks.ATTACHED_MELON_STEM;
+    }
+
+    private static boolean worldzero$hasRestorationDamage(HouseSaveData saveData, UUID playerId) {
+        return !worldzero$getRestorationEntries(saveData, playerId).isEmpty();
+    }
+
+    private static List<RestorationEntry> worldzero$getRestorationEntries(HouseSaveData saveData, UUID playerId) {
+        Map<Long, RestorationEntry> entries = saveData.worldzero$restorationEntries.get(playerId);
+        if (entries == null || entries.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        return new ArrayList<>(entries.values());
+    }
+
+    private static boolean worldzero$seedDebugRestorationDamage(
+            MinecraftServer server,
+            HouseSaveData saveData,
+            UUID playerId
+    ) {
+        ServerLevel houseLevel = server.getLevel(WORLDZERO_HOUSE_LEVEL);
+        if (houseLevel == null) {
+            return false;
+        }
+
+        TemplateInfo templateInfo = worldzero$getTemplateInfo(houseLevel);
+        if (templateInfo == null || !worldzero$prepareHouseLevel(houseLevel, templateInfo)) {
+            return false;
+        }
+
+        List<RestorationEntry> debugEntries = worldzero$collectDebugRestorationEntries(houseLevel, templateInfo);
+        if (debugEntries.isEmpty()) {
+            return false;
+        }
+
+        Map<Long, RestorationEntry> playerEntries = new HashMap<>();
+        for (RestorationEntry entry : debugEntries) {
+            playerEntries.put(entry.worldzero$groundPos.asLong(), entry);
+        }
+        saveData.worldzero$restorationEntries.put(playerId, playerEntries);
+        saveData.setDirty();
+        return true;
+    }
+
+    private static List<RestorationEntry> worldzero$collectDebugRestorationEntries(
+            ServerLevel level,
+            TemplateInfo templateInfo
+    ) {
+        List<RestorationEntry> entries = new ArrayList<>();
+        BlockPos origin = WORLDZERO_BASE_ORIGIN;
+        for (int x = origin.getX(); x < origin.getX() + templateInfo.worldzero$size.getX(); x++) {
+            for (int y = origin.getY(); y < origin.getY() + templateInfo.worldzero$size.getY(); y++) {
+                for (int z = origin.getZ(); z < origin.getZ() + templateInfo.worldzero$size.getZ(); z++) {
+                    BlockPos soilPos = new BlockPos(x, y, z);
+                    BlockState soilState = level.getBlockState(soilPos);
+                    if (!(soilState.getBlock() instanceof FarmBlock)) {
+                        continue;
+                    }
+
+                    BlockState plantState = level.getBlockState(soilPos.above());
+                    entries.add(new RestorationEntry(
+                            soilPos,
+                            soilState,
+                            worldzero$isRestorablePlantState(plantState) ? plantState : null,
+                            true,
+                            worldzero$isRestorablePlantState(plantState)
+                    ));
+                }
+            }
+        }
+
+        entries.sort(Comparator
+                .comparingInt((RestorationEntry entry) -> entry.worldzero$groundPos.getZ())
+                .thenComparingInt(entry -> entry.worldzero$groundPos.getX())
+                .thenComparingInt(entry -> entry.worldzero$groundPos.getY()));
+        return entries;
+    }
+
+    private static void worldzero$recordTrampleDamage(
+            ServerPlayer player,
+            ServerLevel level,
+            BlockPos pos,
+            BlockState originalSoilState
+    ) {
+        BlockState plantState = level.getBlockState(pos.above());
+        worldzero$recordRestorationEntry(
+                player,
+                pos,
+                originalSoilState,
+                worldzero$isRestorablePlantState(plantState) ? plantState : null,
+                true,
+                worldzero$isRestorablePlantState(plantState)
+        );
+    }
+
+    private static void worldzero$applyFallbackTrampleDamage(
+            ServerPlayer player,
+            ServerLevel level,
+            BlockPos soilPos,
+            BlockState originalSoilState
+    ) {
+        if (!(level.getBlockState(soilPos).getBlock() instanceof FarmBlock)) {
+            return;
+        }
+
+        worldzero$recordTrampleDamage(player, level, soilPos, originalSoilState);
+        BlockPos plantPos = soilPos.above();
+        if (worldzero$isRestorablePlantState(level.getBlockState(plantPos))) {
+            level.destroyBlock(plantPos, true, player);
+        }
+        level.levelEvent(2001, soilPos, Block.getId(originalSoilState));
+        level.setBlock(soilPos, Blocks.DIRT.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+    }
+
+    private static void worldzero$recordRestorationEntry(
+            ServerPlayer player,
+            BlockPos soilPos,
+            BlockState soilState,
+            @Nullable BlockState plantState,
+            boolean groundBroken,
+            boolean plantBroken
+    ) {
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return;
+        }
+
+        HouseSaveData saveData = worldzero$getSaveData(server);
+        Map<Long, RestorationEntry> playerEntries = saveData.worldzero$restorationEntries.computeIfAbsent(
+                player.getUUID(),
+                ignored -> new HashMap<>()
+        );
+        RestorationEntry entry = playerEntries.get(soilPos.asLong());
+        if (entry == null) {
+            entry = new RestorationEntry(soilPos, soilState, plantState, groundBroken, plantBroken);
+            playerEntries.put(soilPos.asLong(), entry);
+            saveData.setDirty();
+            return;
+        }
+
+        boolean changed = false;
+        if (groundBroken && !entry.worldzero$groundBroken) {
+            entry.worldzero$groundBroken = true;
+            changed = true;
+        }
+        if (plantBroken && !entry.worldzero$plantBroken) {
+            entry.worldzero$plantBroken = true;
+            changed = true;
+        }
+        if (entry.worldzero$plantState == null && plantState != null && !plantState.isAir()) {
+            entry.worldzero$plantState = plantState;
+            changed = true;
+        }
+        if (changed) {
+            saveData.setDirty();
+        }
+    }
+
     private static final class SessionState {
         private final Map<UUID, SleepTracker> worldzero$sleepTrackers = new HashMap<>();
+        private final Map<UUID, RestorationSceneState> worldzero$restorationScenes = new HashMap<>();
+        private final Map<UUID, TrampleMarker> worldzero$lastTrampleMarkers = new HashMap<>();
     }
 
     private static final class SleepTracker {
         private boolean worldzero$currentSleepTracked;
         private boolean worldzero$houseTeleportPending;
+        private boolean worldzero$restorationTeleportPending;
 
         private void worldzero$reset() {
             this.worldzero$currentSleepTracked = false;
             this.worldzero$houseTeleportPending = false;
+            this.worldzero$restorationTeleportPending = false;
         }
     }
 
@@ -991,11 +1863,124 @@ public final class WorldZeroHouseDimension {
         }
     }
 
+    private static final class RestorationSceneState {
+        private final int worldzero$echoEntityId;
+        private int worldzero$timeoutTicks;
+        private int worldzero$spawnGraceTicks;
+
+        private RestorationSceneState(int echoEntityId, int timeoutTicks) {
+            this.worldzero$echoEntityId = echoEntityId;
+            this.worldzero$timeoutTicks = timeoutTicks;
+            this.worldzero$spawnGraceTicks = 20;
+        }
+    }
+
+    private static final class TrampleMarker {
+        private final long worldzero$gameTime;
+        private final BlockPos worldzero$pos;
+
+        private TrampleMarker(long gameTime, BlockPos pos) {
+            this.worldzero$gameTime = gameTime;
+            this.worldzero$pos = pos.immutable();
+        }
+    }
+
+    private static final class RestorationDreamPlan {
+        private final BlockPos worldzero$playerPos;
+        private final BlockPos worldzero$echoSpawnPos;
+        private final float worldzero$playerYaw;
+        private final float worldzero$playerPitch;
+        private final List<WorldZeroHouseEchoEntity.FarmTillTarget> worldzero$tillTargets;
+        private final List<WorldZeroHouseEchoEntity.FarmPlantTarget> worldzero$plantTargets;
+
+        private RestorationDreamPlan(
+                BlockPos playerPos,
+                BlockPos echoSpawnPos,
+                float playerYaw,
+                float playerPitch,
+                List<WorldZeroHouseEchoEntity.FarmTillTarget> tillTargets,
+                List<WorldZeroHouseEchoEntity.FarmPlantTarget> plantTargets
+        ) {
+            this.worldzero$playerPos = playerPos.immutable();
+            this.worldzero$echoSpawnPos = echoSpawnPos.immutable();
+            this.worldzero$playerYaw = playerYaw;
+            this.worldzero$playerPitch = playerPitch;
+            this.worldzero$tillTargets = tillTargets;
+            this.worldzero$plantTargets = plantTargets;
+        }
+    }
+
+    private static final class RestorationEntry {
+        private final BlockPos worldzero$groundPos;
+        private final BlockState worldzero$groundState;
+        @Nullable
+        private BlockState worldzero$plantState;
+        private boolean worldzero$groundBroken;
+        private boolean worldzero$plantBroken;
+
+        private RestorationEntry(
+                BlockPos groundPos,
+                BlockState groundState,
+                @Nullable BlockState plantState,
+                boolean groundBroken,
+                boolean plantBroken
+        ) {
+            this.worldzero$groundPos = groundPos.immutable();
+            this.worldzero$groundState = groundState;
+            this.worldzero$plantState = plantState;
+            this.worldzero$groundBroken = groundBroken;
+            this.worldzero$plantBroken = plantBroken;
+        }
+
+        private BlockPos worldzero$getPlantPos() {
+            return this.worldzero$groundPos.above();
+        }
+
+        private CompoundTag worldzero$save() {
+            CompoundTag tag = new CompoundTag();
+            tag.put("GroundPos", NbtUtils.writeBlockPos(this.worldzero$groundPos));
+            tag.put("GroundState", NbtUtils.writeBlockState(this.worldzero$groundState));
+            if (this.worldzero$plantState != null && !this.worldzero$plantState.isAir()) {
+                tag.put("PlantState", NbtUtils.writeBlockState(this.worldzero$plantState));
+            }
+            tag.putBoolean("GroundBroken", this.worldzero$groundBroken);
+            tag.putBoolean("PlantBroken", this.worldzero$plantBroken);
+            return tag;
+        }
+
+        @Nullable
+        private static RestorationEntry worldzero$load(CompoundTag tag) {
+            if (!tag.contains("GroundPos", Tag.TAG_COMPOUND) || !tag.contains("GroundState", Tag.TAG_COMPOUND)) {
+                return null;
+            }
+
+            BlockPos groundPos = NbtUtils.readBlockPos(tag.getCompound("GroundPos"));
+            BlockState groundState = NbtUtils.readBlockState(net.minecraft.core.registries.BuiltInRegistries.BLOCK.asLookup(), tag.getCompound("GroundState"));
+            BlockState plantState = null;
+            if (tag.contains("PlantState", Tag.TAG_COMPOUND)) {
+                plantState = NbtUtils.readBlockState(
+                        net.minecraft.core.registries.BuiltInRegistries.BLOCK.asLookup(),
+                        tag.getCompound("PlantState")
+                );
+            }
+            return new RestorationEntry(
+                    groundPos,
+                    groundState,
+                    plantState,
+                    tag.getBoolean("GroundBroken"),
+                    tag.getBoolean("PlantBroken")
+            );
+        }
+    }
+
     private static final class HouseSaveData extends SavedData {
         private final Map<UUID, Integer> worldzero$sleepCounts = new HashMap<>();
         private final Set<UUID> worldzero$completedPlayers = new java.util.HashSet<>();
         private final Map<UUID, ReturnPoint> worldzero$returnPoints = new HashMap<>();
         private final Map<UUID, PlayerInventorySnapshot> worldzero$inventorySnapshots = new HashMap<>();
+        private final Map<UUID, HouseVisitMode> worldzero$visitModes = new HashMap<>();
+        private final Set<UUID> worldzero$restorationPendingPlayers = new HashSet<>();
+        private final Map<UUID, Map<Long, RestorationEntry>> worldzero$restorationEntries = new HashMap<>();
 
         @Override
         public CompoundTag save(CompoundTag tag) {
@@ -1022,6 +2007,28 @@ public final class WorldZeroHouseDimension {
                 inventorySnapshotsTag.put(entry.getKey().toString(), entry.getValue().worldzero$save());
             }
             tag.put("InventorySnapshots", inventorySnapshotsTag);
+
+            CompoundTag visitModesTag = new CompoundTag();
+            for (Map.Entry<UUID, HouseVisitMode> entry : this.worldzero$visitModes.entrySet()) {
+                visitModesTag.putByte(entry.getKey().toString(), entry.getValue().worldzero$saveId);
+            }
+            tag.put("VisitModes", visitModesTag);
+
+            CompoundTag restorationPendingTag = new CompoundTag();
+            for (UUID playerId : this.worldzero$restorationPendingPlayers) {
+                restorationPendingTag.putBoolean(playerId.toString(), true);
+            }
+            tag.put("RestorationPending", restorationPendingTag);
+
+            CompoundTag restorationEntriesTag = new CompoundTag();
+            for (Map.Entry<UUID, Map<Long, RestorationEntry>> playerEntry : this.worldzero$restorationEntries.entrySet()) {
+                ListTag listTag = new ListTag();
+                for (RestorationEntry restorationEntry : playerEntry.getValue().values()) {
+                    listTag.add(restorationEntry.worldzero$save());
+                }
+                restorationEntriesTag.put(playerEntry.getKey().toString(), listTag);
+            }
+            tag.put("RestorationEntries", restorationEntriesTag);
             return tag;
         }
 
@@ -1065,6 +2072,50 @@ public final class WorldZeroHouseDimension {
                     );
                     if (snapshot != null) {
                         saveData.worldzero$inventorySnapshots.put(UUID.fromString(key), snapshot);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+
+            CompoundTag visitModesTag = tag.getCompound("VisitModes");
+            for (String key : visitModesTag.getAllKeys()) {
+                try {
+                    HouseVisitMode visitMode = HouseVisitMode.worldzero$fromSaveId(visitModesTag.getByte(key));
+                    if (visitMode != null) {
+                        saveData.worldzero$visitModes.put(UUID.fromString(key), visitMode);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+
+            CompoundTag restorationPendingTag = tag.getCompound("RestorationPending");
+            for (String key : restorationPendingTag.getAllKeys()) {
+                try {
+                    if (restorationPendingTag.getBoolean(key)) {
+                        saveData.worldzero$restorationPendingPlayers.add(UUID.fromString(key));
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+
+            CompoundTag restorationEntriesTag = tag.getCompound("RestorationEntries");
+            for (String key : restorationEntriesTag.getAllKeys()) {
+                try {
+                    UUID playerId = UUID.fromString(key);
+                    ListTag listTag = restorationEntriesTag.getList(key, Tag.TAG_COMPOUND);
+                    if (listTag.isEmpty()) {
+                        continue;
+                    }
+
+                    Map<Long, RestorationEntry> playerEntries = new HashMap<>();
+                    for (int index = 0; index < listTag.size(); index++) {
+                        RestorationEntry restorationEntry = RestorationEntry.worldzero$load(listTag.getCompound(index));
+                        if (restorationEntry != null) {
+                            playerEntries.put(restorationEntry.worldzero$groundPos.asLong(), restorationEntry);
+                        }
+                    }
+                    if (!playerEntries.isEmpty()) {
+                        saveData.worldzero$restorationEntries.put(playerId, playerEntries);
                     }
                 } catch (IllegalArgumentException ignored) {
                 }

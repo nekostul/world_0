@@ -98,6 +98,13 @@ public final class WorldZeroNetwork {
                 WorldZeroHouseMusicFinishedPacket::decode,
                 WorldZeroHouseMusicFinishedPacket::handle
         );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroHouseClientModePacket.class,
+                WorldZeroHouseClientModePacket::encode,
+                WorldZeroHouseClientModePacket::decode,
+                WorldZeroHouseClientModePacket::handle
+        );
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks) {
@@ -177,5 +184,12 @@ public final class WorldZeroNetwork {
 
     public static void sendHouseMusicFinished() {
         WORLDZERO_CHANNEL.sendToServer(new WorldZeroHouseMusicFinishedPacket());
+    }
+
+    public static void sendHouseClientMode(ServerPlayer player, byte mode) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroHouseClientModePacket(mode)
+        );
     }
 }

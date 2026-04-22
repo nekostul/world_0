@@ -37,6 +37,7 @@ import net.minecraftforge.fml.common.Mod;
 import ru.nekostul.worldzero.achievement.WorldZeroAdvancementTriggers;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -587,7 +588,7 @@ public final class WorldZeroParalysisEvent {
             return;
         }
 
-        for (ServerPlayer player : level.players()) {
+        for (ServerPlayer player : new ArrayList<>(level.players())) {
             UUID playerId = player.getUUID();
             int sleepCount = saveData.worldzero$postParalysisSleepCounts.getOrDefault(playerId, -1);
             KoridorSleepTracker tracker = state.worldzero$koridorSleepTrackers.computeIfAbsent(

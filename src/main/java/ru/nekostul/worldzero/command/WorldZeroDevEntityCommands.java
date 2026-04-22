@@ -71,6 +71,10 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$returnFromKoridor(context.getSource())))
                         .then(Commands.literal("tp_house")
                                 .executes(context -> worldzero$teleportToHouse(context.getSource())))
+                        .then(Commands.literal("trigger_house_farm_dream")
+                                .executes(context -> worldzero$triggerHouseFarmDream(context.getSource())))
+                        .then(Commands.literal("trigger_house_farm_demo")
+                                .executes(context -> worldzero$triggerHouseFarmDemo(context.getSource())))
                         .then(Commands.literal("return_from_house")
                                 .executes(context -> worldzero$returnFromHouse(context.getSource())))
                         .then(Commands.literal("clean_disc")
@@ -331,6 +335,34 @@ public final class WorldZeroDevEntityCommands {
                         : "[WORLD_0][DEV] house return failed (no saved return point or target dimension is unavailable)"
         ), false);
         return teleported ? 1 : 0;
+    }
+
+    private static int worldzero$triggerHouseFarmDream(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroHouseDimension.worldzero$triggerRestorationDreamNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] house farm restoration dream triggered"
+                        : "[WORLD_0][DEV] house farm restoration dream failed (needs recorded broken farmland from a normal house visit)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerHouseFarmDemo(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroHouseDimension.worldzero$triggerRestorationDreamDemoNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] house farm restoration demo triggered"
+                        : "[WORLD_0][DEV] house farm restoration demo failed (house dimension/template or return state is unavailable)"
+        ), false);
+        return triggered ? 1 : 0;
     }
 
     private static int worldzero$triggerHouse(CommandSourceStack source) {

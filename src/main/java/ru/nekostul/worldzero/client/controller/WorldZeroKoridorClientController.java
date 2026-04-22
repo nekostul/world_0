@@ -241,7 +241,7 @@ public final class WorldZeroKoridorClientController {
         private WorldZeroVanillaDoorSoundInstance(ResourceLocation soundId, double x, double y, double z) {
             super(
                     soundId,
-                    SoundSource.BLOCKS,
+                    SoundSource.PLAYERS,
                     1.35F,
                     1.0F,
                     RandomSource.create(),

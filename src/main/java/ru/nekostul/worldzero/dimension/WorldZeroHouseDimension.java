@@ -29,10 +29,13 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.ChestType;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
@@ -51,8 +54,10 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import javax.annotation.Nullable;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -82,6 +87,30 @@ public final class WorldZeroHouseDimension {
     private static final int WORLDZERO_BARRIER_PADDING = 1;
     private static final int WORLDZERO_BARRIER_HEIGHT_PADDING = 2;
     private static final int WORLDZERO_RESTORATION_SCENE_TIMEOUT_TICKS = 20 * 45;
+    private static final int WORLDZERO_RESTORATION_CHAT_START_DELAY_TICKS = 30;
+    private static final int WORLDZERO_RESTORATION_CHAT_DELAY_MIN_TICKS = 2 * 20;
+    private static final int WORLDZERO_RESTORATION_CHAT_DELAY_MAX_TICKS = 4 * 20;
+    private static final int WORLDZERO_RESTORATION_ECHO_START_DELAY_AFTER_CHAT_TICKS = 20;
+    private static final String WORLDZERO_RESTORATION_CHAT_SANEK_NAME = "sanek0001";
+    private static final String WORLDZERO_RESTORATION_CHAT_LINE_ONE = "наши грятки сново ктото сламал";
+    private static final String WORLDZERO_RESTORATION_CHAT_LINE_TWO = "сматри вон он ево видно в акне";
+    private static final String WORLDZERO_RESTORATION_CHAT_LINE_THREE = "чтото мне страшно";
+    private static final String WORLDZERO_RESTORATION_CHAT_LINE_FOUR = "да чо он сделоет иди пачини пж";
+    private static final String WORLDZERO_RESTORATION_CHAT_LINE_ONE_EN = "our farm again someone brokd";
+    private static final String WORLDZERO_RESTORATION_CHAT_LINE_TWO_EN = "look ther he him in window";
+    private static final String WORLDZERO_RESTORATION_CHAT_LINE_THREE_EN = "somthing to me very scary";
+    private static final String WORLDZERO_RESTORATION_CHAT_LINE_FOUR_EN = "wut he do go fix pls";
+    private static final BlockPos WORLDZERO_RESTORATION_ROUTE_START = new BlockPos(-16, 73, -21);
+    private static final List<BlockPos> WORLDZERO_RESTORATION_ROUTE_POINTS = List.of(
+            new BlockPos(-16, 73, -19),
+            new BlockPos(-19, 73, -19),
+            new BlockPos(-19, 73, -4)
+    );
+    private static final List<BlockPos> WORLDZERO_RESTORATION_ROUTE_DOORS = List.of(
+            new BlockPos(-17, 73, -20),
+            new BlockPos(-17, 73, -19)
+    );
+    private static final int WORLDZERO_RESTORATION_ROUTE_DOOR_OPEN_STEP = 1;
     private static final ChestLootEntry[] WORLDZERO_PRIMARY_CHEST_LOOT = new ChestLootEntry[]{
             new ChestLootEntry(Items.DIAMOND, 27),
             new ChestLootEntry(Items.DIAMOND, 11),
@@ -1095,6 +1124,8 @@ public final class WorldZeroHouseDimension {
                 continue;
             }
 
+            worldzero$tickRestorationChat(level, player, sceneState);
+
             Entity echo = level.getEntity(sceneState.worldzero$echoEntityId);
             if (echo == null || !echo.isAlive()) {
                 if (sceneState.worldzero$spawnGraceTicks > 0) {
@@ -1123,6 +1154,52 @@ public final class WorldZeroHouseDimension {
         }
     }
 
+    private static void worldzero$tickRestorationChat(
+            ServerLevel level,
+            ServerPlayer player,
+            RestorationSceneState sceneState
+    ) {
+        if (sceneState.worldzero$chatMessageIndex >= sceneState.worldzero$chatTicks.length
+                || level.getGameTime() < sceneState.worldzero$chatTicks[sceneState.worldzero$chatMessageIndex]) {
+            return;
+        }
+
+        worldzero$sendRestorationChatLine(player, sceneState.worldzero$chatMessageIndex);
+        sceneState.worldzero$chatMessageIndex++;
+    }
+
+    private static void worldzero$sendRestorationChatLine(ServerPlayer player, int messageIndex) {
+        String playerName = player.getGameProfile().getName();
+        switch (messageIndex) {
+            case 0 -> WorldZeroNetwork.sendHouseChatLine(
+                    player,
+                    playerName,
+                    WORLDZERO_RESTORATION_CHAT_LINE_ONE,
+                    WORLDZERO_RESTORATION_CHAT_LINE_ONE_EN
+            );
+            case 1 -> WorldZeroNetwork.sendHouseChatLine(
+                    player,
+                    WORLDZERO_RESTORATION_CHAT_SANEK_NAME,
+                    WORLDZERO_RESTORATION_CHAT_LINE_TWO,
+                    WORLDZERO_RESTORATION_CHAT_LINE_TWO_EN
+            );
+            case 2 -> WorldZeroNetwork.sendHouseChatLine(
+                    player,
+                    playerName,
+                    WORLDZERO_RESTORATION_CHAT_LINE_THREE,
+                    WORLDZERO_RESTORATION_CHAT_LINE_THREE_EN
+            );
+            case 3 -> WorldZeroNetwork.sendHouseChatLine(
+                    player,
+                    WORLDZERO_RESTORATION_CHAT_SANEK_NAME,
+                    WORLDZERO_RESTORATION_CHAT_LINE_FOUR,
+                    WORLDZERO_RESTORATION_CHAT_LINE_FOUR_EN
+            );
+            default -> {
+            }
+        }
+    }
+
     private static boolean worldzero$startRestorationScene(
             ServerPlayer player,
             ServerLevel houseLevel,
@@ -1133,6 +1210,11 @@ public final class WorldZeroHouseDimension {
             return false;
         }
 
+        long[] chatTicks = worldzero$createRestorationChatSchedule(houseLevel);
+        int farmStartDelayTicks = (int) Math.max(
+                0L,
+                chatTicks[chatTicks.length - 1] + WORLDZERO_RESTORATION_ECHO_START_DELAY_AFTER_CHAT_TICKS - houseLevel.getGameTime()
+        );
         echo.moveTo(
                 plan.worldzero$echoSpawnPos.getX() + 0.5D,
                 plan.worldzero$echoSpawnPos.getY(),
@@ -1143,7 +1225,11 @@ public final class WorldZeroHouseDimension {
         echo.worldzero$configureFarmRestoration(
                 player.getUUID(),
                 plan.worldzero$tillTargets,
-                plan.worldzero$plantTargets
+                plan.worldzero$plantTargets,
+                plan.worldzero$approachTargets,
+                plan.worldzero$doorTargets,
+                plan.worldzero$doorOpenStep,
+                farmStartDelayTicks
         );
         houseLevel.addFreshEntity(echo);
 
@@ -1151,7 +1237,11 @@ public final class WorldZeroHouseDimension {
         SessionState sessionState = WORLDZERO_SERVER_STATES.computeIfAbsent(player.getServer(), ignored -> new SessionState());
         sessionState.worldzero$restorationScenes.put(
                 player.getUUID(),
-                new RestorationSceneState(echo.getId(), timeoutTicks)
+                new RestorationSceneState(
+                        echo.getId(),
+                        timeoutTicks,
+                        chatTicks
+                )
         );
         WorldZeroNetwork.sendFreezeStart(
                 player,
@@ -1166,6 +1256,17 @@ public final class WorldZeroHouseDimension {
     private static int worldzero$getRestorationSceneTimeoutTicks(RestorationDreamPlan plan) {
         int actionCount = plan.worldzero$tillTargets.size() + plan.worldzero$plantTargets.size();
         return Math.max(WORLDZERO_RESTORATION_SCENE_TIMEOUT_TICKS, 20 * 10 + actionCount * 30);
+    }
+
+    private static long[] worldzero$createRestorationChatSchedule(ServerLevel level) {
+        long[] chatTicks = new long[4];
+        chatTicks[0] = level.getGameTime() + WORLDZERO_RESTORATION_CHAT_START_DELAY_TICKS;
+        for (int index = 1; index < chatTicks.length; index++) {
+            chatTicks[index] = chatTicks[index - 1] + level.random.nextInt(
+                    WORLDZERO_RESTORATION_CHAT_DELAY_MAX_TICKS - WORLDZERO_RESTORATION_CHAT_DELAY_MIN_TICKS + 1
+            ) + WORLDZERO_RESTORATION_CHAT_DELAY_MIN_TICKS;
+        }
+        return chatTicks;
     }
 
     private static void worldzero$applyRestorationDamageState(ServerLevel level, List<RestorationEntry> entries) {
@@ -1217,12 +1318,46 @@ public final class WorldZeroHouseDimension {
         BlockPos firstTarget = !tillTargets.isEmpty()
                 ? tillTargets.get(0).worldzero$pos
                 : plantTargets.get(0).worldzero$soilPos;
-        BlockPos echoSpawnPos = worldzero$findRestorationEchoSpawn(level, playerPos, firstTarget);
-        if (echoSpawnPos == null) {
-            return null;
+        RestorationApproachScript approachScript = worldzero$createFixedRestorationApproach(level);
+        BlockPos echoSpawnPos;
+        List<BlockPos> approachTargets;
+        List<BlockPos> doorTargets;
+        int doorOpenStep;
+        if (approachScript != null) {
+            echoSpawnPos = approachScript.worldzero$spawnPos;
+            approachTargets = approachScript.worldzero$waypoints;
+            doorTargets = approachScript.worldzero$doorTargets;
+            doorOpenStep = approachScript.worldzero$doorOpenStep;
+        } else {
+            echoSpawnPos = worldzero$findRestorationEchoSpawn(
+                    level,
+                    templateInfo,
+                    worldzero$findPrimaryBedPos(level, templateInfo),
+                    firstTarget
+            );
+            if (echoSpawnPos == null) {
+                return null;
+            }
+
+            approachTargets = worldzero$findRestorationApproachPath(level, templateInfo, echoSpawnPos, firstTarget);
+            if (approachTargets == null) {
+                return null;
+            }
+            doorTargets = Collections.emptyList();
+            doorOpenStep = -1;
         }
 
-        return new RestorationDreamPlan(playerPos, echoSpawnPos, yawPitch[0], yawPitch[1], tillTargets, plantTargets);
+        return new RestorationDreamPlan(
+                playerPos,
+                echoSpawnPos,
+                yawPitch[0],
+                yawPitch[1],
+                tillTargets,
+                plantTargets,
+                approachTargets,
+                doorTargets,
+                doorOpenStep
+        );
     }
 
     private static void worldzero$appendRestorationLineTargets(
@@ -1425,9 +1560,122 @@ public final class WorldZeroHouseDimension {
     }
 
     @Nullable
-    private static BlockPos worldzero$findRestorationEchoSpawn(ServerLevel level, BlockPos playerPos, BlockPos firstTarget) {
-        int deltaX = Integer.compare(firstTarget.getX(), playerPos.getX());
-        int deltaZ = Integer.compare(firstTarget.getZ(), playerPos.getZ());
+    private static BlockPos worldzero$findRestorationEchoSpawn(
+            ServerLevel level,
+            TemplateInfo templateInfo,
+            @Nullable BlockPos bedPos,
+            BlockPos firstTarget
+    ) {
+        if (bedPos != null) {
+            BlockPos bedStart = worldzero$findSpawnPosNearBed(level, bedPos, templateInfo);
+            if (worldzero$isStandable(level, bedStart)) {
+                return bedStart.immutable();
+            }
+        }
+
+        BlockPos interiorStart = worldzero$findRestorationHouseStart(level, templateInfo, firstTarget);
+        if (interiorStart != null) {
+            return interiorStart;
+        }
+
+        return worldzero$findRestorationEchoSpawnNearField(level, firstTarget);
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findRestorationHouseStart(
+            ServerLevel level,
+            TemplateInfo templateInfo,
+            BlockPos firstTarget
+    ) {
+        BlockPos origin = WORLDZERO_BASE_ORIGIN;
+        int minX = origin.getX();
+        int maxX = origin.getX() + templateInfo.worldzero$size.getX() - 1;
+        int minY = origin.getY();
+        int maxY = origin.getY() + templateInfo.worldzero$size.getY() - 2;
+        int minZ = origin.getZ();
+        int maxZ = origin.getZ() + templateInfo.worldzero$size.getZ() - 1;
+        int centerX = (minX + maxX) / 2;
+        int centerZ = (minZ + maxZ) / 2;
+        boolean preferX = Math.abs(firstTarget.getX() - centerX) >= Math.abs(firstTarget.getZ() - centerZ);
+        int sideDirection = preferX
+                ? Integer.compare(firstTarget.getX(), centerX)
+                : Integer.compare(firstTarget.getZ(), centerZ);
+        if (sideDirection == 0) {
+            sideDirection = 1;
+        }
+
+        Vec3 lookTarget = Vec3.atCenterOf(firstTarget);
+        for (boolean requireClearView : new boolean[]{true, false}) {
+            BlockPos bestPos = null;
+            double bestScore = Double.MAX_VALUE;
+
+            for (int depth = 1; depth <= 5; depth++) {
+                if (preferX) {
+                    int x = sideDirection > 0 ? maxX - depth : minX + depth;
+                    if (x <= minX || x >= maxX) {
+                        continue;
+                    }
+
+                    for (int z = minZ + 1; z <= maxZ - 1; z++) {
+                        for (int y = minY + 1; y <= maxY; y++) {
+                            BlockPos candidate = new BlockPos(x, y, z);
+                            if (!worldzero$isStandable(level, candidate)) {
+                                continue;
+                            }
+                            if (requireClearView && !worldzero$hasClearView(level, candidate, lookTarget)) {
+                                continue;
+                            }
+
+                            double score = candidate.distSqr(firstTarget) + depth * 4.0D + Math.abs(candidate.getY() - firstTarget.getY()) * 6.0D;
+                            if (score < bestScore) {
+                                bestScore = score;
+                                bestPos = candidate.immutable();
+                            }
+                        }
+                    }
+                } else {
+                    int z = sideDirection > 0 ? maxZ - depth : minZ + depth;
+                    if (z <= minZ || z >= maxZ) {
+                        continue;
+                    }
+
+                    for (int x = minX + 1; x <= maxX - 1; x++) {
+                        for (int y = minY + 1; y <= maxY; y++) {
+                            BlockPos candidate = new BlockPos(x, y, z);
+                            if (!worldzero$isStandable(level, candidate)) {
+                                continue;
+                            }
+                            if (requireClearView && !worldzero$hasClearView(level, candidate, lookTarget)) {
+                                continue;
+                            }
+
+                            double score = candidate.distSqr(firstTarget) + depth * 4.0D + Math.abs(candidate.getY() - firstTarget.getY()) * 6.0D;
+                            if (score < bestScore) {
+                                bestScore = score;
+                                bestPos = candidate.immutable();
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (bestPos != null) {
+                return bestPos;
+            }
+        }
+
+        return null;
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findRestorationEchoSpawnNearField(ServerLevel level, BlockPos firstTarget) {
+        int deltaX = 0;
+        int deltaZ = 0;
+        if (Math.abs(firstTarget.getX()) >= Math.abs(firstTarget.getZ())) {
+            deltaX = Integer.compare(firstTarget.getX(), 0);
+        } else {
+            deltaZ = Integer.compare(firstTarget.getZ(), 0);
+        }
         if (deltaX == 0 && deltaZ == 0) {
             deltaZ = 1;
         }
@@ -1453,6 +1701,151 @@ public final class WorldZeroHouseDimension {
         }
 
         return null;
+    }
+
+    @Nullable
+    private static List<BlockPos> worldzero$findRestorationApproachPath(
+            ServerLevel level,
+            TemplateInfo templateInfo,
+            BlockPos startPos,
+            BlockPos firstTarget
+    ) {
+        BlockPos origin = WORLDZERO_BASE_ORIGIN;
+        BlockPos targetPos = firstTarget.above();
+        if (startPos.equals(targetPos)) {
+            return Collections.emptyList();
+        }
+
+        int minX = origin.getX();
+        int maxX = origin.getX() + templateInfo.worldzero$size.getX() - 1;
+        int minY = Math.max(origin.getY() + 1, Math.min(startPos.getY(), targetPos.getY()) - 2);
+        int maxY = Math.min(origin.getY() + templateInfo.worldzero$size.getY() - 1, Math.max(startPos.getY(), targetPos.getY()) + 2);
+        int minZ = origin.getZ();
+        int maxZ = origin.getZ() + templateInfo.worldzero$size.getZ() - 1;
+
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        Map<Long, BlockPos> parents = new HashMap<>();
+        Set<Long> visited = new HashSet<>();
+        queue.add(startPos);
+        visited.add(startPos.asLong());
+
+        while (!queue.isEmpty()) {
+            BlockPos current = queue.removeFirst();
+            if (current.equals(targetPos)) {
+                break;
+            }
+
+            for (Direction direction : Direction.Plane.HORIZONTAL) {
+                BlockPos next = worldzero$findRestorationPathNeighbor(level, current, direction, minY, maxY);
+                if (next == null
+                        || next.getX() < minX
+                        || next.getX() > maxX
+                        || next.getZ() < minZ
+                        || next.getZ() > maxZ) {
+                    continue;
+                }
+
+                long key = next.asLong();
+                if (!visited.add(key)) {
+                    continue;
+                }
+
+                parents.put(key, current);
+                queue.addLast(next);
+            }
+        }
+
+        if (!visited.contains(targetPos.asLong())) {
+            return null;
+        }
+
+        List<BlockPos> path = new ArrayList<>();
+        BlockPos cursor = targetPos;
+        while (!cursor.equals(startPos)) {
+            path.add(cursor.immutable());
+            cursor = parents.get(cursor.asLong());
+            if (cursor == null) {
+                return null;
+            }
+        }
+        Collections.reverse(path);
+        return path;
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findRestorationPathNeighbor(
+            ServerLevel level,
+            BlockPos current,
+            Direction direction,
+            int minY,
+            int maxY
+    ) {
+        int nextX = current.getX() + direction.getStepX();
+        int nextZ = current.getZ() + direction.getStepZ();
+        int[] offsets = new int[]{0, 1, -1, 2, -2};
+        for (int offset : offsets) {
+            int y = current.getY() + offset;
+            if (y < minY || y > maxY) {
+                continue;
+            }
+
+            BlockPos candidate = new BlockPos(nextX, y, nextZ);
+            if (worldzero$isRestorationPathStandable(level, candidate)) {
+                return candidate.immutable();
+            }
+        }
+
+        return null;
+    }
+
+    private static boolean worldzero$isRestorationPathStandable(ServerLevel level, BlockPos pos) {
+        if (worldzero$isStandable(level, pos)) {
+            return true;
+        }
+
+        BlockState feetState = level.getBlockState(pos);
+        BlockState headState = level.getBlockState(pos.above());
+        BlockState floorState = level.getBlockState(pos.below());
+        if (floorState.getCollisionShape(level, pos.below()).isEmpty()) {
+            return false;
+        }
+
+        return worldzero$isRestorationOpenablePassage(feetState)
+                && (headState.getCollisionShape(level, pos.above()).isEmpty()
+                || worldzero$isRestorationOpenablePassage(headState));
+    }
+
+    private static boolean worldzero$isRestorationOpenablePassage(BlockState state) {
+        return state.getBlock() instanceof DoorBlock || state.getBlock() instanceof FenceGateBlock;
+    }
+
+    @Nullable
+    private static RestorationApproachScript worldzero$createFixedRestorationApproach(ServerLevel level) {
+        if (!worldzero$isStandable(level, WORLDZERO_RESTORATION_ROUTE_START)) {
+            return null;
+        }
+
+        for (BlockPos waypoint : WORLDZERO_RESTORATION_ROUTE_POINTS) {
+            if (!worldzero$isStandable(level, waypoint)) {
+                return null;
+            }
+        }
+
+        for (BlockPos doorTarget : WORLDZERO_RESTORATION_ROUTE_DOORS) {
+            BlockState state = level.getBlockState(doorTarget);
+            if (!(state.getBlock() instanceof DoorBlock)
+                    || !state.hasProperty(DoorBlock.HALF)
+                    || state.getValue(DoorBlock.HALF) != DoubleBlockHalf.LOWER) {
+                return null;
+            }
+        }
+
+        return new RestorationApproachScript(
+                WORLDZERO_RESTORATION_ROUTE_START,
+                WORLDZERO_RESTORATION_ROUTE_POINTS,
+                WORLDZERO_RESTORATION_ROUTE_DOORS,
+                WORLDZERO_RESTORATION_ROUTE_DOOR_OPEN_STEP
+        );
     }
 
     private static ItemStack worldzero$getPlantItemForState(BlockState plantState) {
@@ -1865,13 +2258,17 @@ public final class WorldZeroHouseDimension {
 
     private static final class RestorationSceneState {
         private final int worldzero$echoEntityId;
+        private final long[] worldzero$chatTicks;
         private int worldzero$timeoutTicks;
         private int worldzero$spawnGraceTicks;
+        private int worldzero$chatMessageIndex;
 
-        private RestorationSceneState(int echoEntityId, int timeoutTicks) {
+        private RestorationSceneState(int echoEntityId, int timeoutTicks, long[] chatTicks) {
             this.worldzero$echoEntityId = echoEntityId;
+            this.worldzero$chatTicks = chatTicks;
             this.worldzero$timeoutTicks = timeoutTicks;
             this.worldzero$spawnGraceTicks = 20;
+            this.worldzero$chatMessageIndex = 0;
         }
     }
 
@@ -1892,6 +2289,9 @@ public final class WorldZeroHouseDimension {
         private final float worldzero$playerPitch;
         private final List<WorldZeroHouseEchoEntity.FarmTillTarget> worldzero$tillTargets;
         private final List<WorldZeroHouseEchoEntity.FarmPlantTarget> worldzero$plantTargets;
+        private final List<BlockPos> worldzero$approachTargets;
+        private final List<BlockPos> worldzero$doorTargets;
+        private final int worldzero$doorOpenStep;
 
         private RestorationDreamPlan(
                 BlockPos playerPos,
@@ -1899,7 +2299,10 @@ public final class WorldZeroHouseDimension {
                 float playerYaw,
                 float playerPitch,
                 List<WorldZeroHouseEchoEntity.FarmTillTarget> tillTargets,
-                List<WorldZeroHouseEchoEntity.FarmPlantTarget> plantTargets
+                List<WorldZeroHouseEchoEntity.FarmPlantTarget> plantTargets,
+                List<BlockPos> approachTargets,
+                List<BlockPos> doorTargets,
+                int doorOpenStep
         ) {
             this.worldzero$playerPos = playerPos.immutable();
             this.worldzero$echoSpawnPos = echoSpawnPos.immutable();
@@ -1907,7 +2310,18 @@ public final class WorldZeroHouseDimension {
             this.worldzero$playerPitch = playerPitch;
             this.worldzero$tillTargets = tillTargets;
             this.worldzero$plantTargets = plantTargets;
+            this.worldzero$approachTargets = List.copyOf(approachTargets);
+            this.worldzero$doorTargets = List.copyOf(doorTargets);
+            this.worldzero$doorOpenStep = doorOpenStep;
         }
+    }
+
+    private record RestorationApproachScript(
+            BlockPos worldzero$spawnPos,
+            List<BlockPos> worldzero$waypoints,
+            List<BlockPos> worldzero$doorTargets,
+            int worldzero$doorOpenStep
+    ) {
     }
 
     private static final class RestorationEntry {

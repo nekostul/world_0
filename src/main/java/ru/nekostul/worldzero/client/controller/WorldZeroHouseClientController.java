@@ -1,6 +1,7 @@
 package ru.nekostul.worldzero;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance.Attenuation;
@@ -40,6 +41,27 @@ public final class WorldZeroHouseClientController {
         if (mode == WORLDZERO_MODE_SILENT) {
             worldzero$stopActiveHouseSound();
         }
+    }
+
+    public static void handleFakeChatLinePacket(String speaker, String defaultMessage, String englishMessage) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.gui == null || speaker.isBlank() || defaultMessage.isBlank()) {
+            return;
+        }
+
+        String message = defaultMessage;
+        if (minecraft.options != null
+                && minecraft.options.languageCode != null
+                && minecraft.options.languageCode.toLowerCase(java.util.Locale.ROOT).startsWith("en")
+                && !englishMessage.isBlank()) {
+            message = englishMessage;
+        }
+
+        minecraft.gui.getChat().addMessage(Component.translatable(
+                "chat.type.text",
+                Component.literal(speaker),
+                Component.literal(message)
+        ));
     }
 
     @SubscribeEvent

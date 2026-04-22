@@ -45,7 +45,7 @@ public final class WorldZeroFreezeClientController {
         }
 
         worldzero$freezeActive = true;
-        worldzero$fallbackTicksRemaining = WORLDZERO_FREEZE_FALLBACK_TICKS;
+        worldzero$fallbackTicksRemaining = durationTicks > 0 ? durationTicks : WORLDZERO_FREEZE_FALLBACK_TICKS;
         worldzero$capturedPlayerState = false;
         worldzero$focusEntityId = focusEntityId;
         worldzero$forcedYaw = forcedYaw;

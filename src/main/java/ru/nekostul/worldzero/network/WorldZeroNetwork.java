@@ -105,6 +105,13 @@ public final class WorldZeroNetwork {
                 WorldZeroHouseClientModePacket::decode,
                 WorldZeroHouseClientModePacket::handle
         );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroHouseChatLinePacket.class,
+                WorldZeroHouseChatLinePacket::encode,
+                WorldZeroHouseChatLinePacket::decode,
+                WorldZeroHouseChatLinePacket::handle
+        );
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks) {
@@ -190,6 +197,13 @@ public final class WorldZeroNetwork {
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new WorldZeroHouseClientModePacket(mode)
+        );
+    }
+
+    public static void sendHouseChatLine(ServerPlayer player, String speaker, String defaultMessage, String englishMessage) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroHouseChatLinePacket(speaker, defaultMessage, englishMessage)
         );
     }
 }

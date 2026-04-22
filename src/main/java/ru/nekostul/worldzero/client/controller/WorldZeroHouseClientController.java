@@ -1,6 +1,8 @@
 package ru.nekostul.worldzero;
 
+import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -15,8 +17,11 @@ import net.minecraftforge.client.event.RenderHighlightEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.mixin.ChatComponentAccessor;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.List;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class WorldZeroHouseClientController {
@@ -32,6 +37,7 @@ public final class WorldZeroHouseClientController {
     private static boolean worldzero$finishSignalSent;
     private static byte worldzero$pendingHouseMode = WORLDZERO_MODE_DEFAULT;
     private static SoundInstance worldzero$activeHouseSound;
+    private static final List<String> WORLDZERO_TRACKED_FAKE_CHAT_LINES = new ArrayList<>();
 
     private WorldZeroHouseClientController() {
     }
@@ -57,11 +63,13 @@ public final class WorldZeroHouseClientController {
             message = englishMessage;
         }
 
-        minecraft.gui.getChat().addMessage(Component.translatable(
+        Component chatLine = Component.translatable(
                 "chat.type.text",
                 Component.literal(speaker),
                 Component.literal(message)
-        ));
+        );
+        minecraft.gui.getChat().addMessage(chatLine);
+        WORLDZERO_TRACKED_FAKE_CHAT_LINES.add(chatLine.getString());
     }
 
     @SubscribeEvent
@@ -150,6 +158,7 @@ public final class WorldZeroHouseClientController {
 
     private static void worldzero$clearState() {
         worldzero$stopActiveHouseSound();
+        worldzero$removeTrackedFakeChatLines();
         worldzero$houseActive = false;
         worldzero$finishSignalSent = false;
         worldzero$pendingHouseMode = WORLDZERO_MODE_DEFAULT;
@@ -161,6 +170,29 @@ public final class WorldZeroHouseClientController {
             minecraft.getSoundManager().stop(worldzero$activeHouseSound);
         }
         worldzero$activeHouseSound = null;
+    }
+
+    private static void worldzero$removeTrackedFakeChatLines() {
+        if (WORLDZERO_TRACKED_FAKE_CHAT_LINES.isEmpty()) {
+            return;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.gui == null) {
+            WORLDZERO_TRACKED_FAKE_CHAT_LINES.clear();
+            return;
+        }
+
+        ChatComponent chat = minecraft.gui.getChat();
+        ChatComponentAccessor accessor = (ChatComponentAccessor) (Object) chat;
+        List<GuiMessage> allMessages = accessor.worldzero$getAllMessages();
+        boolean removed = allMessages.removeIf(
+                message -> WORLDZERO_TRACKED_FAKE_CHAT_LINES.contains(message.content().getString())
+        );
+        WORLDZERO_TRACKED_FAKE_CHAT_LINES.clear();
+        if (removed) {
+            accessor.worldzero$refreshTrimmedMessage();
+        }
     }
 
     private static boolean worldzero$isHouseLevel(@Nullable Minecraft minecraft) {

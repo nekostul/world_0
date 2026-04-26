@@ -7,6 +7,7 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -25,8 +26,11 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 
@@ -37,6 +41,18 @@ import java.util.UUID;
 
 public class WorldZeroHouseEchoEntity extends Monster {
     public static final String WORLDZERO_HOUSE_DISPLAY_TAG = "worldzero_house_display";
+    private static final ResourceLocation WORLDZERO_WOODEN_DOOR_OPEN_SOUND_ID = new ResourceLocation(
+            "minecraft",
+            "block.wooden_door.open"
+    );
+    private static final ResourceLocation WORLDZERO_IRON_DOOR_OPEN_SOUND_ID = new ResourceLocation(
+            "minecraft",
+            "block.iron_door.open"
+    );
+    private static final ResourceLocation WORLDZERO_FENCE_GATE_OPEN_SOUND_ID = new ResourceLocation(
+            "minecraft",
+            "block.fence_gate.open"
+    );
 
     private UUID worldzero$targetPlayerId;
     private int worldzero$interiorMinX;
@@ -69,6 +85,13 @@ public class WorldZeroHouseEchoEntity extends Monster {
     private int worldzero$farmFinishTicks;
     private double worldzero$farmWalkDistance;
     private boolean worldzero$farmReadyToWake;
+    private int worldzero$farmStartDelayTicks;
+    private final List<BlockPos> worldzero$farmApproachTargets = new ArrayList<>();
+    private final List<BlockPos> worldzero$farmDoorTargets = new ArrayList<>();
+    private int worldzero$farmApproachIndex;
+    private int worldzero$farmApproachPauseTicks;
+    private int worldzero$farmDoorOpenStep;
+    private boolean worldzero$farmDoorOpened;
 
     public WorldZeroHouseEchoEntity(EntityType<? extends Monster> entityType, Level level) {
         super(entityType, level);
@@ -86,7 +109,11 @@ public class WorldZeroHouseEchoEntity extends Monster {
     public void worldzero$configureFarmRestoration(
             UUID targetPlayerId,
             List<FarmTillTarget> tillTargets,
-            List<FarmPlantTarget> plantTargets
+            List<FarmPlantTarget> plantTargets,
+            List<BlockPos> approachTargets,
+            List<BlockPos> doorTargets,
+            int doorOpenStep,
+            int startDelayTicks
     ) {
         this.worldzero$targetPlayerId = targetPlayerId;
         this.worldzero$farmRestoreActive = true;
@@ -95,6 +122,14 @@ public class WorldZeroHouseEchoEntity extends Monster {
         this.worldzero$farmTillTargets.addAll(tillTargets);
         this.worldzero$farmPlantTargets.clear();
         this.worldzero$farmPlantTargets.addAll(plantTargets);
+        this.worldzero$farmApproachTargets.clear();
+        for (BlockPos approachTarget : approachTargets) {
+            this.worldzero$farmApproachTargets.add(approachTarget.immutable());
+        }
+        this.worldzero$farmDoorTargets.clear();
+        for (BlockPos doorTarget : doorTargets) {
+            this.worldzero$farmDoorTargets.add(doorTarget.immutable());
+        }
         this.worldzero$farmPhase = 2;
         this.worldzero$farmTillIndex = 0;
         this.worldzero$farmPlantIndex = 0;
@@ -103,6 +138,11 @@ public class WorldZeroHouseEchoEntity extends Monster {
         this.worldzero$farmFinishTicks = 20;
         this.worldzero$farmWalkDistance = 0.0D;
         this.worldzero$farmReadyToWake = false;
+        this.worldzero$farmStartDelayTicks = Math.max(0, startDelayTicks);
+        this.worldzero$farmApproachIndex = 0;
+        this.worldzero$farmApproachPauseTicks = 0;
+        this.worldzero$farmDoorOpenStep = doorOpenStep;
+        this.worldzero$farmDoorOpened = false;
         this.worldzero$currentWorkPos = null;
         this.worldzero$actionTicksRemaining = 0;
         this.worldzero$stareTicksRemaining = 0;
@@ -498,6 +538,59 @@ public class WorldZeroHouseEchoEntity extends Monster {
     }
 
     private void worldzero$tickFarmRestoration(ServerLevel serverLevel, ServerPlayer targetPlayer) {
+        if (this.worldzero$farmStartDelayTicks > 0) {
+            this.worldzero$farmStartDelayTicks--;
+            this.worldzero$currentWorkPos = null;
+            this.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            this.setDeltaMovement(Vec3.ZERO);
+            this.setSprinting(false);
+            this.worldzero$lookAtPlayer(targetPlayer);
+            return;
+        }
+
+        if (this.worldzero$farmApproachPauseTicks > 0) {
+            this.worldzero$farmApproachPauseTicks--;
+            this.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            this.setDeltaMovement(Vec3.ZERO);
+            this.setSprinting(false);
+            if (this.worldzero$currentWorkPos != null) {
+                this.worldzero$lookAtBlock(this.worldzero$currentWorkPos);
+            }
+            return;
+        }
+
+        if (this.worldzero$farmApproachIndex < this.worldzero$farmApproachTargets.size()) {
+            BlockPos target = this.worldzero$farmApproachTargets.get(this.worldzero$farmApproachIndex);
+            this.worldzero$currentWorkPos = target;
+            this.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            if (!this.worldzero$farmDoorOpened
+                    && this.worldzero$farmDoorOpenStep == this.worldzero$farmApproachIndex
+                    && this.worldzero$tryOpenFarmScriptDoors(serverLevel, targetPlayer)) {
+                this.worldzero$farmApproachPauseTicks = 8;
+                this.setDeltaMovement(Vec3.ZERO);
+                this.setSprinting(false);
+                return;
+            }
+
+            if (this.worldzero$isFarmPassageTarget(serverLevel, target)
+                    && this.distanceToSqr(target.getX() + 0.5D, target.getY() + 0.5D, target.getZ() + 0.5D) <= 2.25D
+                    && this.worldzero$tryOpenFarmPassage(serverLevel, target, targetPlayer)) {
+                this.worldzero$farmApproachPauseTicks = 6;
+                this.setDeltaMovement(Vec3.ZERO);
+                this.setSprinting(false);
+                return;
+            }
+
+            if (this.worldzero$moveTowardTarget(serverLevel, target, 0.12D, true)) {
+                return;
+            }
+
+            this.worldzero$farmApproachIndex++;
+            this.setDeltaMovement(Vec3.ZERO);
+            this.setSprinting(false);
+            return;
+        }
+
         if (this.worldzero$farmReadyToWake) {
             this.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
             this.setDeltaMovement(Vec3.ZERO);
@@ -536,7 +629,7 @@ public class WorldZeroHouseEchoEntity extends Monster {
             FarmTillTarget target = this.worldzero$farmTillTargets.get(this.worldzero$farmTillIndex);
             this.worldzero$currentWorkPos = target.worldzero$pos;
             this.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_HOE));
-            if (this.worldzero$moveTowardTarget(serverLevel, target.worldzero$pos, 0.14D)) {
+            if (this.worldzero$moveTowardTarget(serverLevel, target.worldzero$pos, 0.14D, false)) {
                 return;
             }
 
@@ -582,7 +675,7 @@ public class WorldZeroHouseEchoEntity extends Monster {
             FarmPlantTarget target = this.worldzero$farmPlantTargets.get(this.worldzero$farmPlantIndex);
             this.worldzero$currentWorkPos = target.worldzero$soilPos;
             this.setItemInHand(InteractionHand.MAIN_HAND, target.worldzero$heldItem.copy());
-            if (this.worldzero$moveTowardTarget(serverLevel, target.worldzero$soilPos, 0.14D)) {
+            if (this.worldzero$moveTowardTarget(serverLevel, target.worldzero$soilPos, 0.14D, false)) {
                 return;
             }
 
@@ -625,7 +718,12 @@ public class WorldZeroHouseEchoEntity extends Monster {
         this.setSprinting(false);
     }
 
-    private boolean worldzero$moveTowardTarget(ServerLevel serverLevel, BlockPos targetPos, double speedPerTick) {
+    private boolean worldzero$moveTowardTarget(
+            ServerLevel serverLevel,
+            BlockPos targetPos,
+            double speedPerTick,
+            boolean targetIsStandPosition
+    ) {
         Vec3 target = Vec3.atBottomCenterOf(targetPos);
         Vec3 delta = target.subtract(this.position());
         double horizontalDistance = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
@@ -639,7 +737,7 @@ public class WorldZeroHouseEchoEntity extends Monster {
         double step = Math.min(speedPerTick, horizontalDistance);
         double moveX = (delta.x / horizontalDistance) * step;
         double moveZ = (delta.z / horizontalDistance) * step;
-        double desiredY = targetPos.getY() + 1.0D;
+        double desiredY = targetIsStandPosition ? targetPos.getY() : targetPos.getY() + 1.0D;
         double maxStepUp = this.getY() + 0.5D;
         double minStepDown = this.getY() - 0.5D;
         double nextY = Mth.clamp(desiredY, minStepDown, maxStepUp);
@@ -652,9 +750,147 @@ public class WorldZeroHouseEchoEntity extends Monster {
         return true;
     }
 
+    private boolean worldzero$tryOpenFarmScriptDoors(ServerLevel serverLevel, ServerPlayer targetPlayer) {
+        if (this.worldzero$farmDoorOpened || this.worldzero$farmDoorTargets.isEmpty()) {
+            return false;
+        }
+
+        boolean openedAny = false;
+        boolean playedSound = false;
+        for (BlockPos doorTarget : this.worldzero$farmDoorTargets) {
+            boolean opened = this.worldzero$tryOpenFarmPassage(
+                    serverLevel,
+                    doorTarget,
+                    playedSound ? null : targetPlayer,
+                    !playedSound
+            );
+            openedAny |= opened;
+            if (opened && !playedSound) {
+                playedSound = true;
+            }
+        }
+        if (openedAny) {
+            this.worldzero$farmDoorOpened = true;
+        }
+        return openedAny;
+    }
+
+    private boolean worldzero$isFarmPassageTarget(ServerLevel serverLevel, BlockPos targetPos) {
+        BlockState state = serverLevel.getBlockState(targetPos);
+        return state.getBlock() instanceof DoorBlock || state.getBlock() instanceof FenceGateBlock;
+    }
+
+    private boolean worldzero$tryOpenFarmPassage(ServerLevel serverLevel, BlockPos targetPos, @Nullable ServerPlayer targetPlayer) {
+        return this.worldzero$tryOpenFarmPassage(serverLevel, targetPos, targetPlayer, true);
+    }
+
+    private boolean worldzero$tryOpenFarmPassage(
+            ServerLevel serverLevel,
+            BlockPos targetPos,
+            @Nullable ServerPlayer targetPlayer,
+            boolean playSound
+    ) {
+        BlockState state = serverLevel.getBlockState(targetPos);
+        if (state.getBlock() instanceof FenceGateBlock gateBlock
+                && state.hasProperty(FenceGateBlock.OPEN)) {
+            if (state.getValue(FenceGateBlock.OPEN)) {
+                return false;
+            }
+
+            serverLevel.setBlock(
+                    targetPos,
+                    state.setValue(FenceGateBlock.OPEN, true),
+                    Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE
+            );
+            if (playSound) {
+                if (targetPlayer != null) {
+                    WorldZeroNetwork.sendKoridorDoorSound(
+                            targetPlayer,
+                            WORLDZERO_FENCE_GATE_OPEN_SOUND_ID,
+                            targetPos.getX() + 0.5D,
+                            targetPos.getY() + 0.5D,
+                            targetPos.getZ() + 0.5D
+                    );
+                } else {
+                    serverLevel.playSound(
+                            null,
+                            targetPos,
+                            SoundEvents.FENCE_GATE_OPEN,
+                            SoundSource.PLAYERS,
+                            1.2F,
+                            0.96F + serverLevel.random.nextFloat() * 0.08F
+                    );
+                }
+            }
+            return true;
+        }
+
+        BlockPos lowerPos = targetPos;
+        BlockState lowerState = state;
+        if (lowerState.hasProperty(DoorBlock.HALF) && lowerState.getValue(DoorBlock.HALF) == DoubleBlockHalf.UPPER) {
+            lowerPos = lowerPos.below();
+            lowerState = serverLevel.getBlockState(lowerPos);
+        }
+
+        if (!(lowerState.getBlock() instanceof DoorBlock)
+                || !lowerState.hasProperty(DoorBlock.OPEN)
+                || !lowerState.hasProperty(DoorBlock.HALF)
+                || lowerState.getValue(DoorBlock.HALF) != DoubleBlockHalf.LOWER) {
+            return false;
+        }
+
+        if (lowerState.getValue(DoorBlock.OPEN)) {
+            return false;
+        }
+
+        BlockPos upperPos = lowerPos.above();
+        BlockState upperState = serverLevel.getBlockState(upperPos);
+        if (!(upperState.getBlock() instanceof DoorBlock)
+                || !upperState.hasProperty(DoorBlock.HALF)
+                || upperState.getValue(DoorBlock.HALF) != DoubleBlockHalf.UPPER
+                || !upperState.hasProperty(DoorBlock.OPEN)) {
+            return false;
+        }
+
+        serverLevel.setBlock(
+                lowerPos,
+                lowerState.setValue(DoorBlock.OPEN, true),
+                Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE
+        );
+        serverLevel.setBlock(
+                upperPos,
+                upperState.setValue(DoorBlock.OPEN, true),
+                Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE
+        );
+        if (playSound) {
+            if (targetPlayer != null) {
+                ResourceLocation soundId = lowerState.is(Blocks.IRON_DOOR)
+                        ? WORLDZERO_IRON_DOOR_OPEN_SOUND_ID
+                        : WORLDZERO_WOODEN_DOOR_OPEN_SOUND_ID;
+                WorldZeroNetwork.sendKoridorDoorSound(
+                        targetPlayer,
+                        soundId,
+                        lowerPos.getX() + 0.5D,
+                        lowerPos.getY() + 0.5D,
+                        lowerPos.getZ() + 0.5D
+                );
+            } else {
+                serverLevel.playSound(
+                        null,
+                        lowerPos,
+                        lowerState.is(Blocks.IRON_DOOR) ? SoundEvents.IRON_DOOR_OPEN : SoundEvents.WOODEN_DOOR_OPEN,
+                        SoundSource.PLAYERS,
+                        1.2F,
+                        0.96F + serverLevel.random.nextFloat() * 0.08F
+                );
+            }
+        }
+        return true;
+    }
+
     private void worldzero$playFarmFootstep(ServerLevel serverLevel, double horizontalDistanceMoved) {
         this.worldzero$farmWalkDistance += horizontalDistanceMoved;
-        if (this.worldzero$farmWalkDistance < 0.5D) {
+        if (this.worldzero$farmWalkDistance < 0.9D) {
             return;
         }
         this.worldzero$farmWalkDistance = 0.0D;
@@ -673,7 +909,7 @@ public class WorldZeroHouseEchoEntity extends Monster {
                 this.getZ(),
                 soundType.getStepSound(),
                 SoundSource.PLAYERS,
-                soundType.getVolume() * 0.15F,
+                Math.max(0.24F, soundType.getVolume() * 0.3F),
                 soundType.getPitch()
         );
     }

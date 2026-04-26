@@ -1,6 +1,7 @@
 package ru.nekostul.worldzero;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.OptionInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance.Attenuation;
@@ -51,6 +52,7 @@ public final class WorldZeroKoridorClientController {
     private static final Map<SoundSource, Float> WORLDZERO_ORIGINAL_VOLUMES = new EnumMap<>(SoundSource.class);
 
     private static boolean worldzero$koridorActive;
+    private static boolean worldzero$internalVolumeUpdate;
     private static SoundInstance worldzero$activeKoridorSound;
 
     private WorldZeroKoridorClientController() {
@@ -58,6 +60,31 @@ public final class WorldZeroKoridorClientController {
 
     public static boolean worldzero$isVolumeForced() {
         return worldzero$koridorActive || worldzero$isKoridorLevel(Minecraft.getInstance());
+    }
+
+    public static boolean worldzero$shouldBlockSoundOptionChange(@Nullable OptionInstance<?> optionInstance, @Nullable Object value) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (worldzero$internalVolumeUpdate
+                || !worldzero$isVolumeForced()
+                || !(value instanceof Double doubleValue)
+                || doubleValue >= 0.999D
+                || minecraft == null
+                || minecraft.options == null
+                || optionInstance == null) {
+            return false;
+        }
+
+        for (SoundSource source : SoundSource.values()) {
+            if (source == SoundSource.MUSIC) {
+                continue;
+            }
+
+            if (minecraft.options.getSoundSourceOptionInstance(source) == optionInstance) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static boolean worldzero$isVanillaDoorSoundInstance(@Nullable SoundInstance soundInstance) {
@@ -190,7 +217,7 @@ public final class WorldZeroKoridorClientController {
                 continue;
             }
             if (minecraft.options.getSoundSourceVolume(source) != 1.0F) {
-                minecraft.options.getSoundSourceOptionInstance(source).set(1.0D);
+                worldzero$setSourceVolume(minecraft, source, 1.0F);
             }
             minecraft.getSoundManager().updateSourceVolume(source, 1.0F);
         }
@@ -204,7 +231,7 @@ public final class WorldZeroKoridorClientController {
             }
             if (minecraft.options != null) {
                 for (Map.Entry<SoundSource, Float> entry : WORLDZERO_ORIGINAL_VOLUMES.entrySet()) {
-                    minecraft.options.getSoundSourceOptionInstance(entry.getKey()).set((double) entry.getValue());
+                    worldzero$setSourceVolume(minecraft, entry.getKey(), entry.getValue());
                     minecraft.getSoundManager().updateSourceVolume(entry.getKey(), entry.getValue());
                 }
             }
@@ -220,6 +247,15 @@ public final class WorldZeroKoridorClientController {
                 && minecraft.player != null
                 && minecraft.level != null
                 && minecraft.level.dimension() == WorldZeroKoridorDimension.WORLDZERO_KORIDOR_LEVEL;
+    }
+
+    private static void worldzero$setSourceVolume(Minecraft minecraft, SoundSource source, float volume) {
+        worldzero$internalVolumeUpdate = true;
+        try {
+            minecraft.options.getSoundSourceOptionInstance(source).set((double) volume);
+        } finally {
+            worldzero$internalVolumeUpdate = false;
+        }
     }
 
     @Nullable

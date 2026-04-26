@@ -16,6 +16,7 @@
     "MouseHandlerMixin",
     "MusicManagerMixin",
     "NaturalSpawnerMixin",
+    "OptionInstanceMixin",
     "OptionsMixin",
     "ParticleEngineMixin",
     "ShareToLanScreenMixin",

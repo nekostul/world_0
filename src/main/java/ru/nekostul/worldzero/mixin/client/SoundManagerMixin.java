@@ -5,6 +5,7 @@ import net.minecraft.client.sounds.SoundManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import ru.nekostul.worldzero.WorldZeroFallDamageClientController;
 import ru.nekostul.worldzero.WorldZeroKoridorClientController;
 
 @Mixin(SoundManager.class)
@@ -15,11 +16,21 @@ public abstract class SoundManagerMixin {
             return soundInstance;
         }
 
+        SoundInstance mutedFallDamageSound = WorldZeroFallDamageClientController.worldzero$createFallDamageMute(soundInstance);
+        if (mutedFallDamageSound != null) {
+            return mutedFallDamageSound;
+        }
+
         SoundInstance replacementSound = WorldZeroKoridorClientController.worldzero$createDoorReplacement(
                 soundInstance,
                 0
         );
-        return replacementSound != null ? replacementSound : soundInstance;
+        if (replacementSound != null) {
+            return replacementSound;
+        }
+
+        SoundInstance fallReplacement = WorldZeroFallDamageClientController.worldzero$createFallDamageReplacement(soundInstance);
+        return fallReplacement != null ? fallReplacement : soundInstance;
     }
 
     @ModifyVariable(method = "playDelayed", at = @At("HEAD"), argsOnly = true)
@@ -28,10 +39,20 @@ public abstract class SoundManagerMixin {
             return soundInstance;
         }
 
+        SoundInstance mutedFallDamageSound = WorldZeroFallDamageClientController.worldzero$createFallDamageMute(soundInstance);
+        if (mutedFallDamageSound != null) {
+            return mutedFallDamageSound;
+        }
+
         SoundInstance replacementSound = WorldZeroKoridorClientController.worldzero$createDoorReplacement(
                 soundInstance,
                 0
         );
-        return replacementSound != null ? replacementSound : soundInstance;
+        if (replacementSound != null) {
+            return replacementSound;
+        }
+
+        SoundInstance fallReplacement = WorldZeroFallDamageClientController.worldzero$createFallDamageReplacement(soundInstance);
+        return fallReplacement != null ? fallReplacement : soundInstance;
     }
 }

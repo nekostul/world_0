@@ -15,6 +15,13 @@
       }
     ]
   },
+  "hurt": {
+    "sounds": [
+      {
+        "name": "worldzero:hurt"
+      }
+    ]
+  },
   "creak": {
     "sounds": [
       {

@@ -19,23 +19,31 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
+import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.food.FoodData;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.entity.player.PlayerContainerEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
@@ -88,6 +96,24 @@ public final class WorldZeroHouseBadDimension {
     private static final double WORLDZERO_OUTSIDE_PASS_MAX_WINDOW_DISTANCE_SQR = 16.0D * 16.0D;
     private static final double WORLDZERO_OUTSIDE_PASS_SPEED_BLOCKS_PER_TICK = 0.12D;
     private static final double WORLDZERO_OUTSIDE_PASS_STEP_DISTANCE = 1.15D;
+    private static final double WORLDZERO_RETURN_LOCK_TRIGGER_X = -15.443D;
+    private static final int WORLDZERO_RETURN_LOCK_EVENT_DELAY_TICKS = 60;
+    private static final int WORLDZERO_RETURN_LOCK_CHEST_CLOSE_DELAY_TICKS = 60;
+    private static final double WORLDZERO_RETURN_LOCK_BARRIER_START_Y = 65.0D;
+    private static final double WORLDZERO_RETURN_LOCK_BARRIER_END_Y = 67.0D;
+    private static final double WORLDZERO_RETURN_LOCK_BARRIER_START_Z = -31.695D;
+    private static final double WORLDZERO_RETURN_LOCK_BARRIER_END_Z = 15.700D;
+    private static final int WORLDZERO_RETURN_LOCK_BARRIER_MIN_X = -16;
+    private static final int WORLDZERO_RETURN_LOCK_BARRIER_MAX_X = -15;
+    private static final int WORLDZERO_SCRIPTED_BLOCK_SEARCH_HORIZONTAL = 4;
+    private static final int WORLDZERO_SCRIPTED_BLOCK_SEARCH_VERTICAL = 3;
+    private static final double WORLDZERO_SCRIPTED_BLACK_ECHO_SPEED_BLOCKS_PER_TICK = 0.10D;
+    private static final double WORLDZERO_FINAL_AMBUSH_DISTANCE_BLOCKS = 2.0D;
+    private static final int WORLDZERO_FINAL_AMBUSH_FREEZE_TICKS = 15;
+    private static final Vec3 WORLDZERO_SCRIPTED_POINT_1 = new Vec3(-4.413D, 67.0D, -6.436D);
+    private static final Vec3 WORLDZERO_SCRIPTED_POINT_2 = new Vec3(-7.640D, 68.0D, -6.456D);
+    private static final Vec3 WORLDZERO_SCRIPTED_POINT_3 = new Vec3(-11.806D, 68.0D, -2.390D);
+    private static final Vec3 WORLDZERO_SCRIPTED_POINT_4 = new Vec3(-12.252D, 68.0D, -10.488D);
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SERVER_STATES = new WeakHashMap<>();
 
     private WorldZeroHouseBadDimension() {
@@ -110,9 +136,8 @@ public final class WorldZeroHouseBadDimension {
             return;
         }
 
-        if (worldzero$isChestLikeBlock(clickedState)) {
-            worldzero$scheduleChestClose(level, player, event.getPos());
-        }
+        SessionState sessionState = WORLDZERO_SERVER_STATES.computeIfAbsent(level.getServer(), ignored -> new SessionState());
+        worldzero$tryArmFinalUpperChestAmbush(level, sessionState, player, event.getPos());
 
         HouseBadSaveData saveData = worldzero$getSaveData(level);
         BlockPos doorPos = worldzero$resolveDoorLowerPos(level, event.getPos());
@@ -126,7 +151,6 @@ public final class WorldZeroHouseBadDimension {
         }
 
         if (!doorState.getValue(DoorBlock.OPEN)) {
-            SessionState sessionState = WORLDZERO_SERVER_STATES.computeIfAbsent(level.getServer(), ignored -> new SessionState());
             VisitState visitState = sessionState.worldzero$visits.computeIfAbsent(
                     player.getUUID(),
                     ignored -> new VisitState(level.getGameTime(), player.blockPosition())
@@ -139,6 +163,22 @@ public final class WorldZeroHouseBadDimension {
                 visitState.worldzero$doorCloseTriggered = true;
             }
         }
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onPlayerContainerClose(PlayerContainerEvent.Close event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)
+                || player.serverLevel().dimension() != WORLDZERO_HOUSE_BAD_LEVEL
+                || player.isSpectator()) {
+            return;
+        }
+
+        SessionState sessionState = WORLDZERO_SERVER_STATES.get(player.getServer());
+        if (sessionState == null) {
+            return;
+        }
+
+        worldzero$trySpawnFinalUpperChestAmbush(player.serverLevel(), sessionState, player);
     }
 
     @SubscribeEvent
@@ -175,6 +215,20 @@ public final class WorldZeroHouseBadDimension {
     }
 
     @SubscribeEvent
+    public static void worldzero$onPlayerTick(TickEvent.PlayerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END
+                || !(event.player instanceof ServerPlayer player)
+                || player.serverLevel().dimension() != WORLDZERO_HOUSE_BAD_LEVEL
+                || !player.isAlive()
+                || player.isSpectator()) {
+            return;
+        }
+
+        worldzero$applyHouseBadVitals(player);
+        player.setSprinting(false);
+    }
+
+    @SubscribeEvent
     public static void worldzero$onLevelTick(TickEvent.LevelTickEvent event) {
         if (event.phase != TickEvent.Phase.END
                 || !(event.level instanceof ServerLevel level)
@@ -192,7 +246,7 @@ public final class WorldZeroHouseBadDimension {
         long gameTime = level.getGameTime();
         worldzero$tickDoorAppearances(level, sessionState, gameTime);
         worldzero$tickDelayedActions(level, sessionState, gameTime);
-        worldzero$tickOutsidePasses(level, sessionState);
+        worldzero$tickScriptedReturnLockEvent(level, sessionState, gameTime);
         worldzero$tickVisitStates(level, sessionState, structureRuntime, gameTime);
     }
 
@@ -213,7 +267,8 @@ public final class WorldZeroHouseBadDimension {
 
         HouseBadSaveData saveData = worldzero$getSaveData(houseBadLevel);
         if (saveData.worldzero$returnPoints.containsKey(player.getUUID())
-                || saveData.worldzero$inventorySnapshots.containsKey(player.getUUID())) {
+                || saveData.worldzero$inventorySnapshots.containsKey(player.getUUID())
+                || saveData.worldzero$vitalSnapshots.containsKey(player.getUUID())) {
             return false;
         }
 
@@ -237,9 +292,16 @@ public final class WorldZeroHouseBadDimension {
                 player.getUUID(),
                 PlayerInventorySnapshot.worldzero$fromPlayer(player)
         );
+        saveData.worldzero$vitalSnapshots.put(
+                player.getUUID(),
+                PlayerVitalsSnapshot.worldzero$fromPlayer(player)
+        );
         saveData.worldzero$doorEchoConsumed.remove(player.getUUID());
         saveData.setDirty();
 
+        if (player.isSleeping()) {
+            player.stopSleepInBed(false, true);
+        }
         worldzero$clearPlayerInventory(player);
         BlockPos bedPos = worldzero$findPrimaryBedPos(houseBadLevel, templateInfo);
         BlockPos spawnPos = worldzero$findSpawnPosNearBed(houseBadLevel, bedPos, templateInfo);
@@ -251,6 +313,7 @@ public final class WorldZeroHouseBadDimension {
         player.teleportTo(houseBadLevel, spawnPos.getX() + 0.5D, spawnPos.getY(), spawnPos.getZ() + 0.5D, spawnYaw, 0.0F);
         player.setDeltaMovement(0.0D, 0.0D, 0.0D);
         player.fallDistance = 0.0F;
+        worldzero$applyHouseBadVitals(player);
         return true;
     }
 
@@ -272,6 +335,7 @@ public final class WorldZeroHouseBadDimension {
         HouseBadSaveData saveData = worldzero$getSaveData(houseBadLevel);
         ReturnPoint returnPoint = saveData.worldzero$returnPoints.remove(player.getUUID());
         PlayerInventorySnapshot inventorySnapshot = saveData.worldzero$inventorySnapshots.remove(player.getUUID());
+        PlayerVitalsSnapshot vitalSnapshot = saveData.worldzero$vitalSnapshots.remove(player.getUUID());
         saveData.worldzero$doorEchoConsumed.remove(player.getUUID());
         saveData.setDirty();
         SessionState sessionState = WORLDZERO_SERVER_STATES.get(server);
@@ -281,6 +345,7 @@ public final class WorldZeroHouseBadDimension {
 
         if (returnPoint == null
                 && inventorySnapshot == null
+                && vitalSnapshot == null
                 && player.serverLevel().dimension() != WORLDZERO_HOUSE_BAD_LEVEL) {
             return false;
         }
@@ -331,6 +396,9 @@ public final class WorldZeroHouseBadDimension {
         player.fallDistance = 0.0F;
         if (inventorySnapshot != null) {
             worldzero$restorePlayerInventory(player, inventorySnapshot);
+        }
+        if (vitalSnapshot != null) {
+            vitalSnapshot.worldzero$apply(player);
         }
         return true;
     }
@@ -777,54 +845,405 @@ public final class WorldZeroHouseBadDimension {
             boolean insideCore = structureRuntime.worldzero$isInsideCore(player.blockPosition());
             if (insideCore) {
                 visitState.worldzero$lastInsidePos = player.blockPosition().immutable();
-            } else {
-                visitState.worldzero$outsideTicks++;
-                if (visitState.worldzero$outsideTicks >= WORLDZERO_OUTSIDE_PASS_REQUIRED_TICKS) {
-                    visitState.worldzero$outsideReached = true;
-                }
             }
 
-            if (insideCore) {
-                visitState.worldzero$outsideTicks = 0L;
-                int currentSide = worldzero$getNavigationSide(structureRuntime, player.blockPosition());
-                if (!visitState.worldzero$navigationTriggered
-                        && gameTime - visitState.worldzero$enterTick >= WORLDZERO_NAVIGATION_TRIGGER_DELAY_TICKS
-                        && visitState.worldzero$previousNavigationSide != 0
-                        && currentSide != 0
-                        && currentSide != visitState.worldzero$previousNavigationSide) {
-                    BlockPos navigationTarget = worldzero$findWrongNavigationTarget(
-                            structureRuntime,
-                            player.blockPosition(),
-                            visitState.worldzero$previousNavigationSide
-                    );
-                    if (navigationTarget != null) {
-                        player.teleportTo(
-                                level,
-                                navigationTarget.getX() + 0.5D,
-                                navigationTarget.getY(),
-                                navigationTarget.getZ() + 0.5D,
-                                player.getYRot(),
-                                player.getXRot()
-                        );
-                        player.setDeltaMovement(0.0D, 0.0D, 0.0D);
-                        player.fallDistance = 0.0F;
-                        visitState.worldzero$lastInsidePos = navigationTarget.immutable();
-                    }
-                    visitState.worldzero$navigationTriggered = true;
-                }
-
-                if (currentSide != 0) {
-                    visitState.worldzero$previousNavigationSide = currentSide;
-                }
-                continue;
+            if (!visitState.worldzero$returnLockTriggered
+                    && visitState.worldzero$lastKnownX > WORLDZERO_RETURN_LOCK_TRIGGER_X
+                    && player.getX() <= WORLDZERO_RETURN_LOCK_TRIGGER_X
+                    && worldzero$tryStartScriptedReturnLockEvent(level, sessionState, player, gameTime)) {
+                visitState.worldzero$returnLockTriggered = true;
             }
+            visitState.worldzero$lastKnownX = player.getX();
+        }
+    }
 
-            if (visitState.worldzero$outsideReached
-                    && !visitState.worldzero$outsidePassTriggered
-                    && worldzero$tryStartOutsideWindowPass(level, sessionState, structureRuntime, player)) {
-                visitState.worldzero$outsidePassTriggered = true;
+    private static boolean worldzero$tryStartScriptedReturnLockEvent(
+            ServerLevel level,
+            SessionState sessionState,
+            ServerPlayer player,
+            long gameTime
+    ) {
+        if (sessionState.worldzero$scriptedReturnLockEvent != null) {
+            return false;
+        }
+
+        List<BlockPos> barrierPositions = worldzero$placeTemporaryReturnBarriers(level, player.blockPosition());
+        BlockPos doorPos = worldzero$findNearestDoorAlongPath(level, WORLDZERO_SCRIPTED_POINT_1, WORLDZERO_SCRIPTED_POINT_2);
+        BlockPos chestPos = worldzero$findNearestChestLikeBlock(level, WORLDZERO_SCRIPTED_POINT_3);
+        BlockPos upperChestPos = worldzero$findUpperChestLikeBlock(level, chestPos);
+        BlockPos bedPos = worldzero$findNearestBedBlock(level, WORLDZERO_SCRIPTED_POINT_4);
+        sessionState.worldzero$scriptedReturnLockEvent = new ScriptedReturnLockEvent(
+                level.dimension(),
+                player.getUUID(),
+                doorPos,
+                chestPos,
+                upperChestPos,
+                bedPos,
+                barrierPositions,
+                gameTime + WORLDZERO_RETURN_LOCK_EVENT_DELAY_TICKS
+        );
+        return true;
+    }
+
+    private static void worldzero$tickScriptedReturnLockEvent(ServerLevel level, SessionState sessionState, long gameTime) {
+        ScriptedReturnLockEvent scriptedEvent = sessionState.worldzero$scriptedReturnLockEvent;
+        if (scriptedEvent == null || scriptedEvent.worldzero$dimension != level.dimension()) {
+            return;
+        }
+
+        ServerPlayer ownerPlayer = level.getServer().getPlayerList().getPlayer(scriptedEvent.worldzero$playerId);
+        if (ownerPlayer == null || !ownerPlayer.isAlive() || ownerPlayer.isSpectator() || ownerPlayer.serverLevel() != level) {
+            worldzero$clearScriptedReturnLockEvent(level.getServer(), sessionState);
+            return;
+        }
+
+        WorldZeroEchoEntity echo = null;
+        if (scriptedEvent.worldzero$entityId != null) {
+            Entity entity = level.getEntity(scriptedEvent.worldzero$entityId);
+            if (entity instanceof WorldZeroEchoEntity worldZeroEchoEntity) {
+                echo = worldZeroEchoEntity;
+            } else if (scriptedEvent.worldzero$phase != ScriptedReturnLockPhase.WAITING_TO_START) {
+                worldzero$clearScriptedReturnLockEvent(level.getServer(), sessionState);
+                return;
             }
         }
+
+        switch (scriptedEvent.worldzero$phase) {
+            case WAITING_TO_START -> {
+                if (gameTime < scriptedEvent.worldzero$dueTick) {
+                    return;
+                }
+
+                WorldZeroEchoEntity blackEcho = WorldZeroEntities.WORLDZERO_BLACK_ECHO.get().create(level);
+                if (blackEcho == null) {
+                    worldzero$clearScriptedReturnLockEvent(level.getServer(), sessionState);
+                    return;
+                }
+
+                blackEcho.moveTo(
+                        WORLDZERO_SCRIPTED_POINT_1.x,
+                        WORLDZERO_SCRIPTED_POINT_1.y,
+                        WORLDZERO_SCRIPTED_POINT_1.z,
+                        0.0F,
+                        0.0F
+                );
+                blackEcho.setNoGravity(true);
+                blackEcho.setSilent(true);
+                blackEcho.setDeltaMovement(Vec3.ZERO);
+                blackEcho.setSprinting(false);
+                level.addFreshEntity(blackEcho);
+                scriptedEvent.worldzero$entityId = blackEcho.getUUID();
+                scriptedEvent.worldzero$phase = ScriptedReturnLockPhase.WALK_TO_POINT_2;
+            }
+            case WALK_TO_POINT_2 -> {
+                if (echo == null) {
+                    worldzero$clearScriptedReturnLockEvent(level.getServer(), sessionState);
+                    return;
+                }
+
+                if (!scriptedEvent.worldzero$doorOpened
+                        && scriptedEvent.worldzero$doorPos != null
+                        && echo.position().distanceToSqr(worldzero$getBlockCenter(scriptedEvent.worldzero$doorPos)) <= 2.25D) {
+                    worldzero$setDoorStateWithSound(level, scriptedEvent.worldzero$doorPos, true);
+                    scriptedEvent.worldzero$doorOpened = true;
+                }
+
+                if (worldzero$moveSilentBlackEchoTowards(echo, WORLDZERO_SCRIPTED_POINT_2, WORLDZERO_SCRIPTED_BLACK_ECHO_SPEED_BLOCKS_PER_TICK)) {
+                    if (scriptedEvent.worldzero$doorOpened && scriptedEvent.worldzero$doorPos != null) {
+                        worldzero$setDoorStateWithSound(level, scriptedEvent.worldzero$doorPos, false);
+                    }
+                    scriptedEvent.worldzero$phase = ScriptedReturnLockPhase.WALK_TO_POINT_3;
+                }
+            }
+            case WALK_TO_POINT_3 -> {
+                if (echo == null) {
+                    worldzero$clearScriptedReturnLockEvent(level.getServer(), sessionState);
+                    return;
+                }
+
+                if (worldzero$moveSilentBlackEchoTowards(echo, WORLDZERO_SCRIPTED_POINT_3, WORLDZERO_SCRIPTED_BLACK_ECHO_SPEED_BLOCKS_PER_TICK)) {
+                    if (scriptedEvent.worldzero$chestPos != null) {
+                        worldzero$openChestLike(level, scriptedEvent.worldzero$chestPos, ownerPlayer);
+                    }
+                    scriptedEvent.worldzero$dueTick = gameTime + WORLDZERO_RETURN_LOCK_CHEST_CLOSE_DELAY_TICKS;
+                    scriptedEvent.worldzero$phase = ScriptedReturnLockPhase.WAITING_CHEST_CLOSE;
+                }
+            }
+            case WAITING_CHEST_CLOSE -> {
+                if (echo == null) {
+                    worldzero$clearScriptedReturnLockEvent(level.getServer(), sessionState);
+                    return;
+                }
+
+                worldzero$moveSilentBlackEchoTowards(echo, WORLDZERO_SCRIPTED_POINT_3, WORLDZERO_SCRIPTED_BLACK_ECHO_SPEED_BLOCKS_PER_TICK);
+                if (gameTime < scriptedEvent.worldzero$dueTick) {
+                    return;
+                }
+
+                if (scriptedEvent.worldzero$chestPos != null) {
+                    worldzero$closeChestLike(level, scriptedEvent.worldzero$chestPos, ownerPlayer);
+                }
+                if (scriptedEvent.worldzero$upperChestPos != null) {
+                    worldzero$clearContainer(level, scriptedEvent.worldzero$upperChestPos, ownerPlayer);
+                }
+                scriptedEvent.worldzero$phase = ScriptedReturnLockPhase.WALK_TO_POINT_4;
+            }
+            case WALK_TO_POINT_4 -> {
+                if (echo == null) {
+                    worldzero$clearScriptedReturnLockEvent(level.getServer(), sessionState);
+                    return;
+                }
+
+                if (worldzero$moveSilentBlackEchoTowards(echo, WORLDZERO_SCRIPTED_POINT_4, WORLDZERO_SCRIPTED_BLACK_ECHO_SPEED_BLOCKS_PER_TICK)) {
+                    if (scriptedEvent.worldzero$bedPos != null) {
+                        worldzero$putBlackEchoToBed(level, echo, scriptedEvent.worldzero$bedPos);
+                    }
+                    if (!scriptedEvent.worldzero$barriersReleased) {
+                        worldzero$removeTemporaryReturnBarriers(level, scriptedEvent.worldzero$barrierPositions);
+                        scriptedEvent.worldzero$barriersReleased = true;
+                    }
+                    scriptedEvent.worldzero$phase = ScriptedReturnLockPhase.COMPLETED;
+                }
+            }
+            case COMPLETED -> {
+            }
+            case WAITING_PLAYER_UPPER_CHEST_CLOSE -> {
+            }
+            case FINAL_AMBUSH_WAIT_LOOK -> {
+                if (echo == null) {
+                    worldzero$clearScriptedReturnLockEvent(level.getServer(), sessionState);
+                    return;
+                }
+
+                worldzero$lookEntityAtPlayer(echo, ownerPlayer);
+                if (!worldzero$isSeenByPlayer(echo, ownerPlayer)) {
+                    return;
+                }
+
+                ownerPlayer.setDeltaMovement(0.0D, 0.0D, 0.0D);
+                ownerPlayer.fallDistance = 0.0F;
+                scriptedEvent.worldzero$dueTick = gameTime + WORLDZERO_FINAL_AMBUSH_FREEZE_TICKS;
+                WorldZeroNetwork.sendFreezeStart(ownerPlayer, WORLDZERO_FINAL_AMBUSH_FREEZE_TICKS, echo.getId());
+                scriptedEvent.worldzero$phase = ScriptedReturnLockPhase.FINAL_AMBUSH_FREEZE;
+            }
+            case FINAL_AMBUSH_FREEZE -> {
+                ownerPlayer.setDeltaMovement(0.0D, 0.0D, 0.0D);
+                ownerPlayer.fallDistance = 0.0F;
+                if (echo != null) {
+                    worldzero$lookEntityAtPlayer(echo, ownerPlayer);
+                }
+                if (gameTime < scriptedEvent.worldzero$dueTick) {
+                    return;
+                }
+
+                WorldZeroNetwork.sendFreezeEnd(ownerPlayer);
+                worldzero$returnPlayerFromHouseBad(ownerPlayer);
+                return;
+            }
+        }
+    }
+
+    private static void worldzero$clearScriptedReturnLockEvent(MinecraftServer server, SessionState sessionState) {
+        ScriptedReturnLockEvent scriptedEvent = sessionState.worldzero$scriptedReturnLockEvent;
+        if (scriptedEvent == null) {
+            return;
+        }
+
+        if (scriptedEvent.worldzero$phase == ScriptedReturnLockPhase.FINAL_AMBUSH_FREEZE) {
+            ServerPlayer player = server.getPlayerList().getPlayer(scriptedEvent.worldzero$playerId);
+            if (player != null) {
+                WorldZeroNetwork.sendFreezeEnd(player);
+            }
+        }
+
+        if (!scriptedEvent.worldzero$barriersReleased) {
+            ServerLevel level = server.getLevel(scriptedEvent.worldzero$dimension);
+            if (level != null) {
+                worldzero$removeTemporaryReturnBarriers(level, scriptedEvent.worldzero$barrierPositions);
+            }
+        }
+
+        Entity entity = worldzero$findEntity(server, scriptedEvent.worldzero$entityId);
+        if (entity != null) {
+            entity.discard();
+        }
+        sessionState.worldzero$scriptedReturnLockEvent = null;
+    }
+
+    private static List<BlockPos> worldzero$placeTemporaryReturnBarriers(ServerLevel level, BlockPos centerPos) {
+        List<BlockPos> barrierPositions = new ArrayList<>();
+        int minZ = Mth.floor(Math.min(WORLDZERO_RETURN_LOCK_BARRIER_START_Z, WORLDZERO_RETURN_LOCK_BARRIER_END_Z));
+        int maxZ = Mth.ceil(Math.max(WORLDZERO_RETURN_LOCK_BARRIER_START_Z, WORLDZERO_RETURN_LOCK_BARRIER_END_Z));
+        double zSpan = WORLDZERO_RETURN_LOCK_BARRIER_END_Z - WORLDZERO_RETURN_LOCK_BARRIER_START_Z;
+        for (int x = WORLDZERO_RETURN_LOCK_BARRIER_MIN_X; x <= WORLDZERO_RETURN_LOCK_BARRIER_MAX_X; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                double sampledZ = z + 0.5D;
+                double progress = zSpan == 0.0D
+                        ? 0.0D
+                        : Mth.clamp((sampledZ - WORLDZERO_RETURN_LOCK_BARRIER_START_Z) / zSpan, 0.0D, 1.0D);
+                double sampledY = Mth.lerp(progress, WORLDZERO_RETURN_LOCK_BARRIER_START_Y, WORLDZERO_RETURN_LOCK_BARRIER_END_Y);
+                int minY = Mth.floor(sampledY);
+                int maxY = Mth.ceil(sampledY) + 1;
+                for (int y = minY; y <= maxY; y++) {
+                    BlockPos pos = new BlockPos(x, y, z);
+                    BlockState state = level.getBlockState(pos);
+                    if (!state.isAir() && !state.getCollisionShape(level, pos).isEmpty()) {
+                        continue;
+                    }
+
+                    level.setBlock(pos, Blocks.BARRIER.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+                    barrierPositions.add(pos.immutable());
+                }
+            }
+        }
+        return barrierPositions;
+    }
+
+    private static void worldzero$removeTemporaryReturnBarriers(ServerLevel level, List<BlockPos> barrierPositions) {
+        for (BlockPos pos : barrierPositions) {
+            if (level.getBlockState(pos).is(Blocks.BARRIER)) {
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            }
+        }
+    }
+
+    private static boolean worldzero$moveSilentBlackEchoTowards(WorldZeroEchoEntity echo, Vec3 target, double speed) {
+        Vec3 currentPos = echo.position();
+        Vec3 delta = target.subtract(currentPos);
+        double distance = delta.length();
+        if (distance <= speed + 0.0001D) {
+            echo.setPos(target.x, target.y, target.z);
+            echo.setDeltaMovement(Vec3.ZERO);
+            echo.setSprinting(false);
+            if (distance > 0.0001D) {
+                float yaw = (float) (Math.atan2(delta.z, delta.x) * (180.0D / Math.PI)) - 90.0F;
+                worldzero$setEntityYawPitch(echo, yaw, 0.0F);
+            }
+            return true;
+        }
+
+        Vec3 direction = delta.scale(1.0D / distance);
+        Vec3 nextPos = currentPos.add(direction.scale(speed));
+        echo.setPos(nextPos.x, nextPos.y, nextPos.z);
+        echo.setDeltaMovement(Vec3.ZERO);
+        echo.setSprinting(false);
+        float yaw = (float) (Math.atan2(direction.z, direction.x) * (180.0D / Math.PI)) - 90.0F;
+        worldzero$setEntityYawPitch(echo, yaw, 0.0F);
+        return false;
+    }
+
+    private static void worldzero$setDoorStateWithSound(ServerLevel level, BlockPos doorPos, boolean open) {
+        if (worldzero$setDoorOpenSilent(level, doorPos, open)) {
+            worldzero$playDoorSound(level, doorPos, open);
+        }
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findNearestDoorAlongPath(ServerLevel level, Vec3 start, Vec3 end) {
+        int minX = Mth.floor(Math.min(start.x, end.x)) - WORLDZERO_SCRIPTED_BLOCK_SEARCH_HORIZONTAL;
+        int maxX = Mth.floor(Math.max(start.x, end.x)) + WORLDZERO_SCRIPTED_BLOCK_SEARCH_HORIZONTAL;
+        int minY = Mth.floor(Math.min(start.y, end.y)) - WORLDZERO_SCRIPTED_BLOCK_SEARCH_VERTICAL;
+        int maxY = Mth.floor(Math.max(start.y, end.y)) + WORLDZERO_SCRIPTED_BLOCK_SEARCH_VERTICAL;
+        int minZ = Mth.floor(Math.min(start.z, end.z)) - WORLDZERO_SCRIPTED_BLOCK_SEARCH_HORIZONTAL;
+        int maxZ = Mth.floor(Math.max(start.z, end.z)) + WORLDZERO_SCRIPTED_BLOCK_SEARCH_HORIZONTAL;
+        BlockPos bestPos = null;
+        double bestDistanceSqr = Double.MAX_VALUE;
+        Set<BlockPos> visited = new HashSet<>();
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    BlockPos candidate = new BlockPos(x, y, z);
+                    BlockPos doorPos = worldzero$resolveDoorLowerPos(level, candidate);
+                    if (doorPos == null || !visited.add(doorPos)) {
+                        continue;
+                    }
+
+                    double distanceSqr = worldzero$distanceToSegmentSqr(worldzero$getBlockCenter(doorPos), start, end);
+                    if (distanceSqr < bestDistanceSqr) {
+                        bestDistanceSqr = distanceSqr;
+                        bestPos = doorPos.immutable();
+                    }
+                }
+            }
+        }
+        return bestPos;
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findNearestChestLikeBlock(ServerLevel level, Vec3 target) {
+        return worldzero$findNearestBlock(level, target, WorldZeroHouseBadDimension::worldzero$isChestLikeBlock);
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findUpperChestLikeBlock(ServerLevel level, @Nullable BlockPos baseChestPos) {
+        if (baseChestPos == null) {
+            return null;
+        }
+
+        BlockPos bestPos = null;
+        for (int offset = 0; offset <= 2; offset++) {
+            BlockPos candidate = baseChestPos.above(offset);
+            if (worldzero$isChestLikeBlock(level.getBlockState(candidate))) {
+                bestPos = candidate.immutable();
+            }
+        }
+        return bestPos != null ? bestPos : baseChestPos.immutable();
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findNearestBedBlock(ServerLevel level, Vec3 target) {
+        return worldzero$findNearestBlock(level, target, state -> state.is(BlockTags.BEDS));
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findNearestBlock(
+            ServerLevel level,
+            Vec3 target,
+            java.util.function.Predicate<BlockState> predicate
+    ) {
+        BlockPos centerPos = BlockPos.containing(target);
+        BlockPos bestPos = null;
+        double bestDistanceSqr = Double.MAX_VALUE;
+        for (int x = centerPos.getX() - WORLDZERO_SCRIPTED_BLOCK_SEARCH_HORIZONTAL;
+             x <= centerPos.getX() + WORLDZERO_SCRIPTED_BLOCK_SEARCH_HORIZONTAL;
+             x++) {
+            for (int y = centerPos.getY() - WORLDZERO_SCRIPTED_BLOCK_SEARCH_VERTICAL;
+                 y <= centerPos.getY() + WORLDZERO_SCRIPTED_BLOCK_SEARCH_VERTICAL;
+                 y++) {
+                for (int z = centerPos.getZ() - WORLDZERO_SCRIPTED_BLOCK_SEARCH_HORIZONTAL;
+                     z <= centerPos.getZ() + WORLDZERO_SCRIPTED_BLOCK_SEARCH_HORIZONTAL;
+                     z++) {
+                    BlockPos candidate = new BlockPos(x, y, z);
+                    BlockState state = level.getBlockState(candidate);
+                    if (!predicate.test(state)) {
+                        continue;
+                    }
+
+                    double distanceSqr = target.distanceToSqr(worldzero$getBlockCenter(candidate));
+                    if (distanceSqr < bestDistanceSqr) {
+                        bestDistanceSqr = distanceSqr;
+                        bestPos = candidate.immutable();
+                    }
+                }
+            }
+        }
+        return bestPos;
+    }
+
+    private static double worldzero$distanceToSegmentSqr(Vec3 point, Vec3 start, Vec3 end) {
+        Vec3 segment = end.subtract(start);
+        double segmentLengthSqr = segment.lengthSqr();
+        if (segmentLengthSqr < 0.0001D) {
+            return point.distanceToSqr(start);
+        }
+
+        double progress = Mth.clamp(point.subtract(start).dot(segment) / segmentLengthSqr, 0.0D, 1.0D);
+        Vec3 projectedPoint = start.add(segment.scale(progress));
+        return point.distanceToSqr(projectedPoint);
+    }
+
+    private static Vec3 worldzero$getBlockCenter(BlockPos pos) {
+        return new Vec3(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D);
     }
 
     @Nullable
@@ -1040,6 +1459,11 @@ public final class WorldZeroHouseBadDimension {
             SessionState sessionState,
             UUID playerId
     ) {
+        if (sessionState.worldzero$scriptedReturnLockEvent != null
+                && sessionState.worldzero$scriptedReturnLockEvent.worldzero$playerId.equals(playerId)) {
+            worldzero$clearScriptedReturnLockEvent(server, sessionState);
+        }
+
         sessionState.worldzero$visits.remove(playerId);
 
         Iterator<ActiveAppearance> appearanceIterator = sessionState.worldzero$activeAppearances.iterator();
@@ -1121,23 +1545,313 @@ public final class WorldZeroHouseBadDimension {
                 null,
                 doorPos,
                 soundEvent,
-                SoundSource.PLAYERS,
-                0.85F,
+                SoundSource.BLOCKS,
+                3.0F,
                 0.96F + level.random.nextFloat() * 0.08F
         );
     }
 
     private static void worldzero$playChestCloseSound(ServerLevel level, BlockPos chestPos) {
+        List<BlockPos> chestPositions = worldzero$getConnectedChestPositions(level, chestPos);
         BlockState state = level.getBlockState(chestPos);
+        Vec3 soundPos = worldzero$getAverageBlockCenter(chestPositions);
         SoundEvent soundEvent = state.is(Blocks.ENDER_CHEST) ? SoundEvents.ENDER_CHEST_CLOSE : SoundEvents.CHEST_CLOSE;
         level.playSound(
                 null,
-                chestPos,
+                soundPos.x,
+                soundPos.y,
+                soundPos.z,
                 soundEvent,
-                SoundSource.PLAYERS,
-                0.75F,
+                SoundSource.BLOCKS,
+                3.0F,
                 0.95F + level.random.nextFloat() * 0.08F
         );
+    }
+
+    private static void worldzero$playChestOpenSound(ServerLevel level, BlockPos chestPos) {
+        List<BlockPos> chestPositions = worldzero$getConnectedChestPositions(level, chestPos);
+        BlockState state = level.getBlockState(chestPos);
+        Vec3 soundPos = worldzero$getAverageBlockCenter(chestPositions);
+        SoundEvent soundEvent = state.is(Blocks.ENDER_CHEST) ? SoundEvents.ENDER_CHEST_OPEN : SoundEvents.CHEST_OPEN;
+        level.playSound(
+                null,
+                soundPos.x,
+                soundPos.y,
+                soundPos.z,
+                soundEvent,
+                SoundSource.BLOCKS,
+                3.0F,
+                0.95F + level.random.nextFloat() * 0.08F
+        );
+    }
+
+    private static void worldzero$openChestLike(ServerLevel level, BlockPos chestPos, @Nullable ServerPlayer player) {
+        List<BlockPos> chestPositions = worldzero$getConnectedChestPositions(level, chestPos);
+        for (BlockPos pos : chestPositions) {
+            BlockState state = level.getBlockState(pos);
+            if (!(state.getBlock() instanceof ChestBlock)) {
+                continue;
+            }
+
+            level.blockEvent(pos, state.getBlock(), 1, 1);
+            level.sendBlockUpdated(pos, state, state, Block.UPDATE_CLIENTS);
+        }
+
+        worldzero$playChestOpenSound(level, chestPos);
+    }
+
+    private static void worldzero$closeChestLike(ServerLevel level, BlockPos chestPos, @Nullable ServerPlayer player) {
+        List<BlockPos> chestPositions = worldzero$getConnectedChestPositions(level, chestPos);
+        for (BlockPos pos : chestPositions) {
+            BlockState state = level.getBlockState(pos);
+            if (!(state.getBlock() instanceof ChestBlock)) {
+                continue;
+            }
+
+            level.blockEvent(pos, state.getBlock(), 1, 0);
+            level.sendBlockUpdated(pos, state, state, Block.UPDATE_CLIENTS);
+        }
+
+        worldzero$playChestCloseSound(level, chestPos);
+    }
+
+    private static void worldzero$clearContainer(ServerLevel level, BlockPos pos, @Nullable ServerPlayer player) {
+        for (BlockPos containerPos : worldzero$getConnectedChestPositions(level, pos)) {
+            BlockEntity blockEntity = level.getBlockEntity(containerPos);
+            if (!(blockEntity instanceof RandomizableContainerBlockEntity container)) {
+                continue;
+            }
+
+            if (player != null) {
+                container.unpackLootTable(player);
+            }
+            container.clearContent();
+            container.setChanged();
+            BlockState state = level.getBlockState(containerPos);
+            level.sendBlockUpdated(containerPos, state, state, Block.UPDATE_CLIENTS);
+        }
+    }
+
+    private static void worldzero$putBlackEchoToBed(ServerLevel level, WorldZeroEchoEntity echo, BlockPos bedPos) {
+        BlockState bedState = level.getBlockState(bedPos);
+        if (!bedState.is(BlockTags.BEDS) || !(bedState.getBlock() instanceof BedBlock)) {
+            return;
+        }
+
+        BlockPos headPos = bedPos.immutable();
+        if (bedState.hasProperty(BedBlock.PART)
+                && bedState.getValue(BedBlock.PART) == BedPart.FOOT
+                && bedState.hasProperty(BedBlock.FACING)) {
+            headPos = bedPos.relative(bedState.getValue(BedBlock.FACING)).immutable();
+        }
+
+        BlockState headState = level.getBlockState(headPos);
+        if (!headState.is(BlockTags.BEDS)) {
+            headPos = bedPos.immutable();
+            headState = bedState;
+        }
+
+        echo.setPos(headPos.getX() + 0.5D, headPos.getY() + 0.5625D, headPos.getZ() + 0.5D);
+        echo.setDeltaMovement(Vec3.ZERO);
+        echo.setSprinting(false);
+        echo.startSleeping(headPos);
+        if (headState.hasProperty(BedBlock.FACING)) {
+            worldzero$setEntityYawPitch(echo, headState.getValue(BedBlock.FACING).toYRot(), 0.0F);
+        }
+    }
+
+    private static void worldzero$tryArmFinalUpperChestAmbush(
+            ServerLevel level,
+            SessionState sessionState,
+            ServerPlayer player,
+            BlockPos clickedPos
+    ) {
+        ScriptedReturnLockEvent scriptedEvent = sessionState.worldzero$scriptedReturnLockEvent;
+        if (scriptedEvent == null
+                || scriptedEvent.worldzero$dimension != level.dimension()
+                || !scriptedEvent.worldzero$playerId.equals(player.getUUID())
+                || scriptedEvent.worldzero$phase != ScriptedReturnLockPhase.COMPLETED
+                || !worldzero$isScriptedUpperChest(level, scriptedEvent, clickedPos)
+                || !worldzero$isContainerEmpty(level, scriptedEvent.worldzero$upperChestPos, player)) {
+            return;
+        }
+
+        Entity entity = worldzero$findEntity(level.getServer(), scriptedEvent.worldzero$entityId);
+        if (entity != null) {
+            entity.discard();
+        }
+        scriptedEvent.worldzero$entityId = null;
+        scriptedEvent.worldzero$phase = ScriptedReturnLockPhase.WAITING_PLAYER_UPPER_CHEST_CLOSE;
+    }
+
+    private static void worldzero$trySpawnFinalUpperChestAmbush(
+            ServerLevel level,
+            SessionState sessionState,
+            ServerPlayer player
+    ) {
+        ScriptedReturnLockEvent scriptedEvent = sessionState.worldzero$scriptedReturnLockEvent;
+        if (scriptedEvent == null
+                || scriptedEvent.worldzero$dimension != level.dimension()
+                || !scriptedEvent.worldzero$playerId.equals(player.getUUID())
+                || scriptedEvent.worldzero$phase != ScriptedReturnLockPhase.WAITING_PLAYER_UPPER_CHEST_CLOSE) {
+            return;
+        }
+
+        WorldZeroEchoEntity blackEcho = worldzero$spawnFinalAmbushEcho(level, player);
+        if (blackEcho == null) {
+            return;
+        }
+
+        scriptedEvent.worldzero$entityId = blackEcho.getUUID();
+        scriptedEvent.worldzero$phase = ScriptedReturnLockPhase.FINAL_AMBUSH_WAIT_LOOK;
+    }
+
+    private static boolean worldzero$isScriptedUpperChest(
+            ServerLevel level,
+            ScriptedReturnLockEvent scriptedEvent,
+            BlockPos pos
+    ) {
+        if (scriptedEvent.worldzero$upperChestPos == null) {
+            return false;
+        }
+
+        for (BlockPos chestPos : worldzero$getConnectedChestPositions(level, scriptedEvent.worldzero$upperChestPos)) {
+            if (chestPos.equals(pos)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean worldzero$isContainerEmpty(
+            ServerLevel level,
+            @Nullable BlockPos pos,
+            @Nullable ServerPlayer player
+    ) {
+        if (pos == null) {
+            return false;
+        }
+
+        for (BlockPos containerPos : worldzero$getConnectedChestPositions(level, pos)) {
+            BlockEntity blockEntity = level.getBlockEntity(containerPos);
+            if (blockEntity instanceof RandomizableContainerBlockEntity randomizableContainer && player != null) {
+                randomizableContainer.unpackLootTable(player);
+            }
+            if (!(blockEntity instanceof Container container)) {
+                continue;
+            }
+
+            for (int slot = 0; slot < container.getContainerSize(); slot++) {
+                if (!container.getItem(slot).isEmpty()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    @Nullable
+    private static WorldZeroEchoEntity worldzero$spawnFinalAmbushEcho(ServerLevel level, ServerPlayer player) {
+        Vec3 spawnPos = worldzero$findFinalAmbushSpawnPos(level, player);
+        if (spawnPos == null) {
+            return null;
+        }
+
+        WorldZeroEchoEntity blackEcho = WorldZeroEntities.WORLDZERO_BLACK_ECHO.get().create(level);
+        if (blackEcho == null) {
+            return null;
+        }
+
+        blackEcho.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, 0.0F, 0.0F);
+        blackEcho.setNoGravity(true);
+        blackEcho.setSilent(true);
+        blackEcho.setDeltaMovement(Vec3.ZERO);
+        blackEcho.setSprinting(false);
+        worldzero$lookEntityAtPlayer(blackEcho, player);
+        level.addFreshEntity(blackEcho);
+        return blackEcho;
+    }
+
+    @Nullable
+    private static Vec3 worldzero$findFinalAmbushSpawnPos(ServerLevel level, ServerPlayer player) {
+        Vec3 lookVector = player.getViewVector(1.0F);
+        Vec3 horizontalLook = new Vec3(lookVector.x, 0.0D, lookVector.z);
+        if (horizontalLook.lengthSqr() < 0.0001D) {
+            float yawRadians = player.getYRot() * ((float) Math.PI / 180.0F);
+            horizontalLook = new Vec3(-Mth.sin(yawRadians), 0.0D, Mth.cos(yawRadians));
+        } else {
+            horizontalLook = horizontalLook.normalize();
+        }
+
+        Vec3 idealPos = player.position().subtract(horizontalLook.scale(WORLDZERO_FINAL_AMBUSH_DISTANCE_BLOCKS));
+        BlockPos basePos = BlockPos.containing(idealPos.x, player.getY(), idealPos.z);
+        int[][] offsets = new int[][]{
+                {0, 0},
+                {1, 0},
+                {-1, 0},
+                {0, 1},
+                {0, -1},
+                {1, 1},
+                {1, -1},
+                {-1, 1},
+                {-1, -1}
+        };
+        for (int[] offset : offsets) {
+            BlockPos standPos = worldzero$findStandableFeetPos(level, basePos.offset(offset[0], -1, offset[1]));
+            if (standPos == null) {
+                continue;
+            }
+
+            AABB spawnBox = WorldZeroEntities.WORLDZERO_BLACK_ECHO.get().getDimensions().makeBoundingBox(
+                    standPos.getX() + 0.5D,
+                    standPos.getY(),
+                    standPos.getZ() + 0.5D
+            );
+            if (!level.noCollision(spawnBox)
+                    || level.containsAnyLiquid(spawnBox)
+                    || spawnBox.intersects(player.getBoundingBox())) {
+                continue;
+            }
+
+            return new Vec3(standPos.getX() + 0.5D, standPos.getY(), standPos.getZ() + 0.5D);
+        }
+        return null;
+    }
+
+    private static List<BlockPos> worldzero$getConnectedChestPositions(ServerLevel level, BlockPos chestPos) {
+        List<BlockPos> chestPositions = new ArrayList<>();
+        chestPositions.add(chestPos.immutable());
+        BlockState state = level.getBlockState(chestPos);
+        if (!(state.getBlock() instanceof ChestBlock)
+                || !state.hasProperty(ChestBlock.TYPE)
+                || state.getValue(ChestBlock.TYPE) == ChestType.SINGLE) {
+            return chestPositions;
+        }
+
+        BlockPos connectedPos = chestPos.relative(ChestBlock.getConnectedDirection(state));
+        BlockState connectedState = level.getBlockState(connectedPos);
+        if (connectedState.getBlock() instanceof ChestBlock) {
+            chestPositions.add(connectedPos.immutable());
+        }
+        return chestPositions;
+    }
+
+    private static Vec3 worldzero$getAverageBlockCenter(List<BlockPos> positions) {
+        if (positions.isEmpty()) {
+            return Vec3.ZERO;
+        }
+
+        double x = 0.0D;
+        double y = 0.0D;
+        double z = 0.0D;
+        for (BlockPos pos : positions) {
+            x += pos.getX() + 0.5D;
+            y += pos.getY() + 0.5D;
+            z += pos.getZ() + 0.5D;
+        }
+
+        double scale = 1.0D / positions.size();
+        return new Vec3(x * scale, y * scale, z * scale);
     }
 
     private static void worldzero$playFootstep(ServerLevel level, BlockPos pos, Entity entity) {
@@ -1357,6 +2071,19 @@ public final class WorldZeroHouseBadDimension {
         player.containerMenu.broadcastChanges();
     }
 
+    private static void worldzero$applyHouseBadVitals(ServerPlayer player) {
+        if (player == null) {
+            return;
+        }
+
+        player.setHealth(player.getMaxHealth());
+        player.setAbsorptionAmount(0.0F);
+        FoodData foodData = player.getFoodData();
+        foodData.setFoodLevel(20);
+        foodData.setSaturation(20.0F);
+        foodData.setExhaustion(0.0F);
+    }
+
     private static AABB worldzero$getStructureBounds(TemplateInfo templateInfo) {
         BlockPos origin = WORLDZERO_BASE_ORIGIN;
         BlockPos max = origin.offset(
@@ -1408,6 +2135,8 @@ public final class WorldZeroHouseBadDimension {
         private final Map<UUID, VisitState> worldzero$visits = new HashMap<>();
         private final List<DelayedAction> worldzero$delayedActions = new ArrayList<>();
         private final List<ActiveOutsidePass> worldzero$outsidePasses = new ArrayList<>();
+        @Nullable
+        private ScriptedReturnLockEvent worldzero$scriptedReturnLockEvent;
     }
 
     private static final class ActiveAppearance {
@@ -1441,10 +2170,13 @@ public final class WorldZeroHouseBadDimension {
         private boolean worldzero$outsideReached;
         private boolean worldzero$outsidePassTriggered;
         private BlockPos worldzero$lastInsidePos;
+        private double worldzero$lastKnownX;
+        private boolean worldzero$returnLockTriggered;
 
         private VisitState(long enterTick, BlockPos initialPos) {
             this.worldzero$enterTick = enterTick;
             this.worldzero$lastInsidePos = initialPos.immutable();
+            this.worldzero$lastKnownX = initialPos.getX() + 0.5D;
         }
     }
 
@@ -1595,9 +2327,62 @@ public final class WorldZeroHouseBadDimension {
         }
     }
 
+    private enum ScriptedReturnLockPhase {
+        WAITING_TO_START,
+        WALK_TO_POINT_2,
+        WALK_TO_POINT_3,
+        WAITING_CHEST_CLOSE,
+        WALK_TO_POINT_4,
+        COMPLETED,
+        WAITING_PLAYER_UPPER_CHEST_CLOSE,
+        FINAL_AMBUSH_WAIT_LOOK,
+        FINAL_AMBUSH_FREEZE
+    }
+
+    private static final class ScriptedReturnLockEvent {
+        private final ResourceKey<Level> worldzero$dimension;
+        private final UUID worldzero$playerId;
+        @Nullable
+        private final BlockPos worldzero$doorPos;
+        @Nullable
+        private final BlockPos worldzero$chestPos;
+        @Nullable
+        private final BlockPos worldzero$upperChestPos;
+        @Nullable
+        private final BlockPos worldzero$bedPos;
+        private final List<BlockPos> worldzero$barrierPositions;
+        private long worldzero$dueTick;
+        @Nullable
+        private UUID worldzero$entityId;
+        private boolean worldzero$doorOpened;
+        private boolean worldzero$barriersReleased;
+        private ScriptedReturnLockPhase worldzero$phase = ScriptedReturnLockPhase.WAITING_TO_START;
+
+        private ScriptedReturnLockEvent(
+                ResourceKey<Level> dimension,
+                UUID playerId,
+                @Nullable BlockPos doorPos,
+                @Nullable BlockPos chestPos,
+                @Nullable BlockPos upperChestPos,
+                @Nullable BlockPos bedPos,
+                List<BlockPos> barrierPositions,
+                long dueTick
+        ) {
+            this.worldzero$dimension = dimension;
+            this.worldzero$playerId = playerId;
+            this.worldzero$doorPos = doorPos;
+            this.worldzero$chestPos = chestPos;
+            this.worldzero$upperChestPos = upperChestPos;
+            this.worldzero$bedPos = bedPos;
+            this.worldzero$barrierPositions = barrierPositions;
+            this.worldzero$dueTick = dueTick;
+        }
+    }
+
     private static final class HouseBadSaveData extends SavedData {
         private final Map<UUID, ReturnPoint> worldzero$returnPoints = new HashMap<>();
         private final Map<UUID, PlayerInventorySnapshot> worldzero$inventorySnapshots = new HashMap<>();
+        private final Map<UUID, PlayerVitalsSnapshot> worldzero$vitalSnapshots = new HashMap<>();
         private final Set<UUID> worldzero$doorEchoConsumed = new HashSet<>();
 
         @Override
@@ -1613,6 +2398,12 @@ public final class WorldZeroHouseBadDimension {
                 inventorySnapshotsTag.put(entry.getKey().toString(), entry.getValue().worldzero$save());
             }
             tag.put("InventorySnapshots", inventorySnapshotsTag);
+
+            CompoundTag vitalSnapshotsTag = new CompoundTag();
+            for (Map.Entry<UUID, PlayerVitalsSnapshot> entry : this.worldzero$vitalSnapshots.entrySet()) {
+                vitalSnapshotsTag.put(entry.getKey().toString(), entry.getValue().worldzero$save());
+            }
+            tag.put("VitalSnapshots", vitalSnapshotsTag);
 
             ListTag doorEchoConsumedTag = new ListTag();
             for (UUID playerId : this.worldzero$doorEchoConsumed) {
@@ -1651,6 +2442,19 @@ public final class WorldZeroHouseBadDimension {
                 }
             }
 
+            CompoundTag vitalSnapshotsTag = tag.getCompound("VitalSnapshots");
+            for (String key : vitalSnapshotsTag.getAllKeys()) {
+                try {
+                    PlayerVitalsSnapshot snapshot = PlayerVitalsSnapshot.worldzero$load(
+                            vitalSnapshotsTag.getCompound(key)
+                    );
+                    if (snapshot != null) {
+                        saveData.worldzero$vitalSnapshots.put(UUID.fromString(key), snapshot);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+
             ListTag doorEchoConsumedTag = tag.getList("DoorEchoConsumed", Tag.TAG_COMPOUND);
             for (int index = 0; index < doorEchoConsumedTag.size(); index++) {
                 CompoundTag playerTag = doorEchoConsumedTag.getCompound(index);
@@ -1659,6 +2463,76 @@ public final class WorldZeroHouseBadDimension {
                 }
             }
             return saveData;
+        }
+    }
+
+    private static final class PlayerVitalsSnapshot {
+        private final float worldzero$health;
+        private final float worldzero$absorptionAmount;
+        private final int worldzero$foodLevel;
+        private final float worldzero$saturationLevel;
+        private final float worldzero$exhaustionLevel;
+
+        private PlayerVitalsSnapshot(
+                float health,
+                float absorptionAmount,
+                int foodLevel,
+                float saturationLevel,
+                float exhaustionLevel
+        ) {
+            this.worldzero$health = health;
+            this.worldzero$absorptionAmount = absorptionAmount;
+            this.worldzero$foodLevel = foodLevel;
+            this.worldzero$saturationLevel = saturationLevel;
+            this.worldzero$exhaustionLevel = exhaustionLevel;
+        }
+
+        private static PlayerVitalsSnapshot worldzero$fromPlayer(ServerPlayer player) {
+            FoodData foodData = player.getFoodData();
+            return new PlayerVitalsSnapshot(
+                    player.getHealth(),
+                    player.getAbsorptionAmount(),
+                    foodData.getFoodLevel(),
+                    foodData.getSaturationLevel(),
+                    foodData.getExhaustionLevel()
+            );
+        }
+
+        private CompoundTag worldzero$save() {
+            CompoundTag tag = new CompoundTag();
+            tag.putFloat("Health", this.worldzero$health);
+            tag.putFloat("AbsorptionAmount", this.worldzero$absorptionAmount);
+            tag.putInt("FoodLevel", this.worldzero$foodLevel);
+            tag.putFloat("SaturationLevel", this.worldzero$saturationLevel);
+            tag.putFloat("ExhaustionLevel", this.worldzero$exhaustionLevel);
+            return tag;
+        }
+
+        private void worldzero$apply(ServerPlayer player) {
+            int foodLevel = Mth.clamp(this.worldzero$foodLevel, 0, 20);
+            float saturationLevel = Mth.clamp(this.worldzero$saturationLevel, 0.0F, (float) foodLevel);
+            player.setAbsorptionAmount(Math.max(0.0F, this.worldzero$absorptionAmount));
+            player.setHealth(Mth.clamp(this.worldzero$health, 0.0F, player.getMaxHealth()));
+            FoodData foodData = player.getFoodData();
+            foodData.setFoodLevel(foodLevel);
+            foodData.setSaturation(saturationLevel);
+            foodData.setExhaustion(Math.max(0.0F, this.worldzero$exhaustionLevel));
+        }
+
+        @Nullable
+        private static PlayerVitalsSnapshot worldzero$load(CompoundTag tag) {
+            if (!tag.contains("Health", Tag.TAG_FLOAT)
+                    || !tag.contains("FoodLevel", Tag.TAG_INT)) {
+                return null;
+            }
+
+            return new PlayerVitalsSnapshot(
+                    tag.getFloat("Health"),
+                    tag.getFloat("AbsorptionAmount"),
+                    tag.getInt("FoodLevel"),
+                    tag.getFloat("SaturationLevel"),
+                    tag.getFloat("ExhaustionLevel")
+            );
         }
     }
 

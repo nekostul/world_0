@@ -77,6 +77,8 @@ public final class WorldZeroHouseDimension {
     private static final BlockPos WORLDZERO_BASE_ORIGIN = new BlockPos(-32, 64, -32);
     private static final int WORLDZERO_SLEEP_COUNT_BEFORE_TRIGGER = 2;
     private static final int WORLDZERO_SLEEP_FADE_TICKS = 3 * 20;
+    private static final int WORLDZERO_POST_KORIDOR_SLEEP_COUNT_BEFORE_TRIGGER = 2;
+    private static final int WORLDZERO_POST_KORIDOR_HOUSE_BAD_DELAY_TICKS = 65;
     private static final int WORLDZERO_SCAN_RADIUS_HORIZONTAL = 16;
     private static final int WORLDZERO_SCAN_RADIUS_VERTICAL = 8;
     private static final int WORLDZERO_BARRIER_PADDING = 1;
@@ -206,6 +208,33 @@ public final class WorldZeroHouseDimension {
 
             if (!player.isAlive() || player.isSpectator()) {
                 tracker.worldzero$reset();
+                continue;
+            }
+
+            int postKoridorSleepCount = saveData.worldzero$postKoridorSleepCounts.getOrDefault(playerId, -1);
+            if (postKoridorSleepCount >= 0) {
+                if (!player.isSleeping()) {
+                    tracker.worldzero$reset();
+                    continue;
+                }
+
+                if (!tracker.worldzero$currentSleepTracked && player.getSleepTimer() > 0) {
+                    tracker.worldzero$currentSleepTracked = true;
+                    if (postKoridorSleepCount >= WORLDZERO_POST_KORIDOR_SLEEP_COUNT_BEFORE_TRIGGER) {
+                        tracker.worldzero$houseBadTeleportPending = true;
+                    } else {
+                        saveData.worldzero$postKoridorSleepCounts.put(playerId, postKoridorSleepCount + 1);
+                        saveData.setDirty();
+                    }
+                }
+
+                if (tracker.worldzero$houseBadTeleportPending
+                        && player.getSleepTimer() >= WORLDZERO_POST_KORIDOR_HOUSE_BAD_DELAY_TICKS
+                        && WorldZeroHouseBadDimension.worldzero$teleportPlayerToHouseBad(player)) {
+                    saveData.worldzero$postKoridorSleepCounts.remove(playerId);
+                    saveData.setDirty();
+                    tracker.worldzero$reset();
+                }
                 continue;
             }
 
@@ -389,6 +418,29 @@ public final class WorldZeroHouseDimension {
         }
 
         return worldzero$teleportPlayerToHouseInternal(player, false, HouseVisitMode.NORMAL);
+    }
+
+    public static void worldzero$unlockHouseBadAfterKoridor(ServerPlayer player) {
+        if (player == null) {
+            return;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return;
+        }
+
+        UUID playerId = player.getUUID();
+        HouseSaveData saveData = worldzero$getSaveData(server);
+        saveData.worldzero$postKoridorSleepCounts.put(playerId, 0);
+        saveData.worldzero$sleepCounts.remove(playerId);
+        saveData.setDirty();
+
+        SessionState sessionState = WORLDZERO_SERVER_STATES.computeIfAbsent(server, ignored -> new SessionState());
+        SleepTracker tracker = sessionState.worldzero$sleepTrackers.get(playerId);
+        if (tracker != null) {
+            tracker.worldzero$reset();
+        }
     }
 
     public static boolean worldzero$triggerRestorationDreamNow(ServerPlayer player) {
@@ -1752,11 +1804,13 @@ public final class WorldZeroHouseDimension {
     private static final class SleepTracker {
         private boolean worldzero$currentSleepTracked;
         private boolean worldzero$houseTeleportPending;
+        private boolean worldzero$houseBadTeleportPending;
         private boolean worldzero$restorationTeleportPending;
 
         private void worldzero$reset() {
             this.worldzero$currentSleepTracked = false;
             this.worldzero$houseTeleportPending = false;
+            this.worldzero$houseBadTeleportPending = false;
             this.worldzero$restorationTeleportPending = false;
         }
     }
@@ -1975,6 +2029,7 @@ public final class WorldZeroHouseDimension {
 
     private static final class HouseSaveData extends SavedData {
         private final Map<UUID, Integer> worldzero$sleepCounts = new HashMap<>();
+        private final Map<UUID, Integer> worldzero$postKoridorSleepCounts = new HashMap<>();
         private final Set<UUID> worldzero$completedPlayers = new java.util.HashSet<>();
         private final Map<UUID, ReturnPoint> worldzero$returnPoints = new HashMap<>();
         private final Map<UUID, PlayerInventorySnapshot> worldzero$inventorySnapshots = new HashMap<>();
@@ -1989,6 +2044,12 @@ public final class WorldZeroHouseDimension {
                 sleepCountsTag.putInt(entry.getKey().toString(), entry.getValue());
             }
             tag.put("SleepCounts", sleepCountsTag);
+
+            CompoundTag postKoridorSleepCountsTag = new CompoundTag();
+            for (Map.Entry<UUID, Integer> entry : this.worldzero$postKoridorSleepCounts.entrySet()) {
+                postKoridorSleepCountsTag.putInt(entry.getKey().toString(), entry.getValue());
+            }
+            tag.put("PostKoridorSleepCounts", postKoridorSleepCountsTag);
 
             CompoundTag completedPlayersTag = new CompoundTag();
             for (UUID playerId : this.worldzero$completedPlayers) {
@@ -2039,6 +2100,17 @@ public final class WorldZeroHouseDimension {
             for (String key : sleepCountsTag.getAllKeys()) {
                 try {
                     saveData.worldzero$sleepCounts.put(UUID.fromString(key), sleepCountsTag.getInt(key));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+
+            CompoundTag postKoridorSleepCountsTag = tag.getCompound("PostKoridorSleepCounts");
+            for (String key : postKoridorSleepCountsTag.getAllKeys()) {
+                try {
+                    saveData.worldzero$postKoridorSleepCounts.put(
+                            UUID.fromString(key),
+                            postKoridorSleepCountsTag.getInt(key)
+                    );
                 } catch (IllegalArgumentException ignored) {
                 }
             }

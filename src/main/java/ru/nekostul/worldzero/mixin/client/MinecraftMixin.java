@@ -7,19 +7,22 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.nekostul.worldzero.WorldZeroBlankDiscClientController;
+import ru.nekostul.worldzero.WorldZeroHouseBadClientController;
 
 @Mixin(Minecraft.class)
 public abstract class MinecraftMixin {
     @Inject(method = "pauseGame", at = @At("HEAD"), cancellable = true)
     private void worldzero$blockPauseDuringBlankDisc(boolean showPauseMenu, CallbackInfo callbackInfo) {
-        if (WorldZeroBlankDiscClientController.worldzero$isPauseBlocked()) {
+        if (WorldZeroBlankDiscClientController.worldzero$isPauseBlocked()
+                || WorldZeroHouseBadClientController.worldzero$isPauseBlocked()) {
             callbackInfo.cancel();
         }
     }
 
     @Inject(method = "isPaused", at = @At("HEAD"), cancellable = true)
     private void worldzero$forceUnpausedDuringBlankDisc(CallbackInfoReturnable<Boolean> callbackInfo) {
-        if (WorldZeroBlankDiscClientController.worldzero$isPauseBlocked()) {
+        if (WorldZeroBlankDiscClientController.worldzero$isPauseBlocked()
+                || WorldZeroHouseBadClientController.worldzero$isPauseBlocked()) {
             callbackInfo.setReturnValue(false);
         }
     }

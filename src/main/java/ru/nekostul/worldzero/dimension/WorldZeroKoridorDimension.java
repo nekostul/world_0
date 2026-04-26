@@ -819,6 +819,7 @@ public final class WorldZeroKoridorDimension {
             if (player.serverLevel().dimension() == Level.OVERWORLD) {
                 worldzero$setMorning(player.serverLevel());
             }
+            WorldZeroHouseDimension.worldzero$unlockHouseBadAfterKoridor(player);
             player.setDeltaMovement(0.0D, 0.0D, 0.0D);
             player.fallDistance = 0.0F;
         }

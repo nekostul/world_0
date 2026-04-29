@@ -890,6 +890,10 @@ public final class WorldZeroFootstepsEvent {
 
     private static boolean worldzero$hasActiveEcho(MinecraftServer server) {
         for (ServerLevel serverLevel : server.getAllLevels()) {
+            if (serverLevel.dimension() == WorldZeroVoidPortalDimension.WORLDZERO_VOIDPORTAL_LEVEL) {
+                continue;
+            }
+
             if (!serverLevel.getEntitiesOfClass(
                     WorldZeroEchoEntity.class,
                     WORLDZERO_ENTITY_SCAN_AABB,

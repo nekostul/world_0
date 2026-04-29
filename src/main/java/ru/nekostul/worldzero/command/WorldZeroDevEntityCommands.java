@@ -106,6 +106,41 @@ public final class WorldZeroDevEntityCommands {
                                         context.getSource(),
                                         WorldZeroMinorAnomalies.MinorAnomalyType.BLOCK_BLINK
                                 )))
+                        .then(Commands.literal("trigger_watching")
+                                .executes(context -> worldzero$triggerMajorEvent(
+                                        context.getSource(),
+                                        WorldZeroMajorEventType.WATCHING
+                                )))
+                        .then(Commands.literal("trigger_stalker")
+                                .executes(context -> worldzero$triggerMajorEvent(
+                                        context.getSource(),
+                                        WorldZeroMajorEventType.STALKER
+                                )))
+                        .then(Commands.literal("trigger_void_call")
+                                .executes(context -> worldzero$triggerMajorEvent(
+                                        context.getSource(),
+                                        WorldZeroMajorEventType.VOID_CALL
+                                )))
+                        .then(Commands.literal("trigger_growth")
+                                .executes(context -> worldzero$triggerMajorEvent(
+                                        context.getSource(),
+                                        WorldZeroMajorEventType.GROWTH
+                                )))
+                        .then(Commands.literal("trigger_swarm")
+                                .executes(context -> worldzero$triggerMajorEvent(
+                                        context.getSource(),
+                                        WorldZeroMajorEventType.SWARM
+                                )))
+                        .then(Commands.literal("trigger_time_loop")
+                                .executes(context -> worldzero$triggerMajorEvent(
+                                        context.getSource(),
+                                        WorldZeroMajorEventType.TIME_LOOP
+                                )))
+                        .then(Commands.literal("trigger_glitch_rain")
+                                .executes(context -> worldzero$triggerMajorEvent(
+                                        context.getSource(),
+                                        WorldZeroMajorEventType.GLITCH_RAIN
+                                )))
                         .then(Commands.literal("trigger_memory")
                                 .executes(context -> worldzero$triggerMemory(context.getSource())))
                         .then(Commands.literal("trigger_last_block")
@@ -126,6 +161,10 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$teleportToHouseBad(context.getSource())))
                         .then(Commands.literal("tp_void")
                                 .executes(context -> worldzero$teleportToVoid(context.getSource())))
+                        .then(Commands.literal("tp_voidportal")
+                                .executes(context -> worldzero$teleportToVoidPortal(context.getSource())))
+                        .then(Commands.literal("return_from_voidportal")
+                                .executes(context -> worldzero$returnFromVoidPortal(context.getSource())))
                         .then(Commands.literal("return_to_overworld")
                                 .executes(context -> worldzero$returnToOverworld(context.getSource())))
                         .then(Commands.literal("clean_disc")
@@ -167,6 +206,9 @@ public final class WorldZeroDevEntityCommands {
         MinecraftServer server = source.getServer();
         int stopped = 0;
         if (WorldZeroHorrorEventSystem.worldzero$stopAllEvents(server)) {
+            stopped++;
+        }
+        if (WorldZeroMajorEventSystem.worldzero$stopAllEvents(server)) {
             stopped++;
         }
         if (WorldZeroFreezeEvent.worldzero$stopFreezeNow(server)) {
@@ -328,6 +370,27 @@ public final class WorldZeroDevEntityCommands {
         return triggered ? 1 : 0;
     }
 
+    private static int worldzero$triggerMajorEvent(
+            CommandSourceStack source,
+            WorldZeroMajorEventType eventType
+    ) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroMajorEventSystem.worldzero$triggerMajorEventNow(
+                source.getPlayer(),
+                eventType
+        );
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] major event triggered: " + eventType.worldzero$debugName()
+                        : "[WORLD_0][DEV] major event failed: " + eventType.worldzero$debugName()
+                        + " (active event, invalid conditions, or no valid target)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
     private static int worldzero$triggerParalysis(CommandSourceStack source) {
         if (source.getPlayer() == null) {
             return 0;
@@ -464,6 +527,35 @@ public final class WorldZeroDevEntityCommands {
         return teleported ? 1 : 0;
     }
 
+    private static int worldzero$teleportToVoidPortal(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean teleported = WorldZeroVoidPortalDimension.worldzero$teleportPlayerToVoidPortal(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                teleported
+                        ? "[WORLD_0][DEV] teleported to voidportal dimension"
+                        : "[WORLD_0][DEV] voidportal teleport failed (dimension or active return state is unavailable)"
+        ), false);
+        return teleported ? 1 : 0;
+    }
+
+    private static int worldzero$returnFromVoidPortal(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        boolean teleported = WorldZeroVoidCallEvent.worldzero$returnFromVoidPortalNow(player);
+        source.sendSuccess(() -> Component.literal(
+                teleported
+                        ? "[WORLD_0][DEV] returned from voidportal dimension"
+                        : "[WORLD_0][DEV] return_from_voidportal failed (no saved return point or target dimension is unavailable)"
+        ), false);
+        return teleported ? 1 : 0;
+    }
+
     private static int worldzero$returnToOverworld(CommandSourceStack source) {
         ServerPlayer player = source.getPlayer();
         if (player == null) {
@@ -484,6 +576,9 @@ public final class WorldZeroDevEntityCommands {
         } else if (player.serverLevel().dimension() == WorldZeroVoidDimension.WORLDZERO_VOID_LEVEL) {
             teleported = WorldZeroVoidDimension.worldzero$returnPlayerFromVoid(player);
             dimensionName = "void";
+        } else if (player.serverLevel().dimension() == WorldZeroVoidPortalDimension.WORLDZERO_VOIDPORTAL_LEVEL) {
+            teleported = WorldZeroVoidCallEvent.worldzero$returnFromVoidPortalNow(player);
+            dimensionName = "voidportal";
         } else {
             source.sendSuccess(() -> Component.literal(
                     "[WORLD_0][DEV] return_to_overworld failed (player is not in a worldzero custom dimension)"

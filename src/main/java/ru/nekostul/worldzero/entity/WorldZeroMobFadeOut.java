@@ -35,6 +35,10 @@ public final class WorldZeroMobFadeOut {
             return;
         }
 
+        if (serverLevel.dimension() == WorldZeroVoidPortalDimension.WORLDZERO_VOIDPORTAL_LEVEL) {
+            return;
+        }
+
         long gameTime = serverLevel.getGameTime();
         if (gameTime < WORLDZERO_MOB_FADE_START_TICKS || gameTime % WORLDZERO_FADE_CHECK_INTERVAL_TICKS != 0L) {
             return;

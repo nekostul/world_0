@@ -548,6 +548,10 @@ public final class WorldZeroLastBlockEvent {
 
     private static boolean worldzero$hasActiveEcho(MinecraftServer server) {
         for (ServerLevel level : server.getAllLevels()) {
+            if (level.dimension() == WorldZeroVoidPortalDimension.WORLDZERO_VOIDPORTAL_LEVEL) {
+                continue;
+            }
+
             if (!level.getEntitiesOfClass(
                     WorldZeroEchoEntity.class,
                     WORLDZERO_ENTITY_SCAN_AABB,

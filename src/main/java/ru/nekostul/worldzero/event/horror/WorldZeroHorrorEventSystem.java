@@ -216,7 +216,8 @@ public final class WorldZeroHorrorEventSystem {
                 || WorldZeroFallEvent.worldzero$isFallActive(server)
                 || WorldZeroFootstepsEvent.worldzero$isFootstepsActive(server)
                 || WorldZeroHouseEvent.worldzero$isHouseActive(server)
-                || WorldZeroParalysisEvent.worldzero$isParalysisActive(server);
+                || WorldZeroParalysisEvent.worldzero$isParalysisActive(server)
+                || WorldZeroMajorEventSystem.worldzero$isMajorEventActive(server);
     }
 
     private static boolean worldzero$hasActiveEcho(MinecraftServer server) {
@@ -225,6 +226,10 @@ public final class WorldZeroHorrorEventSystem {
         }
 
         for (ServerLevel level : server.getAllLevels()) {
+            if (level.dimension() == WorldZeroVoidPortalDimension.WORLDZERO_VOIDPORTAL_LEVEL) {
+                continue;
+            }
+
             if (!level.getEntitiesOfClass(
                     WorldZeroEchoEntity.class,
                     WORLDZERO_ENTITY_SCAN_AABB,

@@ -62,6 +62,7 @@ public class WorldZeroEchoEntity extends Monster {
     private int worldzero$windowWatchTicksRemaining;
     private boolean worldzero$paralysisBedActive;
     private boolean worldzero$voidSceneActive;
+    private boolean worldzero$statueActive;
     private boolean worldzero$heIsCloseTrackingActive;
     private UUID worldzero$heIsCloseTargetPlayerId;
     private int worldzero$heIsCloseLookTicks;
@@ -104,6 +105,12 @@ public class WorldZeroEchoEntity extends Monster {
     public void tick() {
         super.tick();
         if (this.level().isClientSide()) {
+            return;
+        }
+
+        if (this.worldzero$statueActive) {
+            this.setDeltaMovement(0.0D, 0.0D, 0.0D);
+            this.setSprinting(false);
             return;
         }
 
@@ -206,6 +213,15 @@ public class WorldZeroEchoEntity extends Monster {
 
     public void worldzero$configureVoidScene() {
         this.worldzero$voidSceneActive = true;
+    }
+
+    public void worldzero$configureStatue() {
+        this.worldzero$statueActive = true;
+        this.setNoAi(true);
+        this.setInvulnerable(true);
+        this.setSilent(true);
+        this.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        this.setSprinting(false);
     }
 
     public void worldzero$configureRuleBreakEvent(UUID targetPlayerId, int idleTicks) {

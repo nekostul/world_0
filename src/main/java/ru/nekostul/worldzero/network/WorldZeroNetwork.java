@@ -133,6 +133,13 @@ public final class WorldZeroNetwork {
                 WorldZeroMinorAnomalyPacket::decode,
                 WorldZeroMinorAnomalyPacket::handle
         );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroMajorEventPacket.class,
+                WorldZeroMajorEventPacket::encode,
+                WorldZeroMajorEventPacket::decode,
+                WorldZeroMajorEventPacket::handle
+        );
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks) {
@@ -246,6 +253,13 @@ public final class WorldZeroNetwork {
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new WorldZeroMinorAnomalyPacket(action, durationTicks, variant)
+        );
+    }
+
+    public static void sendMajorEvent(ServerPlayer player, byte action, int durationTicks, int variant) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroMajorEventPacket(action, durationTicks, variant)
         );
     }
 }

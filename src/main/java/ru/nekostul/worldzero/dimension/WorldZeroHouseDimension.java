@@ -52,6 +52,7 @@ import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.achievement.WorldZeroAdvancementTriggers;
 
 import javax.annotation.Nullable;
 import java.util.ArrayDeque;
@@ -94,14 +95,7 @@ public final class WorldZeroHouseDimension {
     private static final int WORLDZERO_RESTORATION_CHAT_DELAY_MAX_TICKS = 4 * 20;
     private static final int WORLDZERO_RESTORATION_ECHO_START_DELAY_AFTER_CHAT_TICKS = 20;
     private static final String WORLDZERO_RESTORATION_CHAT_SANEK_NAME = "sanek0001";
-    private static final String WORLDZERO_RESTORATION_CHAT_LINE_ONE = "наши грятки сново ктото сламал";
-    private static final String WORLDZERO_RESTORATION_CHAT_LINE_TWO = "сматри вон он ево видно в акне";
-    private static final String WORLDZERO_RESTORATION_CHAT_LINE_THREE = "чтото мне страшно";
-    private static final String WORLDZERO_RESTORATION_CHAT_LINE_FOUR = "да чо он сделоет иди пачини пж";
-    private static final String WORLDZERO_RESTORATION_CHAT_LINE_ONE_EN = "our farm again someone brokd";
-    private static final String WORLDZERO_RESTORATION_CHAT_LINE_TWO_EN = "look ther he him in window";
-    private static final String WORLDZERO_RESTORATION_CHAT_LINE_THREE_EN = "somthing to me very scary";
-    private static final String WORLDZERO_RESTORATION_CHAT_LINE_FOUR_EN = "wut he do go fix pls";
+    private static final String WORLDZERO_RESTORATION_CHAT_LINE_KEY_PREFIX = "message.worldzero.house.restoration.line.";
     private static final BlockPos WORLDZERO_RESTORATION_ROUTE_START = new BlockPos(-16, 73, -21);
     private static final List<BlockPos> WORLDZERO_RESTORATION_ROUTE_POINTS = List.of(
             new BlockPos(-16, 73, -19),
@@ -1153,6 +1147,7 @@ public final class WorldZeroHouseDimension {
         }
 
         List<UUID> playersToWake = new ArrayList<>();
+        Set<UUID> playersToCompleteRestoration = new HashSet<>();
         List<UUID> playersToDrop = new ArrayList<>();
         for (Map.Entry<UUID, RestorationSceneState> entry : sessionState.worldzero$restorationScenes.entrySet()) {
             UUID playerId = entry.getKey();
@@ -1189,6 +1184,7 @@ public final class WorldZeroHouseDimension {
             if (echo instanceof WorldZeroHouseEchoEntity houseEcho
                     && houseEcho.worldzero$isFarmRestorationReadyToWake()) {
                 playersToWake.add(playerId);
+                playersToCompleteRestoration.add(playerId);
             }
         }
 
@@ -1199,7 +1195,10 @@ public final class WorldZeroHouseDimension {
         for (UUID playerId : playersToWake) {
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
             if (player != null) {
-                worldzero$finishRestorationDream(player);
+                boolean finished = worldzero$finishRestorationDream(player);
+                if (finished && playersToCompleteRestoration.contains(playerId)) {
+                    WorldZeroAdvancementTriggers.grantNotOurFarm(player);
+                }
             } else {
                 sessionState.worldzero$restorationScenes.remove(playerId);
             }
@@ -1223,29 +1222,15 @@ public final class WorldZeroHouseDimension {
     private static void worldzero$sendRestorationChatLine(ServerPlayer player, int messageIndex) {
         String playerName = player.getGameProfile().getName();
         switch (messageIndex) {
-            case 0 -> WorldZeroNetwork.sendHouseChatLine(
+            case 0, 2 -> WorldZeroNetwork.sendLocalizedChatLine(
                     player,
                     playerName,
-                    WORLDZERO_RESTORATION_CHAT_LINE_ONE,
-                    WORLDZERO_RESTORATION_CHAT_LINE_ONE_EN
+                    WORLDZERO_RESTORATION_CHAT_LINE_KEY_PREFIX + messageIndex
             );
-            case 1 -> WorldZeroNetwork.sendHouseChatLine(
+            case 1, 3 -> WorldZeroNetwork.sendLocalizedChatLine(
                     player,
                     WORLDZERO_RESTORATION_CHAT_SANEK_NAME,
-                    WORLDZERO_RESTORATION_CHAT_LINE_TWO,
-                    WORLDZERO_RESTORATION_CHAT_LINE_TWO_EN
-            );
-            case 2 -> WorldZeroNetwork.sendHouseChatLine(
-                    player,
-                    playerName,
-                    WORLDZERO_RESTORATION_CHAT_LINE_THREE,
-                    WORLDZERO_RESTORATION_CHAT_LINE_THREE_EN
-            );
-            case 3 -> WorldZeroNetwork.sendHouseChatLine(
-                    player,
-                    WORLDZERO_RESTORATION_CHAT_SANEK_NAME,
-                    WORLDZERO_RESTORATION_CHAT_LINE_FOUR,
-                    WORLDZERO_RESTORATION_CHAT_LINE_FOUR_EN
+                    WORLDZERO_RESTORATION_CHAT_LINE_KEY_PREFIX + messageIndex
             );
             default -> {
             }

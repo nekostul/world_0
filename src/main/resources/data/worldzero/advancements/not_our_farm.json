@@ -1,9 +1,9 @@
 {
   "display": {
-    "title": {"translate": "advancements.worldzero.forgotten_disc"},
-    "description": {"translate": "advancements.worldzero.forgotten_disc.desc"},
+    "title": {"translate": "advancements.worldzero.not_our_farm"},
+    "description": {"translate": "advancements.worldzero.not_our_farm.desc"},
     "icon": {
-      "item": "minecraft:music_disc_otherside"
+      "item": "minecraft:iron_hoe"
     },
     "frame": "goal",
     "hidden": true,

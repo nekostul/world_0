@@ -112,6 +112,20 @@ public final class WorldZeroNetwork {
                 WorldZeroHouseChatLinePacket::decode,
                 WorldZeroHouseChatLinePacket::handle
         );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroKeyboardBlockPacket.class,
+                WorldZeroKeyboardBlockPacket::encode,
+                WorldZeroKeyboardBlockPacket::decode,
+                WorldZeroKeyboardBlockPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroLocalizedChatLinePacket.class,
+                WorldZeroLocalizedChatLinePacket::encode,
+                WorldZeroLocalizedChatLinePacket::decode,
+                WorldZeroLocalizedChatLinePacket::handle
+        );
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks) {
@@ -204,6 +218,20 @@ public final class WorldZeroNetwork {
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new WorldZeroHouseChatLinePacket(speaker, defaultMessage, englishMessage)
+        );
+    }
+
+    public static void sendKeyboardBlock(ServerPlayer player, int durationTicks) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroKeyboardBlockPacket(durationTicks)
+        );
+    }
+
+    public static void sendLocalizedChatLine(ServerPlayer player, String speaker, String messageKey) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroLocalizedChatLinePacket(speaker, messageKey)
         );
     }
 }

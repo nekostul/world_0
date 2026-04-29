@@ -61,6 +61,7 @@ public class WorldZeroEchoEntity extends Monster {
     private UUID worldzero$windowWatchTargetPlayerId;
     private int worldzero$windowWatchTicksRemaining;
     private boolean worldzero$paralysisBedActive;
+    private boolean worldzero$voidSceneActive;
     private boolean worldzero$heIsCloseTrackingActive;
     private UUID worldzero$heIsCloseTargetPlayerId;
     private int worldzero$heIsCloseLookTicks;
@@ -139,7 +140,9 @@ public class WorldZeroEchoEntity extends Monster {
                 if (this.isRemoved()) {
                     return;
                 }
-            } else if (nearestPlayer != null && this.distanceToSqr(nearestPlayer) < this.worldzero$echoDespawnDistanceSqr) {
+            } else if (!this.worldzero$voidSceneActive
+                    && nearestPlayer != null
+                    && this.distanceToSqr(nearestPlayer) < this.worldzero$echoDespawnDistanceSqr) {
                 this.discard();
                 return;
             }
@@ -199,6 +202,10 @@ public class WorldZeroEchoEntity extends Monster {
                 WORLDZERO_ECHO_DESPAWN_MAX_DISTANCE
         );
         this.worldzero$echoDespawnDistanceSqr = clampedDistance * clampedDistance;
+    }
+
+    public void worldzero$configureVoidScene() {
+        this.worldzero$voidSceneActive = true;
     }
 
     public void worldzero$configureRuleBreakEvent(UUID targetPlayerId, int idleTicks) {

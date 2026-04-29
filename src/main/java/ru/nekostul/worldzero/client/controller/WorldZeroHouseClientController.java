@@ -68,7 +68,15 @@ public final class WorldZeroHouseClientController {
                 Component.literal(speaker),
                 Component.literal(message)
         );
-        minecraft.gui.getChat().addMessage(chatLine);
+        ChatComponent chat = minecraft.gui.getChat();
+        ChatComponentAccessor accessor = (ChatComponentAccessor) (Object) chat;
+        accessor.worldzero$getAllMessages().add(0, new GuiMessage(
+                minecraft.gui.getGuiTicks(),
+                chatLine,
+                null,
+                null
+        ));
+        accessor.worldzero$refreshTrimmedMessage();
         WORLDZERO_TRACKED_FAKE_CHAT_LINES.add(chatLine.getString());
     }
 

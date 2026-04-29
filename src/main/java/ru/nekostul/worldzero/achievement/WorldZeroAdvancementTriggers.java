@@ -8,6 +8,7 @@ public final class WorldZeroAdvancementTriggers {
     public static final ResourceLocation HE_IS_CLOSE = ResourceLocation.fromNamespaceAndPath(WorldZeroMod.MOD_ID, "he_is_close");
     public static final ResourceLocation PARALYSIS = ResourceLocation.fromNamespaceAndPath(WorldZeroMod.MOD_ID, "paralysis");
     public static final ResourceLocation FORGOTTEN_DISC = ResourceLocation.fromNamespaceAndPath(WorldZeroMod.MOD_ID, "forgotten_disc");
+    public static final ResourceLocation NOT_OUR_FARM = ResourceLocation.fromNamespaceAndPath(WorldZeroMod.MOD_ID, "not_our_farm");
 
     private WorldZeroAdvancementTriggers() {
     }
@@ -33,5 +34,9 @@ public final class WorldZeroAdvancementTriggers {
 
     public static void grantForgottenDisc(ServerPlayer player) {
         grantAdvancement(player, FORGOTTEN_DISC);
+    }
+
+    public static void grantNotOurFarm(ServerPlayer player) {
+        grantAdvancement(player, NOT_OUR_FARM);
     }
 }

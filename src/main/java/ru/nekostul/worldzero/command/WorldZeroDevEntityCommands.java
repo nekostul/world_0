@@ -5,6 +5,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -67,20 +68,18 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerKoridorChase(context.getSource())))
                         .then(Commands.literal("tp_koridor")
                                 .executes(context -> worldzero$teleportToKoridor(context.getSource())))
-                        .then(Commands.literal("return_from_koridor")
-                                .executes(context -> worldzero$returnFromKoridor(context.getSource())))
                         .then(Commands.literal("tp_house")
                                 .executes(context -> worldzero$teleportToHouse(context.getSource())))
                         .then(Commands.literal("trigger_house_farm_dream")
                                 .executes(context -> worldzero$triggerHouseFarmDream(context.getSource())))
                         .then(Commands.literal("trigger_house_farm_demo")
                                 .executes(context -> worldzero$triggerHouseFarmDemo(context.getSource())))
-                        .then(Commands.literal("return_from_house")
-                                .executes(context -> worldzero$returnFromHouse(context.getSource())))
                         .then(Commands.literal("tp_house_bad")
                                 .executes(context -> worldzero$teleportToHouseBad(context.getSource())))
-                        .then(Commands.literal("return_from_house_bad")
-                                .executes(context -> worldzero$returnFromHouseBad(context.getSource())))
+                        .then(Commands.literal("tp_void")
+                                .executes(context -> worldzero$teleportToVoid(context.getSource())))
+                        .then(Commands.literal("return_to_overworld")
+                                .executes(context -> worldzero$returnToOverworld(context.getSource())))
                         .then(Commands.literal("clean_disc")
                                 .executes(context -> worldzero$cleanDisc(context.getSource())))
                         .then(Commands.literal("trigger_house")
@@ -299,20 +298,6 @@ public final class WorldZeroDevEntityCommands {
         return teleported ? 1 : 0;
     }
 
-    private static int worldzero$returnFromKoridor(CommandSourceStack source) {
-        if (source.getPlayer() == null) {
-            return 0;
-        }
-
-        boolean teleported = WorldZeroKoridorDimension.worldzero$returnPlayerFromKoridor(source.getPlayer());
-        source.sendSuccess(() -> Component.literal(
-                teleported
-                        ? "[WORLD_0][DEV] returned from koridor dimension"
-                        : "[WORLD_0][DEV] koridor return failed (no saved return point or target dimension is unavailable)"
-        ), false);
-        return teleported ? 1 : 0;
-    }
-
     private static int worldzero$teleportToHouse(CommandSourceStack source) {
         if (source.getPlayer() == null) {
             return 0;
@@ -323,20 +308,6 @@ public final class WorldZeroDevEntityCommands {
                 teleported
                         ? "[WORLD_0][DEV] teleported to house dimension"
                         : "[WORLD_0][DEV] house teleport failed (dimension, structure, or active return state is unavailable)"
-        ), false);
-        return teleported ? 1 : 0;
-    }
-
-    private static int worldzero$returnFromHouse(CommandSourceStack source) {
-        if (source.getPlayer() == null) {
-            return 0;
-        }
-
-        boolean teleported = WorldZeroHouseDimension.worldzero$returnPlayerFromHouse(source.getPlayer());
-        source.sendSuccess(() -> Component.literal(
-                teleported
-                        ? "[WORLD_0][DEV] returned from house dimension"
-                        : "[WORLD_0][DEV] house return failed (no saved return point or target dimension is unavailable)"
         ), false);
         return teleported ? 1 : 0;
     }
@@ -355,16 +326,52 @@ public final class WorldZeroDevEntityCommands {
         return teleported ? 1 : 0;
     }
 
-    private static int worldzero$returnFromHouseBad(CommandSourceStack source) {
+    private static int worldzero$teleportToVoid(CommandSourceStack source) {
         if (source.getPlayer() == null) {
             return 0;
         }
 
-        boolean teleported = WorldZeroHouseBadDimension.worldzero$returnPlayerFromHouseBad(source.getPlayer());
+        boolean teleported = WorldZeroVoidDimension.worldzero$teleportPlayerToVoid(source.getPlayer());
         source.sendSuccess(() -> Component.literal(
                 teleported
-                        ? "[WORLD_0][DEV] returned from house_bad dimension"
-                        : "[WORLD_0][DEV] house_bad return failed (no saved return point or target dimension is unavailable)"
+                        ? "[WORLD_0][DEV] teleported to void dimension"
+                        : "[WORLD_0][DEV] void teleport failed (dimension or active return state is unavailable)"
+        ), false);
+        return teleported ? 1 : 0;
+    }
+
+    private static int worldzero$returnToOverworld(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        boolean teleported;
+        String dimensionName;
+        if (player.serverLevel().dimension() == WorldZeroKoridorDimension.WORLDZERO_KORIDOR_LEVEL) {
+            teleported = WorldZeroKoridorDimension.worldzero$returnPlayerFromKoridor(player);
+            dimensionName = "koridor";
+        } else if (player.serverLevel().dimension() == WorldZeroHouseDimension.WORLDZERO_HOUSE_LEVEL) {
+            teleported = WorldZeroHouseDimension.worldzero$returnPlayerFromHouse(player);
+            dimensionName = "house";
+        } else if (player.serverLevel().dimension() == WorldZeroHouseBadDimension.WORLDZERO_HOUSE_BAD_LEVEL) {
+            teleported = WorldZeroHouseBadDimension.worldzero$returnPlayerFromHouseBad(player);
+            dimensionName = "house_bad";
+        } else if (player.serverLevel().dimension() == WorldZeroVoidDimension.WORLDZERO_VOID_LEVEL) {
+            teleported = WorldZeroVoidDimension.worldzero$returnPlayerFromVoid(player);
+            dimensionName = "void";
+        } else {
+            source.sendSuccess(() -> Component.literal(
+                    "[WORLD_0][DEV] return_to_overworld failed (player is not in a worldzero custom dimension)"
+            ), false);
+            return 0;
+        }
+
+        String finalDimensionName = dimensionName;
+        source.sendSuccess(() -> Component.literal(
+                teleported
+                        ? "[WORLD_0][DEV] returned from " + finalDimensionName + " dimension"
+                        : "[WORLD_0][DEV] return_to_overworld failed from " + finalDimensionName + " (no saved return point or target dimension is unavailable)"
         ), false);
         return teleported ? 1 : 0;
     }

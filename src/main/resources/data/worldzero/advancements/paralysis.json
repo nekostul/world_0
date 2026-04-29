@@ -6,6 +6,7 @@
       "item": "minecraft:purple_bed"
     },
     "frame": "goal",
+    "hidden": true,
     "show_toast": true,
     "announce_to_chat": true,
     "background": "minecraft:textures/gui/advancements/backgrounds/end.png"

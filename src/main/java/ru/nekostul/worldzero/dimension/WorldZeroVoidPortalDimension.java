@@ -56,13 +56,13 @@ public final class WorldZeroVoidPortalDimension {
     private static final int WORLDZERO_STATUE_CELL_SIZE = 14;
     private static final int WORLDZERO_STATUE_CELL_RADIUS = 4;
     private static final String[] WORLDZERO_SIGN_TEXTS = {
-            "you left this here",
+            "ты оставил это здесь",
             "do not count them",
             "wrong way again",
             "it remembers your name",
             "the floor repeats",
             "stop running",
-            "this is not the first loop",
+            "это не первый цикл",
             "someone wore your skin",
             "look behind the statues",
             "the return is borrowed",
@@ -75,7 +75,7 @@ public final class WorldZeroVoidPortalDimension {
             "you are the noise",
             "keep going, it gets closer",
             "home is not loaded",
-            "the exit moved"
+            "выход переместился"
     };
     private static final AABB WORLDZERO_ENTITY_SCAN_AABB = new AABB(
             -30_000_000.0D,

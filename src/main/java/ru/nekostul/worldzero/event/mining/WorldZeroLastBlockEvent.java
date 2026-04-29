@@ -210,6 +210,24 @@ public final class WorldZeroLastBlockEvent {
         );
     }
 
+    public static boolean worldzero$stopLastBlockNow(MinecraftServer server) {
+        SessionState sessionState = WORLDZERO_SERVER_STATES.remove(server);
+        if (server == null || sessionState == null) {
+            return false;
+        }
+
+        boolean changed = !sessionState.worldzero$pendingAppearances.isEmpty()
+                || !sessionState.worldzero$activeAppearances.isEmpty();
+        for (ActiveAppearance activeAppearance : sessionState.worldzero$activeAppearances) {
+            Entity entity = worldzero$findEntity(server, activeAppearance.worldzero$entityId);
+            if (entity != null) {
+                entity.discard();
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
     private static void worldzero$spawnPendingAppearances(
             ServerLevel level,
             SessionState sessionState,
@@ -577,6 +595,22 @@ public final class WorldZeroLastBlockEvent {
 
     private static LastBlockSaveData worldzero$getSaveData(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(LastBlockSaveData::load, LastBlockSaveData::new, WORLDZERO_SAVE_ID);
+    }
+
+    @Nullable
+    private static Entity worldzero$findEntity(MinecraftServer server, @Nullable UUID entityId) {
+        if (server == null || entityId == null) {
+            return null;
+        }
+
+        for (ServerLevel level : server.getAllLevels()) {
+            Entity entity = level.getEntity(entityId);
+            if (entity != null) {
+                return entity;
+            }
+        }
+
+        return null;
     }
 
     private static final class SessionState {

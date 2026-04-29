@@ -199,6 +199,26 @@ public final class WorldZeroFallEvent {
         return state != null && state.worldzero$phase != Phase.INACTIVE;
     }
 
+    public static boolean worldzero$stopFallNow(MinecraftServer server) {
+        if (server == null) {
+            return false;
+        }
+
+        SessionState state = WORLDZERO_SESSION_STATES.get(server);
+        if (state == null || state.worldzero$phase == Phase.INACTIVE) {
+            return false;
+        }
+
+        ServerPlayer targetPlayer = server.getPlayerList().getPlayer(state.worldzero$targetPlayerId);
+        if (targetPlayer != null) {
+            WorldZeroNetwork.sendFreezeEnd(targetPlayer);
+            WorldZeroNetwork.sendFallClientAction(targetPlayer, WorldZeroFallClientPacket.WORLDZERO_ACTION_CLEAR);
+        }
+
+        worldzero$clearState(server, state);
+        return true;
+    }
+
     public static void worldzero$rescheduleAfterFreeze(ServerLevel level) {
         if (level == null || level.isClientSide() || level.dimension() != Level.OVERWORLD) {
             return;

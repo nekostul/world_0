@@ -265,6 +265,21 @@ public final class WorldZeroParalysisEvent {
         return state != null && state.worldzero$phase != Phase.INACTIVE;
     }
 
+    public static boolean worldzero$stopParalysisNow(MinecraftServer server) {
+        if (server == null) {
+            return false;
+        }
+
+        SessionState state = WORLDZERO_SESSION_STATES.get(server);
+        if (state == null || state.worldzero$phase == Phase.INACTIVE) {
+            return false;
+        }
+
+        ServerPlayer targetPlayer = server.getPlayerList().getPlayer(state.worldzero$targetPlayerId);
+        worldzero$clearState(server, state, targetPlayer);
+        return true;
+    }
+
     public static void worldzero$acknowledgeCameraAligned(ServerPlayer player) {
         if (player == null) {
             return;

@@ -126,6 +126,13 @@ public final class WorldZeroNetwork {
                 WorldZeroLocalizedChatLinePacket::decode,
                 WorldZeroLocalizedChatLinePacket::handle
         );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroMinorAnomalyPacket.class,
+                WorldZeroMinorAnomalyPacket::encode,
+                WorldZeroMinorAnomalyPacket::decode,
+                WorldZeroMinorAnomalyPacket::handle
+        );
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks) {
@@ -232,6 +239,13 @@ public final class WorldZeroNetwork {
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new WorldZeroLocalizedChatLinePacket(speaker, messageKey)
+        );
+    }
+
+    public static void sendMinorAnomaly(ServerPlayer player, byte action, int durationTicks, int variant) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroMinorAnomalyPacket(action, durationTicks, variant)
         );
     }
 }

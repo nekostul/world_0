@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
@@ -46,6 +47,8 @@ public final class WorldZeroDevEntityCommands {
                                 )))
                         .then(Commands.literal("remove_all_echoes")
                                 .executes(context -> worldzero$removeAll(context.getSource())))
+                        .then(Commands.literal("stop_all_events")
+                                .executes(context -> worldzero$stopAllEvents(context.getSource())))
                         .then(Commands.literal("trigger_echo")
                                 .executes(context -> worldzero$triggerEcho(context.getSource())))
                         .then(Commands.literal("trigger_echo_rule_break")
@@ -58,6 +61,51 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerParalysis(context.getSource())))
                         .then(Commands.literal("trigger_footsteps")
                                 .executes(context -> worldzero$triggerFootsteps(context.getSource())))
+                        .then(Commands.literal("trigger_peripheral_echo")
+                                .executes(context -> worldzero$triggerMinorAnomaly(
+                                        context.getSource(),
+                                        WorldZeroMinorAnomalies.MinorAnomalyType.PERIPHERAL_ECHO
+                                )))
+                        .then(Commands.literal("trigger_phantom_steps")
+                                .executes(context -> worldzero$triggerMinorAnomaly(
+                                        context.getSource(),
+                                        WorldZeroMinorAnomalies.MinorAnomalyType.PHANTOM_STEPS
+                                )))
+                        .then(Commands.literal("trigger_whisper")
+                                .executes(context -> worldzero$triggerMinorAnomaly(
+                                        context.getSource(),
+                                        WorldZeroMinorAnomalies.MinorAnomalyType.WHISPER
+                                )))
+                        .then(Commands.literal("trigger_object_presence")
+                                .executes(context -> worldzero$triggerMinorAnomaly(
+                                        context.getSource(),
+                                        WorldZeroMinorAnomalies.MinorAnomalyType.OBJECT_PRESENCE
+                                )))
+                        .then(Commands.literal("trigger_light_anomaly")
+                                .executes(context -> worldzero$triggerMinorAnomaly(
+                                        context.getSource(),
+                                        WorldZeroMinorAnomalies.MinorAnomalyType.LIGHT_ANOMALY
+                                )))
+                        .then(Commands.literal("trigger_shadow_delay")
+                                .executes(context -> worldzero$triggerMinorAnomaly(
+                                        context.getSource(),
+                                        WorldZeroMinorAnomalies.MinorAnomalyType.SHADOW_DELAY
+                                )))
+                        .then(Commands.literal("trigger_wrong_wind")
+                                .executes(context -> worldzero$triggerMinorAnomaly(
+                                        context.getSource(),
+                                        WorldZeroMinorAnomalies.MinorAnomalyType.WRONG_WIND
+                                )))
+                        .then(Commands.literal("trigger_entity_blackout")
+                                .executes(context -> worldzero$triggerMinorAnomaly(
+                                        context.getSource(),
+                                        WorldZeroMinorAnomalies.MinorAnomalyType.ENTITY_BLACKOUT
+                                )))
+                        .then(Commands.literal("trigger_block_blink")
+                                .executes(context -> worldzero$triggerMinorAnomaly(
+                                        context.getSource(),
+                                        WorldZeroMinorAnomalies.MinorAnomalyType.BLOCK_BLINK
+                                )))
                         .then(Commands.literal("trigger_memory")
                                 .executes(context -> worldzero$triggerMemory(context.getSource())))
                         .then(Commands.literal("trigger_last_block")
@@ -115,17 +163,50 @@ public final class WorldZeroDevEntityCommands {
         return removed;
     }
 
-    private static int worldzero$removeAll(CommandSourceStack source) {
-        int removed = 0;
-        for (ServerLevel level : source.getServer().getAllLevels()) {
-            for (WorldZeroEchoEntity entity : level.getEntitiesOfClass(
-                    WorldZeroEchoEntity.class,
-                    WORLDZERO_ENTITY_SCAN_AABB
-            )) {
-                entity.discard();
-                removed++;
-            }
+    private static int worldzero$stopAllEvents(CommandSourceStack source) {
+        MinecraftServer server = source.getServer();
+        int stopped = 0;
+        if (WorldZeroHorrorEventSystem.worldzero$stopAllEvents(server)) {
+            stopped++;
         }
+        if (WorldZeroFreezeEvent.worldzero$stopFreezeNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroFallEvent.worldzero$stopFallNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroParalysisEvent.worldzero$stopParalysisNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroFootstepsEvent.worldzero$stopFootstepsNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroHouseEvent.worldzero$stopHouseNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroWorldMemoryEvent.worldzero$stopMemoryNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroLastBlockEvent.worldzero$stopLastBlockNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroFootstepsEvent.worldzero$resetBlankDiscPlayback(server)) {
+            stopped++;
+        }
+
+        int removedEntities = worldzero$removeAllEventEntities(server);
+        int finalStopped = stopped;
+        source.sendSuccess(() -> Component.literal(
+                "[WORLD_0][DEV] stop_all_events completed: stopped_groups="
+                        + finalStopped
+                        + ", removed_event_entities="
+                        + removedEntities
+        ), false);
+        return stopped + removedEntities > 0 ? 1 : 0;
+    }
+
+    private static int worldzero$removeAll(CommandSourceStack source) {
+        int removed = worldzero$removeAllEventEntities(source.getServer());
 
         int finalRemoved = removed;
         source.sendSuccess(() -> Component.literal(
@@ -133,6 +214,28 @@ public final class WorldZeroDevEntityCommands {
         ), false);
         return removed;
     }
+
+    private static int worldzero$removeAllEventEntities(MinecraftServer server) {
+        int removed = 0;
+        for (ServerLevel level : server.getAllLevels()) {
+            for (WorldZeroEchoEntity entity : level.getEntitiesOfClass(
+                    WorldZeroEchoEntity.class,
+                    WORLDZERO_ENTITY_SCAN_AABB
+            )) {
+                entity.discard();
+                removed++;
+            }
+            for (WorldZeroHouseEchoEntity entity : level.getEntitiesOfClass(
+                    WorldZeroHouseEchoEntity.class,
+                    WORLDZERO_ENTITY_SCAN_AABB
+            )) {
+                entity.discard();
+                removed++;
+            }
+        }
+        return removed;
+    }
+
 
     private static int worldzero$triggerEcho(CommandSourceStack source) {
         if (source.getPlayer() == null) {
@@ -200,6 +303,27 @@ public final class WorldZeroDevEntityCommands {
                 triggered
                         ? "[WORLD_0][DEV] footsteps event force-triggered"
                         : "[WORLD_0][DEV] footsteps event trigger failed (already active or invalid player)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerMinorAnomaly(
+            CommandSourceStack source,
+            WorldZeroMinorAnomalies.MinorAnomalyType anomalyType
+    ) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroHorrorEventSystem.worldzero$triggerMinorAnomalyNow(
+                source.getPlayer(),
+                anomalyType
+        );
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] minor anomaly triggered: " + anomalyType.worldzero$debugName()
+                        : "[WORLD_0][DEV] minor anomaly failed: " + anomalyType.worldzero$debugName()
+                        + " (active event, invalid conditions, or no valid target)"
         ), false);
         return triggered ? 1 : 0;
     }

@@ -235,6 +235,26 @@ public final class WorldZeroWorldMemoryEvent {
         return false;
     }
 
+    public static boolean worldzero$stopMemoryNow(MinecraftServer server) {
+        SessionState sessionState = WORLDZERO_SERVER_STATES.remove(server);
+        if (server == null || sessionState == null) {
+            return false;
+        }
+
+        ServerLevel level = server.getLevel(Level.OVERWORLD);
+        boolean changed = false;
+        if (level != null) {
+            for (PlayerState playerState : sessionState.worldzero$playerStates.values()) {
+                if (playerState.worldzero$openedChestPos != null) {
+                    playerState.worldzero$openedChestCloseTick = 0L;
+                    worldzero$closeSilentChestIfNeeded(level, playerState);
+                    changed = true;
+                }
+            }
+        }
+        return changed || !sessionState.worldzero$playerStates.isEmpty();
+    }
+
     private static boolean worldzero$hasConflictingEvent(MinecraftServer server) {
         return WorldZeroFreezeEvent.worldzero$isFreezeActive(server)
                 || WorldZeroFallEvent.worldzero$isFallActive(server)

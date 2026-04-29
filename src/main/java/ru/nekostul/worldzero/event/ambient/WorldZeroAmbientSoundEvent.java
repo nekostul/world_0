@@ -7,7 +7,7 @@ public final class WorldZeroAmbientSoundEvent {
     }
 
     public static boolean worldzero$isMajorEventStartBlocked(ServerLevel level) {
-        return false;
+        return WorldZeroHorrorEventSystem.worldzero$isMinorAnomalyActive(level);
     }
 
     public static void worldzero$notifyMajorEventStarted(ServerLevel level) {

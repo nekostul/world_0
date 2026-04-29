@@ -234,6 +234,27 @@ public final class WorldZeroHouseEvent {
         return false;
     }
 
+    public static boolean worldzero$stopHouseNow(MinecraftServer server) {
+        SessionState sessionState = WORLDZERO_SERVER_STATES.get(server);
+        if (server == null || sessionState == null) {
+            return false;
+        }
+
+        boolean changed = false;
+        for (Map.Entry<UUID, PlayerState> entry : sessionState.worldzero$playerStates.entrySet()) {
+            PlayerState playerState = entry.getValue();
+            if (!playerState.worldzero$bedrockActive
+                    && playerState.worldzero$activeVisualBlocks.isEmpty()
+                    && playerState.worldzero$activeBlackEchoId == null) {
+                continue;
+            }
+
+            worldzero$deactivateBedrockScene(server, server.getPlayerList().getPlayer(entry.getKey()), playerState);
+            changed = true;
+        }
+        return changed;
+    }
+
     private static boolean worldzero$triggerHouseNowInternal(ServerPlayer player, boolean enforceRealConditions) {
         if (player == null || !player.isAlive() || player.isSpectator()) {
             return false;

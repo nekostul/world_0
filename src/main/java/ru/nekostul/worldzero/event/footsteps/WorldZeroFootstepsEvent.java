@@ -249,6 +249,20 @@ public final class WorldZeroFootstepsEvent {
         return state != null && state.worldzero$phase != Phase.INACTIVE;
     }
 
+    public static boolean worldzero$stopFootstepsNow(MinecraftServer server) {
+        if (server == null) {
+            return false;
+        }
+
+        SessionState state = WORLDZERO_SESSION_STATES.get(server);
+        if (state == null || state.worldzero$phase == Phase.INACTIVE) {
+            return false;
+        }
+
+        worldzero$clearState(server, state);
+        return true;
+    }
+
     private static boolean worldzero$startEvent(
             ServerLevel level,
             SessionState state,
@@ -386,11 +400,11 @@ public final class WorldZeroFootstepsEvent {
 
     private static Vec3 worldzero$playFootstepBehind(
             ServerLevel level,
-            ServerPlayer player,
-            @Nullable SessionState state
+        ServerPlayer player,
+        @Nullable SessionState state
     ) {
         Vec3 source = worldzero$resolveFootstepSource(level, player);
-        BlockPos belowPos = BlockPos.containing(source.x, source.y - 0.2D, source.z).below();
+        BlockPos belowPos = worldzero$resolvePlayerStepSoundBlock(player);
         BlockState belowState = level.getBlockState(belowPos);
         SoundType soundType = belowState.getSoundType(level, belowPos, player);
         level.playSound(
@@ -411,6 +425,10 @@ public final class WorldZeroFootstepsEvent {
         }
 
         return source;
+    }
+
+    private static BlockPos worldzero$resolvePlayerStepSoundBlock(ServerPlayer player) {
+        return BlockPos.containing(player.getX(), player.getY() - 0.2D, player.getZ());
     }
 
     private static Vec3 worldzero$resolveFootstepSource(ServerLevel level, ServerPlayer player) {

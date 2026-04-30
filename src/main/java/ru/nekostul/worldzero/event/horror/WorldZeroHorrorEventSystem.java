@@ -55,8 +55,6 @@ public final class WorldZeroHorrorEventSystem {
         }
 
         long worldTicks = saveData.worldzero$worldTicks;
-        WorldZeroMinorAnomalies.worldzero$tick(level, worldTicks);
-
         MinecraftServer server = level.getServer();
         SessionState state = WORLDZERO_SESSION_STATES.computeIfAbsent(server, ignored -> new SessionState());
         if (state.worldzero$activeUntilWorldTick >= 0L && state.worldzero$activeUntilWorldTick <= worldTicks) {
@@ -64,12 +62,15 @@ public final class WorldZeroHorrorEventSystem {
             state.worldzero$debugForcedActive = false;
         }
 
-        if (WorldZeroHorrorFinale.worldzero$isEndReached(worldTicks)) {
-            if (!state.worldzero$debugForcedActive) {
+        boolean finaleActive = WorldZeroHorrorFinale.worldzero$isActive(server);
+        if (finaleActive || WorldZeroHorrorFinale.worldzero$isEndReached(worldTicks)) {
+            if (finaleActive || !state.worldzero$debugForcedActive) {
                 WorldZeroHorrorFinale.worldzero$tickEnd(level);
             }
             return;
         }
+
+        WorldZeroMinorAnomalies.worldzero$tick(level, worldTicks);
 
         WorldZeroHorrorPhase phase = worldzero$resolvePhase(worldTicks);
         if (phase == WorldZeroHorrorPhase.FIRST || phase == WorldZeroHorrorPhase.END) {
@@ -217,6 +218,7 @@ public final class WorldZeroHorrorEventSystem {
                 || WorldZeroFootstepsEvent.worldzero$isFootstepsActive(server)
                 || WorldZeroHouseEvent.worldzero$isHouseActive(server)
                 || WorldZeroParalysisEvent.worldzero$isParalysisActive(server)
+                || WorldZeroHorrorFinale.worldzero$isActive(server)
                 || WorldZeroMajorEventSystem.worldzero$isMajorEventActive(server);
     }
 

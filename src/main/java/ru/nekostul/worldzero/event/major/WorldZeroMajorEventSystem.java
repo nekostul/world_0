@@ -182,6 +182,7 @@ public final class WorldZeroMajorEventSystem {
                 || WorldZeroFootstepsEvent.worldzero$isFootstepsActive(server)
                 || WorldZeroHouseEvent.worldzero$isHouseActive(server)
                 || WorldZeroParalysisEvent.worldzero$isParalysisActive(server)
+                || WorldZeroHorrorFinale.worldzero$isActive(server)
                 || WorldZeroHorrorEventSystem.worldzero$isMinorAnomalyActive(level);
     }
 

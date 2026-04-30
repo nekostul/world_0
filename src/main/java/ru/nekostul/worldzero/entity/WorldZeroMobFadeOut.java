@@ -10,7 +10,6 @@ import net.minecraftforge.fml.common.Mod;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class WorldZeroMobFadeOut {
-    private static final long WORLDZERO_MOB_FADE_START_TICKS = 30L * 60L * 20L;
     private static final long WORLDZERO_MOB_FADE_END_TICKS = 180L * 60L * 20L;
     private static final long WORLDZERO_FADE_CHECK_INTERVAL_TICKS = 20L;
     private static final AABB WORLDZERO_ENTITY_SCAN_AABB = new AABB(
@@ -39,30 +38,19 @@ public final class WorldZeroMobFadeOut {
             return;
         }
 
-        long gameTime = serverLevel.getGameTime();
-        if (gameTime < WORLDZERO_MOB_FADE_START_TICKS || gameTime % WORLDZERO_FADE_CHECK_INTERVAL_TICKS != 0L) {
-            return;
-        }
-
-        if (gameTime >= WORLDZERO_MOB_FADE_END_TICKS) {
+        long worldTicks = worldzero$worldTicks(serverLevel);
+        if (worldTicks >= WORLDZERO_MOB_FADE_END_TICKS && worldTicks % WORLDZERO_FADE_CHECK_INTERVAL_TICKS == 0L) {
             worldzero$removeAllMobs(serverLevel);
-            return;
+        }
+    }
+
+    private static long worldzero$worldTicks(ServerLevel serverLevel) {
+        ServerLevel overworld = serverLevel.getServer().getLevel(net.minecraft.world.level.Level.OVERWORLD);
+        if (overworld == null) {
+            return serverLevel.getGameTime();
         }
 
-        float despawnChance = worldzero$despawnChance(gameTime);
-        if (despawnChance <= 0.0f) {
-            return;
-        }
-
-        for (Mob mob : serverLevel.getEntitiesOfClass(
-                Mob.class,
-                WORLDZERO_ENTITY_SCAN_AABB,
-                WorldZeroMobFadeOut::worldzero$shouldFadeMob
-        )) {
-            if (serverLevel.random.nextFloat() < despawnChance) {
-                mob.discard();
-            }
-        }
+        return WorldZeroHorrorEventSystem.worldzero$getWorldTicks(overworld);
     }
 
     private static void worldzero$removeAllMobs(ServerLevel serverLevel) {
@@ -73,19 +61,6 @@ public final class WorldZeroMobFadeOut {
         )) {
             mob.discard();
         }
-    }
-
-    private static float worldzero$despawnChance(long gameTime) {
-        double progress = (double) (gameTime - WORLDZERO_MOB_FADE_START_TICKS)
-                / (double) (WORLDZERO_MOB_FADE_END_TICKS - WORLDZERO_MOB_FADE_START_TICKS);
-        if (progress < 0.0D) {
-            progress = 0.0D;
-        } else if (progress > 1.0D) {
-            progress = 1.0D;
-        }
-
-        // Cubic easing keeps early despawn almost invisible and ramps up close to the end.
-        return (float) (progress * progress * progress);
     }
 
     private static boolean worldzero$shouldFadeMob(Mob mob) {

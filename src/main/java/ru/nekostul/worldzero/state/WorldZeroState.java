@@ -33,6 +33,7 @@ public final class WorldZeroState {
     private static final String REACTIVATION_FILE_NAME = "reactivation_pending.txt";
     private static final String CREATE_REDIRECT_FILE_NAME = "create_redirect_pending.txt";
     private static final String COMMAND_ANOMALY_FILE_NAME = "command_anomaly_seen.txt";
+    private static final String FINALE_RECONNECT_STAGE_FILE_NAME = "finale_reconnect_stage.txt";
     private static final String WORLD_SUFFIX = "_0";
     private static final String DEFAULT_PRIMARY_WORLD_NAME = "World_0";
     private static final String NO_PRIMARY_TITLE_KEY = "worldzero.error.title";
@@ -369,6 +370,69 @@ public final class WorldZeroState {
         return Component.translatable(LAN_CHEATS_MESSAGE_KEY);
     }
 
+    public static Component finaleReconnectTitle() {
+        return Component.literal("Failed to connect to world");
+    }
+
+    public static Component finaleDuplicateSessionMessage() {
+        return Component.literal("Player already in world\nDisconnecting duplicate session");
+    }
+
+    public static Component finaleActiveSessionMessage() {
+        return Component.literal("Player already in world\nLocation: unknown\nState: active\n\nDisconnecting you");
+    }
+
+    public static int readFinaleReconnectStage(Minecraft minecraft) {
+        if (minecraft == null) {
+            return 0;
+        }
+
+        Path stageFile = getFinaleReconnectStageFilePath(minecraft);
+        if (!Files.exists(stageFile)) {
+            return 0;
+        }
+
+        try {
+            return Math.max(0, Integer.parseInt(Files.readString(stageFile, StandardCharsets.UTF_8).trim()));
+        } catch (IOException | NumberFormatException exception) {
+            LOGGER.warn("Failed to read WORLD_0 finale reconnect stage", exception);
+            return 0;
+        }
+    }
+
+    public static void writeFinaleReconnectStage(Minecraft minecraft, int stage) {
+        if (minecraft == null) {
+            return;
+        }
+
+        Path stageFile = getFinaleReconnectStageFilePath(minecraft);
+        try {
+            Files.createDirectories(stageFile.getParent());
+            Files.writeString(
+                    stageFile,
+                    Math.max(0, stage) + System.lineSeparator(),
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            );
+        } catch (IOException exception) {
+            LOGGER.warn("Failed to write WORLD_0 finale reconnect stage", exception);
+        }
+    }
+
+    public static void clearFinaleReconnectStage(Minecraft minecraft) {
+        if (minecraft == null) {
+            return;
+        }
+
+        try {
+            Files.deleteIfExists(getFinaleReconnectStageFilePath(minecraft));
+        } catch (IOException exception) {
+            LOGGER.warn("Failed to clear WORLD_0 finale reconnect stage", exception);
+        }
+    }
+
     public static boolean hasSeenCommandAnomaly(Minecraft minecraft) {
         if (minecraft == null) {
             return false;
@@ -474,6 +538,10 @@ public final class WorldZeroState {
 
     private static Path getCommandAnomalyFilePath(Minecraft minecraft) {
         return getWorldZeroDirectory(minecraft).resolve(COMMAND_ANOMALY_FILE_NAME);
+    }
+
+    private static Path getFinaleReconnectStageFilePath(Minecraft minecraft) {
+        return getWorldZeroDirectory(minecraft).resolve(FINALE_RECONNECT_STAGE_FILE_NAME);
     }
 
     private static Path getWorldZeroDirectory(Minecraft minecraft) {

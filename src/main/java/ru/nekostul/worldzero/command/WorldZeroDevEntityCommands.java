@@ -141,6 +141,12 @@ public final class WorldZeroDevEntityCommands {
                                         context.getSource(),
                                         WorldZeroMajorEventType.GLITCH_RAIN
                                 )))
+                        .then(Commands.literal("trigger_finale")
+                                .executes(context -> worldzero$triggerFinale(context.getSource())))
+                        .then(Commands.literal("trigger_final_menu")
+                                .executes(context -> worldzero$triggerFinalMenu(context.getSource())))
+                        .then(Commands.literal("trigger_final_screamer")
+                                .executes(context -> worldzero$triggerFinalScreamer(context.getSource())))
                         .then(Commands.literal("trigger_memory")
                                 .executes(context -> worldzero$triggerMemory(context.getSource())))
                         .then(Commands.literal("trigger_last_block")
@@ -209,6 +215,9 @@ public final class WorldZeroDevEntityCommands {
             stopped++;
         }
         if (WorldZeroMajorEventSystem.worldzero$stopAllEvents(server)) {
+            stopped++;
+        }
+        if (WorldZeroHorrorFinale.worldzero$stopNow(server)) {
             stopped++;
         }
         if (WorldZeroFreezeEvent.worldzero$stopFreezeNow(server)) {
@@ -387,6 +396,47 @@ public final class WorldZeroDevEntityCommands {
                         ? "[WORLD_0][DEV] major event triggered: " + eventType.worldzero$debugName()
                         : "[WORLD_0][DEV] major event failed: " + eventType.worldzero$debugName()
                         + " (active event, invalid conditions, or no valid target)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerFinale(CommandSourceStack source) {
+        if (source.getPlayer() == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroHorrorFinale.worldzero$triggerNow(source.getPlayer());
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] finale event triggered"
+                        : "[WORLD_0][DEV] finale event trigger failed (invalid player or missing overworld)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerFinalMenu(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        WorldZeroHorrorFinale.worldzero$prepareFinalMenuEntry(player);
+        WorldZeroNetwork.sendFinale(player, WorldZeroFinalePacket.WORLDZERO_ACTION_FINAL_BLACK_MENU, 1, 0);
+        source.sendSuccess(() -> Component.literal("[WORLD_0][DEV] final menu opened"), false);
+        return 1;
+    }
+
+    private static int worldzero$triggerFinalScreamer(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroVoidDimension.worldzero$startAbsoluteFinal(player);
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] final screamer triggered"
+                        : "[WORLD_0][DEV] final screamer failed (invalid player or missing void dimension)"
         ), false);
         return triggered ? 1 : 0;
     }

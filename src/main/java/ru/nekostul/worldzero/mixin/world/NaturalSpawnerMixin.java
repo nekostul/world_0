@@ -2,6 +2,7 @@ package ru.nekostul.worldzero.mixin;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.NaturalSpawner;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.spongepowered.asm.mixin.Mixin;
@@ -9,6 +10,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import ru.nekostul.worldzero.WorldZeroHorrorEventSystem;
 
 @Mixin(NaturalSpawner.class)
 public abstract class NaturalSpawnerMixin {
@@ -34,7 +36,7 @@ public abstract class NaturalSpawnerMixin {
             return;
         }
 
-        float spawnMultiplier = worldzero$spawnMultiplier(serverLevel.getGameTime());
+        float spawnMultiplier = worldzero$spawnMultiplier(worldzero$worldTicks(serverLevel));
         if (spawnMultiplier <= 0.0f) {
             callbackInfo.cancel();
             return;
@@ -50,16 +52,26 @@ public abstract class NaturalSpawnerMixin {
     }
 
     @Unique
-    private static float worldzero$spawnMultiplier(long gameTime) {
-        if (gameTime <= WORLDZERO_SPAWN_FADE_START_TICKS) {
+    private static long worldzero$worldTicks(ServerLevel serverLevel) {
+        ServerLevel overworld = serverLevel.getServer().getLevel(Level.OVERWORLD);
+        if (overworld == null) {
+            return serverLevel.getGameTime();
+        }
+
+        return WorldZeroHorrorEventSystem.worldzero$getWorldTicks(overworld);
+    }
+
+    @Unique
+    private static float worldzero$spawnMultiplier(long worldTicks) {
+        if (worldTicks <= WORLDZERO_SPAWN_FADE_START_TICKS) {
             return 1.0f;
         }
 
-        if (gameTime >= WORLDZERO_SPAWN_FADE_END_TICKS) {
+        if (worldTicks >= WORLDZERO_SPAWN_FADE_END_TICKS) {
             return WORLDZERO_MIN_SPAWN_MULTIPLIER;
         }
 
-        double progress = (double) (gameTime - WORLDZERO_SPAWN_FADE_START_TICKS)
+        double progress = (double) (worldTicks - WORLDZERO_SPAWN_FADE_START_TICKS)
                 / (double) (WORLDZERO_SPAWN_FADE_END_TICKS - WORLDZERO_SPAWN_FADE_START_TICKS);
         if (progress < 0.0D) {
             progress = 0.0D;

@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
@@ -36,7 +37,12 @@ public final class WorldZeroVoidDimension {
     private static final int WORLDZERO_FREEZE_TICKS = 180;
     private static final int WORLDZERO_ECHO_TAKE_OBSIDIAN_TICK = 320;
     private static final int WORLDZERO_FINAL_TICK = 4100;
+    private static final int WORLDZERO_FINAL_MENU_TICK = 4140;
     private static final int WORLDZERO_KEYBOARD_BLOCK_TICKS = WORLDZERO_FINAL_TICK + 1;
+    private static final int WORLDZERO_ABSOLUTE_EMPTY_TICKS = 30;
+    private static final int WORLDZERO_ABSOLUTE_ATTACK_TICKS = 40;
+    private static final int WORLDZERO_ABSOLUTE_TOTAL_TICKS = WORLDZERO_ABSOLUTE_EMPTY_TICKS + WORLDZERO_ABSOLUTE_ATTACK_TICKS;
+    private static final int WORLDZERO_ABSOLUTE_RUN_TICKS = 8;
     private static final int WORLDZERO_ECHO_MOVE_TICKS = 20;
     private static final int WORLDZERO_ECHO_GLITCH_COUNT = 7;
     private static final float WORLDZERO_ECHO_PLACE_PITCH = 75.0F;
@@ -59,6 +65,7 @@ public final class WorldZeroVoidDimension {
     private static final float WORLDZERO_PLAYER_PITCH = 0.0F;
     private static final Map<MinecraftServer, Map<UUID, ReturnPoint>> WORLDZERO_RETURN_POINTS = new WeakHashMap<>();
     private static final Map<MinecraftServer, Map<UUID, VoidSceneState>> WORLDZERO_SCENES = new WeakHashMap<>();
+    private static final Map<MinecraftServer, Map<UUID, AbsoluteFinalState>> WORLDZERO_ABSOLUTE_FINALS = new WeakHashMap<>();
 
     private WorldZeroVoidDimension() {
     }
@@ -73,37 +80,51 @@ public final class WorldZeroVoidDimension {
 
         MinecraftServer server = level.getServer();
         Map<UUID, VoidSceneState> scenes = WORLDZERO_SCENES.get(server);
-        if (scenes == null || scenes.isEmpty()) {
+        Map<UUID, AbsoluteFinalState> absoluteFinals = WORLDZERO_ABSOLUTE_FINALS.get(server);
+        boolean hasScenes = scenes != null && !scenes.isEmpty();
+        boolean hasAbsoluteFinals = absoluteFinals != null && !absoluteFinals.isEmpty();
+        if (!hasScenes && !hasAbsoluteFinals) {
             return;
         }
 
         long gameTime = level.getGameTime();
-        Iterator<Map.Entry<UUID, VoidSceneState>> iterator = scenes.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<UUID, VoidSceneState> entry = iterator.next();
-            ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
-            VoidSceneState scene = entry.getValue();
-            if (player == null || !player.isAlive() || player.serverLevel().dimension() != WORLDZERO_VOID_LEVEL) {
-                worldzero$discardSceneEcho(server, scene);
-                iterator.remove();
-                continue;
-            }
+        if (hasScenes) {
+            Iterator<Map.Entry<UUID, VoidSceneState>> iterator = scenes.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<UUID, VoidSceneState> entry = iterator.next();
+                ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+                VoidSceneState scene = entry.getValue();
+                if (player == null || !player.isAlive() || player.serverLevel().dimension() != WORLDZERO_VOID_LEVEL) {
+                    worldzero$discardSceneEcho(server, scene);
+                    iterator.remove();
+                    continue;
+                }
 
-            if (gameTime < scene.worldzero$startTick + WORLDZERO_FREEZE_TICKS) {
-                worldzero$applyFullFreeze(player, scene);
-            }
+                if (gameTime < scene.worldzero$startTick + WORLDZERO_FREEZE_TICKS) {
+                    worldzero$applyFullFreeze(player, scene);
+                }
 
-            int elapsedTicks = (int) (gameTime - scene.worldzero$startTick);
-            worldzero$tickVoidDialogue(player, scene, elapsedTicks);
-            worldzero$tickEchoBuild(level, scene, elapsedTicks);
-            if (worldzero$isGlitchTick(scene, elapsedTicks)) {
-                worldzero$applyEchoGlitch(level, scene);
-            }
+                int elapsedTicks = (int) (gameTime - scene.worldzero$startTick);
+                worldzero$tickVoidDialogue(player, scene, elapsedTicks);
+                worldzero$tickEchoBuild(level, scene, elapsedTicks);
+                if (worldzero$isGlitchTick(scene, elapsedTicks)) {
+                    worldzero$applyEchoGlitch(level, scene);
+                }
 
-            if (!scene.worldzero$finished && elapsedTicks >= WORLDZERO_FINAL_TICK) {
-                scene.worldzero$finished = true;
-                WorldZeroNetwork.sendKeyboardBlock(player, 0);
+                if (!scene.worldzero$finished && elapsedTicks >= WORLDZERO_FINAL_TICK) {
+                    scene.worldzero$finished = true;
+                    WorldZeroNetwork.sendKeyboardBlock(player, 0);
+                }
+                if (scene.worldzero$finaleScene && !scene.worldzero$finalMenuSent && elapsedTicks >= WORLDZERO_FINAL_MENU_TICK) {
+                    scene.worldzero$finalMenuSent = true;
+                    worldzero$discardSceneEcho(server, scene);
+                    iterator.remove();
+                    WorldZeroHorrorFinale.worldzero$finishFinalVoid(player);
+                }
             }
+        }
+        if (hasAbsoluteFinals) {
+            worldzero$tickAbsoluteFinals(level, server, absoluteFinals, gameTime);
         }
     }
 
@@ -111,9 +132,72 @@ public final class WorldZeroVoidDimension {
     public static void worldzero$onServerStopped(ServerStoppedEvent event) {
         WORLDZERO_RETURN_POINTS.clear();
         WORLDZERO_SCENES.clear();
+        WORLDZERO_ABSOLUTE_FINALS.clear();
     }
 
     public static boolean worldzero$teleportPlayerToVoid(ServerPlayer player) {
+        return worldzero$teleportPlayerToVoid(player, false);
+    }
+
+    public static boolean worldzero$teleportPlayerToFinalVoid(ServerPlayer player) {
+        return worldzero$teleportPlayerToVoid(player, true);
+    }
+
+    public static boolean worldzero$startAbsoluteFinal(ServerPlayer player) {
+        if (player == null || !player.isAlive() || player.isSpectator()) {
+            return false;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return false;
+        }
+
+        ServerLevel voidLevel = server.getLevel(WORLDZERO_VOID_LEVEL);
+        if (voidLevel == null) {
+            return false;
+        }
+
+        worldzero$prepareVoidLevel(voidLevel);
+        worldzero$ensureBuiltPath(voidLevel);
+        worldzero$clearVoidScene(server, player.getUUID());
+        worldzero$clearAbsoluteFinal(server, player.getUUID());
+
+        if (player.isSleeping()) {
+            player.stopSleepInBed(false, true);
+        }
+        voidLevel.getChunkAt(WORLDZERO_FIRST_OBSIDIAN_POS);
+        voidLevel.getChunkAt(WORLDZERO_SECOND_OBSIDIAN_POS);
+        double lockedX = WORLDZERO_FIRST_OBSIDIAN_POS.getX() + 0.5D;
+        double lockedY = WORLDZERO_FIRST_OBSIDIAN_POS.getY() + 1.0D;
+        double lockedZ = WORLDZERO_FIRST_OBSIDIAN_POS.getZ() + 0.5D;
+        player.teleportTo(voidLevel, lockedX, lockedY, lockedZ, WORLDZERO_PLAYER_YAW, WORLDZERO_PLAYER_PITCH);
+        player.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        player.fallDistance = 0.0F;
+
+        WORLDZERO_ABSOLUTE_FINALS.computeIfAbsent(server, ignored -> new HashMap<>()).put(
+                player.getUUID(),
+                new AbsoluteFinalState(
+                        voidLevel.getGameTime(),
+                        lockedX,
+                        lockedY,
+                        lockedZ,
+                        WORLDZERO_PLAYER_YAW,
+                        WORLDZERO_PLAYER_PITCH
+                )
+        );
+        WorldZeroNetwork.sendFreezeStart(
+                player,
+                WORLDZERO_ABSOLUTE_TOTAL_TICKS,
+                -1,
+                WORLDZERO_PLAYER_YAW,
+                WORLDZERO_PLAYER_PITCH
+        );
+        WorldZeroNetwork.sendKeyboardBlock(player, WORLDZERO_ABSOLUTE_TOTAL_TICKS + 5);
+        return true;
+    }
+
+    private static boolean worldzero$teleportPlayerToVoid(ServerPlayer player, boolean finalScene) {
         if (player == null || !player.isAlive() || player.isSpectator()) {
             return false;
         }
@@ -129,8 +213,11 @@ public final class WorldZeroVoidDimension {
         }
 
         Map<UUID, ReturnPoint> returnPoints = WORLDZERO_RETURN_POINTS.computeIfAbsent(server, ignored -> new HashMap<>());
-        if (returnPoints.containsKey(player.getUUID())) {
+        if (!finalScene && returnPoints.containsKey(player.getUUID())) {
             return false;
+        }
+        if (finalScene) {
+            returnPoints.remove(player.getUUID());
         }
 
         worldzero$prepareVoidLevel(voidLevel);
@@ -140,17 +227,19 @@ public final class WorldZeroVoidDimension {
             return false;
         }
 
-        returnPoints.put(
-                player.getUUID(),
-                new ReturnPoint(
-                        player.serverLevel().dimension(),
-                        player.getX(),
-                        player.getY(),
-                        player.getZ(),
-                        player.getYRot(),
-                        player.getXRot()
-                )
-        );
+        if (!finalScene) {
+            returnPoints.put(
+                    player.getUUID(),
+                    new ReturnPoint(
+                            player.serverLevel().dimension(),
+                            player.getX(),
+                            player.getY(),
+                            player.getZ(),
+                            player.getYRot(),
+                            player.getXRot()
+                    )
+            );
+        }
 
         if (player.isSleeping()) {
             player.stopSleepInBed(false, true);
@@ -176,7 +265,8 @@ public final class WorldZeroVoidDimension {
                         WORLDZERO_PLAYER_YAW,
                         WORLDZERO_PLAYER_PITCH,
                         echo.getUUID(),
-                        worldzero$createGlitchTicks(voidLevel)
+                        worldzero$createGlitchTicks(voidLevel),
+                        finalScene
                 )
         );
         WorldZeroNetwork.sendFreezeStart(
@@ -186,7 +276,7 @@ public final class WorldZeroVoidDimension {
                 WORLDZERO_PLAYER_YAW,
                 WORLDZERO_PLAYER_PITCH
         );
-        WorldZeroNetwork.sendKeyboardBlock(player, WORLDZERO_KEYBOARD_BLOCK_TICKS);
+        WorldZeroNetwork.sendKeyboardBlock(player, finalScene ? WORLDZERO_FINAL_MENU_TICK + 1 : WORLDZERO_KEYBOARD_BLOCK_TICKS);
         return true;
     }
 
@@ -416,6 +506,120 @@ public final class WorldZeroVoidDimension {
         echo.setXRot(pitch);
     }
 
+    private static void worldzero$tickAbsoluteFinals(
+            ServerLevel level,
+            MinecraftServer server,
+            Map<UUID, AbsoluteFinalState> absoluteFinals,
+            long gameTime
+    ) {
+        Iterator<Map.Entry<UUID, AbsoluteFinalState>> iterator = absoluteFinals.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, AbsoluteFinalState> entry = iterator.next();
+            ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+            AbsoluteFinalState scene = entry.getValue();
+            if (player == null || !player.isAlive() || player.serverLevel().dimension() != WORLDZERO_VOID_LEVEL) {
+                worldzero$discardAbsoluteBlackEcho(level, scene);
+                iterator.remove();
+                continue;
+            }
+
+            worldzero$applyAbsoluteFreeze(player, scene);
+            int elapsedTicks = (int) (gameTime - scene.worldzero$startTick);
+            if (!scene.worldzero$blackEchoSpawned && elapsedTicks >= WORLDZERO_ABSOLUTE_EMPTY_TICKS) {
+                worldzero$spawnAbsoluteBlackEcho(level, player, scene);
+            }
+            if (scene.worldzero$blackEchoSpawned) {
+                worldzero$tickAbsoluteBlackEcho(level, scene, elapsedTicks);
+            }
+
+            if (elapsedTicks >= WORLDZERO_ABSOLUTE_TOTAL_TICKS) {
+                worldzero$discardAbsoluteBlackEcho(level, scene);
+                iterator.remove();
+                WorldZeroHorrorFinale.worldzero$finishAbsoluteFinal(player);
+            }
+        }
+        if (absoluteFinals.isEmpty()) {
+            WORLDZERO_ABSOLUTE_FINALS.remove(server);
+        }
+    }
+
+    private static void worldzero$spawnAbsoluteBlackEcho(
+            ServerLevel level,
+            ServerPlayer player,
+            AbsoluteFinalState scene
+    ) {
+        WorldZeroEchoEntity blackEcho = WorldZeroEntities.WORLDZERO_BLACK_ECHO.get().create(level);
+        if (blackEcho == null) {
+            return;
+        }
+
+        blackEcho.moveTo(
+                WORLDZERO_SECOND_OBSIDIAN_POS.getX() + 0.5D,
+                WORLDZERO_SECOND_OBSIDIAN_POS.getY() + 1.0D,
+                WORLDZERO_SECOND_OBSIDIAN_POS.getZ() + 0.5D,
+                90.0F,
+                0.0F
+        );
+        blackEcho.worldzero$configureVoidScene();
+        if (!level.addFreshEntity(blackEcho)) {
+            return;
+        }
+
+        scene.worldzero$blackEchoSpawned = true;
+        scene.worldzero$blackEchoId = blackEcho.getUUID();
+        WorldZeroNetwork.sendFreezeStart(player, WORLDZERO_ABSOLUTE_ATTACK_TICKS, blackEcho.getId());
+        WorldZeroNetwork.sendFinale(
+                player,
+                WorldZeroFinalePacket.WORLDZERO_ACTION_ABSOLUTE_ATTACK,
+                WORLDZERO_ABSOLUTE_ATTACK_TICKS,
+                level.random.nextInt()
+        );
+    }
+
+    private static void worldzero$tickAbsoluteBlackEcho(ServerLevel level, AbsoluteFinalState scene, int elapsedTicks) {
+        if (scene.worldzero$blackEchoId == null) {
+            return;
+        }
+
+        Entity entity = level.getEntity(scene.worldzero$blackEchoId);
+        if (!(entity instanceof WorldZeroEchoEntity blackEcho)) {
+            return;
+        }
+
+        double progress = Mth.clamp(
+                (elapsedTicks - WORLDZERO_ABSOLUTE_EMPTY_TICKS) / (double) WORLDZERO_ABSOLUTE_RUN_TICKS,
+                0.0D,
+                1.0D
+        );
+        double startX = WORLDZERO_SECOND_OBSIDIAN_POS.getX() + 0.5D;
+        double startY = WORLDZERO_SECOND_OBSIDIAN_POS.getY() + 1.0D;
+        double startZ = WORLDZERO_SECOND_OBSIDIAN_POS.getZ() + 0.5D;
+        double targetX = scene.worldzero$lockedX + 0.75D;
+        double nextX = Mth.lerp(progress, startX, targetX);
+        blackEcho.setPos(nextX, startY, startZ);
+        blackEcho.setDeltaMovement((targetX - startX) / WORLDZERO_ABSOLUTE_RUN_TICKS, 0.0D, 0.0D);
+        blackEcho.setSprinting(true);
+        blackEcho.setYRot(90.0F);
+        blackEcho.setYHeadRot(90.0F);
+        blackEcho.setYBodyRot(90.0F);
+        blackEcho.setXRot(0.0F);
+        blackEcho.hasImpulse = true;
+    }
+
+    private static void worldzero$applyAbsoluteFreeze(ServerPlayer player, AbsoluteFinalState scene) {
+        player.teleportTo(
+                player.serverLevel(),
+                scene.worldzero$lockedX,
+                scene.worldzero$lockedY,
+                scene.worldzero$lockedZ,
+                scene.worldzero$lockedYaw,
+                scene.worldzero$lockedPitch
+        );
+        player.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        player.setSprinting(false);
+        player.fallDistance = 0.0F;
+    }
+
     private static WorldZeroEchoEntity worldzero$spawnVoidEcho(ServerLevel level, ServerPlayer player) {
         WorldZeroEchoEntity echo = WorldZeroEntities.WORLDZERO_ECHO.get().create(level);
         if (echo == null) {
@@ -473,6 +677,23 @@ public final class WorldZeroVoidDimension {
         }
     }
 
+    private static void worldzero$clearAbsoluteFinal(MinecraftServer server, UUID playerId) {
+        Map<UUID, AbsoluteFinalState> scenes = WORLDZERO_ABSOLUTE_FINALS.get(server);
+        if (scenes == null) {
+            return;
+        }
+
+        AbsoluteFinalState scene = scenes.remove(playerId);
+        if (scene != null) {
+            for (ServerLevel level : server.getAllLevels()) {
+                worldzero$discardAbsoluteBlackEcho(level, scene);
+            }
+        }
+        if (scenes.isEmpty()) {
+            WORLDZERO_ABSOLUTE_FINALS.remove(server);
+        }
+    }
+
     private static void worldzero$discardSceneEcho(MinecraftServer server, VoidSceneState scene) {
         for (ServerLevel level : server.getAllLevels()) {
             Entity entity = level.getEntity(scene.worldzero$echoId);
@@ -509,6 +730,23 @@ public final class WorldZeroVoidDimension {
         );
     }
 
+    private static void worldzero$ensureBuiltPath(ServerLevel level) {
+        for (BlockPos pos : WORLDZERO_BUILD_POSITIONS) {
+            level.setBlock(pos, Blocks.OBSIDIAN.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        }
+    }
+
+    private static void worldzero$discardAbsoluteBlackEcho(ServerLevel level, AbsoluteFinalState scene) {
+        if (scene.worldzero$blackEchoId == null) {
+            return;
+        }
+
+        Entity entity = level.getEntity(scene.worldzero$blackEchoId);
+        if (entity != null) {
+            entity.discard();
+        }
+    }
+
     private static final class ReturnPoint {
         private final ResourceKey<Level> worldzero$dimension;
         private final double worldzero$x;
@@ -543,6 +781,7 @@ public final class WorldZeroVoidDimension {
         private final float worldzero$lockedPitch;
         private final UUID worldzero$echoId;
         private final int[] worldzero$glitchTicks;
+        private final boolean worldzero$finaleScene;
         private boolean worldzero$echoHoldingObsidian;
         private int worldzero$builtBlocks;
         private int worldzero$moveTicksRemaining;
@@ -553,6 +792,7 @@ public final class WorldZeroVoidDimension {
         private double worldzero$moveTargetY;
         private double worldzero$moveTargetZ;
         private boolean worldzero$finished;
+        private boolean worldzero$finalMenuSent;
 
         private VoidSceneState(
                 long startTick,
@@ -562,7 +802,8 @@ public final class WorldZeroVoidDimension {
                 float lockedYaw,
                 float lockedPitch,
                 UUID echoId,
-                int[] glitchTicks
+                int[] glitchTicks,
+                boolean finaleScene
         ) {
             this.worldzero$startTick = startTick;
             this.worldzero$lockedX = lockedX;
@@ -572,6 +813,34 @@ public final class WorldZeroVoidDimension {
             this.worldzero$lockedPitch = lockedPitch;
             this.worldzero$echoId = echoId;
             this.worldzero$glitchTicks = glitchTicks;
+            this.worldzero$finaleScene = finaleScene;
+        }
+    }
+
+    private static final class AbsoluteFinalState {
+        private final long worldzero$startTick;
+        private final double worldzero$lockedX;
+        private final double worldzero$lockedY;
+        private final double worldzero$lockedZ;
+        private final float worldzero$lockedYaw;
+        private final float worldzero$lockedPitch;
+        private boolean worldzero$blackEchoSpawned;
+        private UUID worldzero$blackEchoId;
+
+        private AbsoluteFinalState(
+                long startTick,
+                double lockedX,
+                double lockedY,
+                double lockedZ,
+                float lockedYaw,
+                float lockedPitch
+        ) {
+            this.worldzero$startTick = startTick;
+            this.worldzero$lockedX = lockedX;
+            this.worldzero$lockedY = lockedY;
+            this.worldzero$lockedZ = lockedZ;
+            this.worldzero$lockedYaw = lockedYaw;
+            this.worldzero$lockedPitch = lockedPitch;
         }
     }
 }

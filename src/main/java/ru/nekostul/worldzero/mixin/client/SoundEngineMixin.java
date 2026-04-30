@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.nekostul.worldzero.WorldZeroFreezeClientController;
+import ru.nekostul.worldzero.WorldZeroFinaleClientController;
 import ru.nekostul.worldzero.WorldZeroKoridorClientController;
 import ru.nekostul.worldzero.WorldZeroParalysisClientController;
 
@@ -30,6 +31,11 @@ public abstract class SoundEngineMixin {
             CallbackInfoReturnable<Float> callbackInfo
     ) {
         if (WorldZeroParalysisClientController.worldzero$isSoundIsolationActive() && source != SoundSource.PLAYERS) {
+            callbackInfo.setReturnValue(0.0F);
+            return;
+        }
+
+        if (WorldZeroFinaleClientController.worldzero$isFullSilenceActive()) {
             callbackInfo.setReturnValue(0.0F);
             return;
         }
@@ -89,6 +95,11 @@ public abstract class SoundEngineMixin {
 
     @Inject(method = "play", at = @At("HEAD"), cancellable = true)
     private void worldzero$filterParalysisSounds(SoundInstance soundInstance, CallbackInfo callbackInfo) {
+        if (WorldZeroFinaleClientController.worldzero$isFullSilenceActive()) {
+            callbackInfo.cancel();
+            return;
+        }
+
         if (WorldZeroParalysisClientController.worldzero$isSoundIsolationActive()
                 && !WorldZeroParalysisClientController.worldzero$isAllowedParalysisSound(soundInstance)) {
             callbackInfo.cancel();
@@ -101,6 +112,11 @@ public abstract class SoundEngineMixin {
             int delay,
             CallbackInfo callbackInfo
     ) {
+        if (WorldZeroFinaleClientController.worldzero$isFullSilenceActive()) {
+            callbackInfo.cancel();
+            return;
+        }
+
         if (WorldZeroParalysisClientController.worldzero$isSoundIsolationActive()
                 && !WorldZeroParalysisClientController.worldzero$isAllowedParalysisSound(soundInstance)) {
             callbackInfo.cancel();
@@ -112,6 +128,11 @@ public abstract class SoundEngineMixin {
             TickableSoundInstance soundInstance,
             CallbackInfo callbackInfo
     ) {
+        if (WorldZeroFinaleClientController.worldzero$isFullSilenceActive()) {
+            callbackInfo.cancel();
+            return;
+        }
+
         if (WorldZeroParalysisClientController.worldzero$isSoundIsolationActive()
                 && !WorldZeroParalysisClientController.worldzero$isAllowedParalysisSound(soundInstance)) {
             callbackInfo.cancel();

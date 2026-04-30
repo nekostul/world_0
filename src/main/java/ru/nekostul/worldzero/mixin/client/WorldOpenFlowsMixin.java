@@ -45,6 +45,20 @@ public abstract class WorldOpenFlowsMixin {
             return;
         }
 
+        int finaleReconnectStage = WorldZeroState.readFinaleReconnectStage(this.minecraft);
+        if (finaleReconnectStage == 1) {
+            WorldZeroState.writeFinaleReconnectStage(this.minecraft, 2);
+            this.worldzero$showFinaleReconnectError(screen, WorldZeroState.finaleDuplicateSessionMessage());
+            callbackInfo.cancel();
+            return;
+        }
+        if (finaleReconnectStage == 2) {
+            WorldZeroState.writeFinaleReconnectStage(this.minecraft, 3);
+            this.worldzero$showFinaleReconnectError(screen, WorldZeroState.finaleActiveSessionMessage());
+            callbackInfo.cancel();
+            return;
+        }
+
         String primaryWorldId = WorldZeroState.readPrimaryWorldId(this.minecraft);
         if (primaryWorldId == null) {
             this.worldzero$showNoPrimaryScreen(screen);
@@ -168,6 +182,17 @@ public abstract class WorldOpenFlowsMixin {
                 () -> this.minecraft.setScreen(previousScreen),
                 WorldZeroState.noPrimaryTitle(),
                 WorldZeroState.noPrimaryMessage(),
+                CommonComponents.GUI_BACK,
+                true
+        ));
+    }
+
+    @Unique
+    private void worldzero$showFinaleReconnectError(Screen previousScreen, net.minecraft.network.chat.Component message) {
+        this.minecraft.setScreen(new AlertScreen(
+                () -> this.minecraft.setScreen(previousScreen),
+                WorldZeroState.finaleReconnectTitle(),
+                message,
                 CommonComponents.GUI_BACK,
                 true
         ));

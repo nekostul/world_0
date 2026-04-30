@@ -548,26 +548,26 @@ public final class WorldZeroVoidDimension {
             ServerPlayer player,
             AbsoluteFinalState scene
     ) {
-        WorldZeroEchoEntity blackEcho = WorldZeroEntities.WORLDZERO_BLACK_ECHO.get().create(level);
-        if (blackEcho == null) {
+        WorldZeroEchoEntity blakEcho = WorldZeroEntities.WORLDZERO_BLAK_ECHO.get().create(level);
+        if (blakEcho == null) {
             return;
         }
 
-        blackEcho.moveTo(
+        blakEcho.moveTo(
                 WORLDZERO_SECOND_OBSIDIAN_POS.getX() + 0.5D,
                 WORLDZERO_SECOND_OBSIDIAN_POS.getY() + 1.0D,
                 WORLDZERO_SECOND_OBSIDIAN_POS.getZ() + 0.5D,
                 90.0F,
                 0.0F
         );
-        blackEcho.worldzero$configureVoidScene();
-        if (!level.addFreshEntity(blackEcho)) {
+        blakEcho.worldzero$configureVoidScene();
+        if (!level.addFreshEntity(blakEcho)) {
             return;
         }
 
         scene.worldzero$blackEchoSpawned = true;
-        scene.worldzero$blackEchoId = blackEcho.getUUID();
-        WorldZeroNetwork.sendFreezeStart(player, WORLDZERO_ABSOLUTE_ATTACK_TICKS, blackEcho.getId());
+        scene.worldzero$blackEchoId = blakEcho.getUUID();
+        WorldZeroNetwork.sendFreezeStart(player, WORLDZERO_ABSOLUTE_ATTACK_TICKS, blakEcho.getId());
         WorldZeroNetwork.sendFinale(
                 player,
                 WorldZeroFinalePacket.WORLDZERO_ACTION_ABSOLUTE_ATTACK,

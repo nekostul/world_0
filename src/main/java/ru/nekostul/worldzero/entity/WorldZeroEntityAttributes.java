@@ -13,6 +13,7 @@ public final class WorldZeroEntityAttributes {
     public static void worldzero$onEntityAttributeCreation(EntityAttributeCreationEvent event) {
         event.put(WorldZeroEntities.WORLDZERO_ECHO.get(), WorldZeroEchoEntity.createAttributes().build());
         event.put(WorldZeroEntities.WORLDZERO_BLACK_ECHO.get(), WorldZeroEchoEntity.createAttributes().build());
+        event.put(WorldZeroEntities.WORLDZERO_BLAK_ECHO.get(), WorldZeroEchoEntity.createAttributes().build());
         event.put(WorldZeroEntities.WORLDZERO_HOUSE_ECHO.get(), WorldZeroHouseEchoEntity.createAttributes().build());
     }
 }

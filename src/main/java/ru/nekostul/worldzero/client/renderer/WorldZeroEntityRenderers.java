@@ -16,6 +16,7 @@ public final class WorldZeroEntityRenderers {
     public static void worldzero$onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(WorldZeroEntities.WORLDZERO_ECHO.get(), WorldZeroEchoRenderer::new);
         event.registerEntityRenderer(WorldZeroEntities.WORLDZERO_BLACK_ECHO.get(), WorldZeroBlackEchoRenderer::new);
+        event.registerEntityRenderer(WorldZeroEntities.WORLDZERO_BLAK_ECHO.get(), WorldZeroBlakEchoRenderer::new);
         event.registerEntityRenderer(WorldZeroEntities.WORLDZERO_HOUSE_ECHO.get(), WorldZeroHouseEchoRenderer::new);
     }
 }

@@ -67,6 +67,7 @@ public final class WorldZeroMobFadeOut {
         EntityType<?> type = mob.getType();
         return type != WorldZeroEntities.WORLDZERO_ECHO.get()
                 && type != WorldZeroEntities.WORLDZERO_HOUSE_ECHO.get()
-                && type != WorldZeroEntities.WORLDZERO_BLACK_ECHO.get();
+                && type != WorldZeroEntities.WORLDZERO_BLACK_ECHO.get()
+                && type != WorldZeroEntities.WORLDZERO_BLAK_ECHO.get();
     }
 }

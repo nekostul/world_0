@@ -30,6 +30,15 @@ public final class WorldZeroEntities {
                     .build(WorldZeroMod.MOD_ID + ":worldzero_black_echo")
     );
 
+    public static final RegistryObject<EntityType<WorldZeroEchoEntity>> WORLDZERO_BLAK_ECHO = ENTITY_TYPES.register(
+            "blak_echo",
+            () -> EntityType.Builder.of(WorldZeroEchoEntity::new, MobCategory.MISC)
+                    .sized(0.6F, 1.8F)
+                    .clientTrackingRange(10)
+                    .updateInterval(2)
+                    .build(WorldZeroMod.MOD_ID + ":blak_echo")
+    );
+
     public static final RegistryObject<EntityType<WorldZeroHouseEchoEntity>> WORLDZERO_HOUSE_ECHO = ENTITY_TYPES.register(
             "worldzero_house_echo",
             () -> EntityType.Builder.of(WorldZeroHouseEchoEntity::new, MobCategory.MISC)

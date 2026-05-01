@@ -25,6 +25,7 @@ import ru.nekostul.worldzero.WorldZeroState;
 
 import java.io.IOException;
 import java.util.function.Function;
+import ru.nekostul.worldzero.worldgen.WorldZeroLegacyWorldFactory;
 
 @Mixin(WorldOpenFlows.class)
 public abstract class WorldOpenFlowsMixin {
@@ -38,6 +39,9 @@ public abstract class WorldOpenFlowsMixin {
 
     @Unique
     private static final ThreadLocal<Boolean> WORLDZERO_INTERNAL_CALL = ThreadLocal.withInitial(() -> false);
+
+    @Unique
+    private static final ThreadLocal<Boolean> WORLDZERO_WRAPPED_WORLDGEN_CALL = ThreadLocal.withInitial(() -> false);
 
     @Inject(method = "loadLevel", at = @At("HEAD"), cancellable = true)
     private void worldzero$forcePrimaryLoad(Screen screen, String worldId, CallbackInfo callbackInfo) {
@@ -113,25 +117,41 @@ public abstract class WorldOpenFlowsMixin {
             Function<RegistryAccess, WorldDimensions> dimensionsFactory,
             CallbackInfo callbackInfo
     ) {
-        if (WORLDZERO_INTERNAL_CALL.get()) {
-            return;
-        }
-
+        boolean internalCall = WORLDZERO_INTERNAL_CALL.get();
+        boolean wrappedWorldgenCall = WORLDZERO_WRAPPED_WORLDGEN_CALL.get();
         String normalizedWorldId = WorldZeroState.ensureSuffix(worldId);
         LevelSettings normalizedLevelSettings = WorldZeroState.ensureSuffixedLevelName(levelSettings);
-        if (!normalizedWorldId.equals(worldId) || normalizedLevelSettings != levelSettings) {
+        if (!wrappedWorldgenCall || (!internalCall && (!normalizedWorldId.equals(worldId) || normalizedLevelSettings != levelSettings))) {
+            if (!internalCall) {
+                String primaryWorldId = WorldZeroState.readPrimaryWorldId(this.minecraft);
+                if (primaryWorldId == null || !WorldZeroState.primaryWorldExists(this.levelSource, primaryWorldId)) {
+                    WorldZeroState.writePrimaryWorldId(this.minecraft, normalizedWorldId);
+                }
+            }
+
+            boolean previousInternalCall = internalCall;
             WORLDZERO_INTERNAL_CALL.set(true);
+            WORLDZERO_WRAPPED_WORLDGEN_CALL.set(true);
             try {
                 ((WorldOpenFlows) (Object) this).createFreshLevel(
                         normalizedWorldId,
                         normalizedLevelSettings,
                         worldOptions,
-                        dimensionsFactory
+                        registryAccess -> WorldZeroLegacyWorldFactory.worldzero$createLegacyWorldDimensions(
+                                registryAccess,
+                                worldOptions.seed(),
+                                dimensionsFactory
+                        )
                 );
             } finally {
-                WORLDZERO_INTERNAL_CALL.set(false);
+                WORLDZERO_WRAPPED_WORLDGEN_CALL.set(false);
+                WORLDZERO_INTERNAL_CALL.set(previousInternalCall);
             }
             callbackInfo.cancel();
+            return;
+        }
+
+        if (internalCall) {
             return;
         }
 

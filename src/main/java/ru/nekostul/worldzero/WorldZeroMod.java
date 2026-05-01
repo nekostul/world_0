@@ -4,6 +4,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import ru.nekostul.worldzero.worldgen.WorldZeroLegacyWorldgen;
 
 @Mod(WorldZeroMod.MOD_ID)
 public final class WorldZeroMod {
@@ -13,6 +14,7 @@ public final class WorldZeroMod {
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, WorldZeroConfig.SPEC);
         WorldZeroEntities.ENTITY_TYPES.register(FMLJavaModLoadingContext.get().getModEventBus());
         WorldZeroItems.ITEMS.register(FMLJavaModLoadingContext.get().getModEventBus());
+        WorldZeroLegacyWorldgen.worldzero$register(FMLJavaModLoadingContext.get().getModEventBus());
         WorldZeroNetwork.register();
     }
 }

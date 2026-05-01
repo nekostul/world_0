@@ -1,5 +1,6 @@
 package ru.nekostul.worldzero.mixin;
 
+import com.mojang.serialization.Lifecycle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.tabs.Tab;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
@@ -138,7 +139,19 @@ public abstract class CreateWorldScreenMixin {
                 false,
                 new GameRules(),
                 levelSettings.getDataConfiguration(),
-                levelSettings.getLifecycle()
+                Lifecycle.stable()
         ));
+    }
+
+    @ModifyArg(
+            method = "onCreate",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/screens/worldselection/WorldOpenFlows;confirmWorldCreation(Lnet/minecraft/client/Minecraft;Lnet/minecraft/client/gui/screens/worldselection/CreateWorldScreen;Lcom/mojang/serialization/Lifecycle;Ljava/lang/Runnable;Z)V"
+            ),
+            index = 2
+    )
+    private Lifecycle worldzero$forceStableWorldCreationLifecycle(Lifecycle lifecycle) {
+        return Lifecycle.stable();
     }
 }

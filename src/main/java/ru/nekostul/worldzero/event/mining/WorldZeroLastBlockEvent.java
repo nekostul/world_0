@@ -91,9 +91,17 @@ public final class WorldZeroLastBlockEvent {
                 ignored -> new PlayerState()
         );
         worldzero$loadPersistentPlayerState(player.serverLevel(), player.getUUID(), playerState);
-        playerState.worldzero$elapsedPlayTicks++;
 
         long gameTime = player.serverLevel().getGameTime();
+        if (!WorldZeroStoryTime.worldzero$countsTowardStoryTime(player)) {
+            if (gameTime - playerState.worldzero$lastPlayTimeSaveGameTick >= WORLDZERO_PLAYTIME_SAVE_INTERVAL_TICKS) {
+                worldzero$savePersistentPlayerState(player.serverLevel(), player.getUUID(), playerState);
+            }
+            return;
+        }
+
+        playerState.worldzero$elapsedPlayTicks++;
+
         if (gameTime - playerState.worldzero$lastPlayTimeSaveGameTick < WORLDZERO_PLAYTIME_SAVE_INTERVAL_TICKS) {
             return;
         }
@@ -111,7 +119,7 @@ public final class WorldZeroLastBlockEvent {
             return;
         }
 
-        if (!player.isAlive() || player.isSpectator() || event.getPos().getY() >= WORLDZERO_UNDERGROUND_MAX_Y) {
+        if (!WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player) || event.getPos().getY() >= WORLDZERO_UNDERGROUND_MAX_Y) {
             return;
         }
 

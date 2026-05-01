@@ -118,10 +118,11 @@ public final class WorldZeroParalysisEvent {
 
         boolean conflictingEvent = worldzero$hasConflictingEvent(server);
         ParalysisSaveData saveData = worldzero$getSaveData(level);
+        long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
         if (!conflictingEvent
                 && !saveData.worldzero$completed
                 && saveData.worldzero$scheduledTick >= 0L
-                && level.getGameTime() >= saveData.worldzero$scheduledTick
+                && storyTicks >= saveData.worldzero$scheduledTick
                 && level.isNight()
                 && !WorldZeroAmbientSoundEvent.worldzero$isMajorEventStartBlocked(level)) {
             StartTarget target = worldzero$pickSleepingTarget(level);
@@ -231,7 +232,8 @@ public final class WorldZeroParalysisEvent {
             return;
         }
 
-        saveData.worldzero$scheduledTick = player.serverLevel().getGameTime() + WORLDZERO_DELAY_AFTER_FALL_TICKS;
+        saveData.worldzero$scheduledTick = WorldZeroStoryTime.worldzero$getStoryTicks(player.serverLevel())
+                + WORLDZERO_DELAY_AFTER_FALL_TICKS;
         saveData.setDirty();
     }
 

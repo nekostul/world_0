@@ -31,10 +31,10 @@ import java.util.WeakHashMap;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class WorldZeroFallEvent {
-    private static final long WORLDZERO_FALL_WINDOW_START_TICKS = 45L * 60L * 20L;
-    private static final long WORLDZERO_FALL_WINDOW_END_TICKS = 120L * 60L * 20L;
-    private static final long WORLDZERO_DELAY_AFTER_FREEZE_MIN_TICKS = 15L * 60L * 20L;
-    private static final long WORLDZERO_DELAY_AFTER_FREEZE_MAX_TICKS = 30L * 60L * 20L;
+    private static final long WORLDZERO_FALL_WINDOW_START_TICKS = 90L * 60L * 20L;
+    private static final long WORLDZERO_FALL_WINDOW_END_TICKS = 150L * 60L * 20L;
+    private static final long WORLDZERO_DELAY_AFTER_FREEZE_MIN_TICKS = 30L * 60L * 20L;
+    private static final long WORLDZERO_DELAY_AFTER_FREEZE_MAX_TICKS = 60L * 60L * 20L;
     private static final int WORLDZERO_FALL_FREEZE_TICKS = 5 * 20;
     private static final double WORLDZERO_BLACK_ECHO_FRONT_DISTANCE_BLOCKS = 3.0D;
     private static final int WORLDZERO_HOLE_RADIUS_BLOCKS = 1;
@@ -86,14 +86,18 @@ public final class WorldZeroFallEvent {
             return;
         }
 
+        long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
         if (saveData.worldzero$triggerTick < 0L) {
             long triggerSpan = WORLDZERO_FALL_WINDOW_END_TICKS - WORLDZERO_FALL_WINDOW_START_TICKS + 1L;
             saveData.worldzero$triggerTick = WORLDZERO_FALL_WINDOW_START_TICKS
                     + (long) (level.random.nextDouble() * triggerSpan);
             saveData.setDirty();
+        } else if (saveData.worldzero$triggerTick < WORLDZERO_FALL_WINDOW_START_TICKS) {
+            saveData.worldzero$triggerTick = WORLDZERO_FALL_WINDOW_START_TICKS;
+            saveData.setDirty();
         }
 
-        if (level.getGameTime() < saveData.worldzero$triggerTick || !level.isNight()) {
+        if (storyTicks < saveData.worldzero$triggerTick || !level.isNight()) {
             return;
         }
 
@@ -230,7 +234,11 @@ public final class WorldZeroFallEvent {
             return;
         }
 
-        saveData.worldzero$triggerTick = level.getGameTime() + worldzero$randomDelayAfterFreeze(level);
+        long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
+        saveData.worldzero$triggerTick = Math.max(
+                WORLDZERO_FALL_WINDOW_START_TICKS,
+                storyTicks + worldzero$randomDelayAfterFreeze(level)
+        );
         saveData.setDirty();
     }
 
@@ -375,7 +383,7 @@ public final class WorldZeroFallEvent {
     @Nullable
     private static ServerPlayer worldzero$pickRunningPlayer(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (!player.isAlive() || player.isSpectator()) {
+            if (!WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player)) {
                 continue;
             }
 

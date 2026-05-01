@@ -58,6 +58,7 @@ public final class WorldZeroEchoPhaseOneSpawner {
         boolean shouldTriggerRuleBreak = WorldZeroEchoRuleBreakState.shouldTriggerRuleBreak(level.getServer());
         boolean spawned = worldzero$trySpawnEcho(level, player, shouldTriggerRuleBreak);
         if (spawned) {
+            long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
             if (shouldTriggerRuleBreak) {
                 WorldZeroEchoRuleBreakState.recordRuleBreakAppearance(level.getServer());
             } else {
@@ -66,7 +67,7 @@ public final class WorldZeroEchoPhaseOneSpawner {
 
             WORLDZERO_NEXT_ALLOWED_SPAWN_TICK.put(
                     player.getUUID(),
-                    level.getGameTime() + worldzero$randomCooldown(level)
+                    storyTicks + worldzero$randomCooldown(level)
             );
         }
         return spawned;
@@ -84,9 +85,10 @@ public final class WorldZeroEchoPhaseOneSpawner {
 
         boolean spawned = worldzero$trySpawnEcho(level, player, true);
         if (spawned) {
+            long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
             WORLDZERO_NEXT_ALLOWED_SPAWN_TICK.put(
                     player.getUUID(),
-                    level.getGameTime() + worldzero$randomCooldown(level)
+                    storyTicks + worldzero$randomCooldown(level)
             );
         }
 
@@ -103,23 +105,23 @@ public final class WorldZeroEchoPhaseOneSpawner {
             return;
         }
 
-        if (!player.isAlive() || player.isSpectator()) {
+        if (!WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player)) {
             return;
         }
 
         ServerLevel level = player.serverLevel();
-        long gameTime = level.getGameTime();
+        long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
 
         long nextAllowedSpawn = WORLDZERO_NEXT_ALLOWED_SPAWN_TICK.computeIfAbsent(
                 player.getUUID(),
-                uuid -> gameTime + worldzero$randomCooldown(level)
+                uuid -> storyTicks + worldzero$randomCooldown(level)
         );
 
-        if (gameTime < nextAllowedSpawn) {
+        if (storyTicks < nextAllowedSpawn) {
             return;
         }
 
-        WORLDZERO_NEXT_ALLOWED_SPAWN_TICK.put(player.getUUID(), gameTime + worldzero$randomCooldown(level));
+        WORLDZERO_NEXT_ALLOWED_SPAWN_TICK.put(player.getUUID(), storyTicks + worldzero$randomCooldown(level));
 
         if (worldzero$hasActiveEcho(level.getServer())) {
             return;

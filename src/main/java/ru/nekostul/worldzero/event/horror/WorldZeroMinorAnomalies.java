@@ -727,7 +727,7 @@ public final class WorldZeroMinorAnomalies {
     private static ServerPlayer worldzero$pickTargetPlayer(ServerLevel level) {
         List<ServerPlayer> players = new ArrayList<>();
         for (ServerPlayer player : level.players()) {
-            if (worldzero$isValidPlayer(player)) {
+            if (WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player)) {
                 players.add(player);
             }
         }
@@ -765,23 +765,33 @@ public final class WorldZeroMinorAnomalies {
 
     private static MinorAnomalyType[] worldzero$candidatesForPhase(WorldZeroHorrorPhase phase) {
         return switch (phase) {
+            case EARLY -> new MinorAnomalyType[]{
+                    MinorAnomalyType.PERIPHERAL_ECHO,
+                    MinorAnomalyType.WHISPER
+            };
             case ACTIVE -> new MinorAnomalyType[]{
                     MinorAnomalyType.PERIPHERAL_ECHO,
-                    MinorAnomalyType.PHANTOM_STEPS,
+                    MinorAnomalyType.WHISPER
+            };
+            case RISING -> new MinorAnomalyType[]{
+                    MinorAnomalyType.PERIPHERAL_ECHO,
                     MinorAnomalyType.WHISPER,
-                    MinorAnomalyType.OBJECT_PRESENCE,
-                    MinorAnomalyType.LIGHT_ANOMALY,
                     MinorAnomalyType.WRONG_WIND
             };
-            case PEAK -> MinorAnomalyType.values();
-            case DECLINE -> new MinorAnomalyType[]{
+            case PEAK -> new MinorAnomalyType[]{
+                    MinorAnomalyType.PERIPHERAL_ECHO,
                     MinorAnomalyType.WHISPER,
                     MinorAnomalyType.WRONG_WIND,
                     MinorAnomalyType.SHADOW_DELAY,
                     MinorAnomalyType.ENTITY_BLACKOUT,
-                    MinorAnomalyType.BLOCK_BLINK,
-                    MinorAnomalyType.OBJECT_PRESENCE,
-                    MinorAnomalyType.PERIPHERAL_ECHO
+                    MinorAnomalyType.BLOCK_BLINK
+            };
+            case DECLINE -> new MinorAnomalyType[]{
+                    MinorAnomalyType.WHISPER,
+                    MinorAnomalyType.PERIPHERAL_ECHO,
+                    MinorAnomalyType.SHADOW_DELAY,
+                    MinorAnomalyType.ENTITY_BLACKOUT,
+                    MinorAnomalyType.BLOCK_BLINK
             };
             default -> new MinorAnomalyType[0];
         };

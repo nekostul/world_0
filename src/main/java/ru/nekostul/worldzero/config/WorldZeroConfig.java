@@ -50,16 +50,16 @@ public final class WorldZeroConfig {
                 .define("enabled", true);
         WORLDZERO_HOUSE_ACTIVE_START_MINUTES = builder
                 .comment("In-game minute when the repeating house event window starts.")
-                .defineInRange("active_start_minutes", 60, 1, 600);
+                .defineInRange("active_start_minutes", 90, 1, 600);
         WORLDZERO_HOUSE_ACTIVE_END_MINUTES = builder
                 .comment("In-game minute when the repeating house event window ends.")
-                .defineInRange("active_end_minutes", 120, 1, 600);
+                .defineInRange("active_end_minutes", 150, 1, 600);
         WORLDZERO_HOUSE_REAL_FIRE_MIN_MINUTES = builder
                 .comment("Earliest in-game minute for the final real house fire.")
-                .defineInRange("real_fire_min_minutes", 115, 1, 600);
+                .defineInRange("real_fire_min_minutes", 140, 1, 600);
         WORLDZERO_HOUSE_REAL_FIRE_MAX_MINUTES = builder
                 .comment("Latest in-game minute for the final real house fire.")
-                .defineInRange("real_fire_max_minutes", 120, 1, 600);
+                .defineInRange("real_fire_max_minutes", 150, 1, 600);
         WORLDZERO_HOUSE_INITIAL_DELAY_MIN_SECONDS = builder
                 .comment("First trigger delay minimum in seconds.")
                 .defineInRange("initial_delay_min_seconds", 1, 0, 60);

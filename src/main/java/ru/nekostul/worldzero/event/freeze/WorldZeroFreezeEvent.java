@@ -89,6 +89,7 @@ public final class WorldZeroFreezeEvent {
             return;
         }
 
+        long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
         if (saveData.worldzero$triggerTick < 0L) {
             long tickSpan = WORLDZERO_FREEZE_WINDOW_END_TICKS - WORLDZERO_FREEZE_WINDOW_START_TICKS + 1L;
             saveData.worldzero$triggerTick = WORLDZERO_FREEZE_WINDOW_START_TICKS
@@ -96,14 +97,13 @@ public final class WorldZeroFreezeEvent {
             saveData.setDirty();
         }
 
-        long gameTime = level.getGameTime();
         if (!state.worldzero$eventTriggered) {
-            if (gameTime > WORLDZERO_FREEZE_WINDOW_END_TICKS
+            if (storyTicks > WORLDZERO_FREEZE_WINDOW_END_TICKS
                     && saveData.worldzero$triggerTick <= WORLDZERO_FREEZE_WINDOW_END_TICKS) {
                 state.worldzero$eventTriggered = true;
                 saveData.worldzero$completed = true;
                 saveData.setDirty();
-            } else if (gameTime >= saveData.worldzero$triggerTick) {
+            } else if (storyTicks >= saveData.worldzero$triggerTick) {
                 if (worldzero$tryStartFreezeEvent(level, state, saveData)) {
                     state.worldzero$eventTriggered = true;
                 }
@@ -170,7 +170,7 @@ public final class WorldZeroFreezeEvent {
             return;
         }
 
-        saveData.worldzero$triggerTick = level.getGameTime() + worldzero$randomDelayAfterFall(level);
+        saveData.worldzero$triggerTick = WorldZeroStoryTime.worldzero$getStoryTicks(level) + worldzero$randomDelayAfterFall(level);
         saveData.setDirty();
     }
 
@@ -221,7 +221,7 @@ public final class WorldZeroFreezeEvent {
 
     private static ServerPlayer worldzero$pickTargetPlayer(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (player.isAlive() && !player.isSpectator() && worldzero$isPlayerOutside(player)) {
+            if (WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player) && worldzero$isPlayerOutside(player)) {
                 return player;
             }
         }

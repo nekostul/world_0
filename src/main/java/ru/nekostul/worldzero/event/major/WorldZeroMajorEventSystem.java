@@ -212,25 +212,28 @@ public final class WorldZeroMajorEventSystem {
 
     private static WorldZeroMajorEventType[] worldzero$candidatesForPhase(WorldZeroHorrorPhase phase) {
         return switch (phase) {
+            case EARLY -> new WorldZeroMajorEventType[]{
+                    WorldZeroMajorEventType.WATCHING
+            };
             case ACTIVE -> new WorldZeroMajorEventType[]{
-                    WorldZeroMajorEventType.WATCHING,
+                    WorldZeroMajorEventType.WATCHING
+            };
+            case RISING -> new WorldZeroMajorEventType[]{
                     WorldZeroMajorEventType.GROWTH,
+                    WorldZeroMajorEventType.STALKER,
                     WorldZeroMajorEventType.GLITCH_RAIN
             };
             case PEAK -> new WorldZeroMajorEventType[]{
-                    WorldZeroMajorEventType.WATCHING,
+                    WorldZeroMajorEventType.GROWTH,
                     WorldZeroMajorEventType.STALKER,
                     WorldZeroMajorEventType.VOID_CALL,
-                    WorldZeroMajorEventType.GROWTH,
-                    WorldZeroMajorEventType.SWARM,
                     WorldZeroMajorEventType.GLITCH_RAIN
             };
             case DECLINE -> new WorldZeroMajorEventType[]{
-                    WorldZeroMajorEventType.WATCHING,
                     WorldZeroMajorEventType.STALKER,
                     WorldZeroMajorEventType.VOID_CALL,
-                    WorldZeroMajorEventType.TIME_LOOP,
-                    WorldZeroMajorEventType.GLITCH_RAIN
+                    WorldZeroMajorEventType.SWARM,
+                    WorldZeroMajorEventType.TIME_LOOP
             };
             default -> new WorldZeroMajorEventType[0];
         };
@@ -243,7 +246,7 @@ public final class WorldZeroMajorEventSystem {
     private static ServerPlayer worldzero$pickTargetPlayer(ServerLevel level) {
         List<ServerPlayer> players = new ArrayList<>();
         for (ServerPlayer player : level.players()) {
-            if (player.isAlive() && !player.isSpectator()) {
+            if (WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player)) {
                 players.add(player);
             }
         }
@@ -287,9 +290,11 @@ public final class WorldZeroMajorEventSystem {
 
     private static long worldzero$randomCooldownTicks(ServerLevel level, WorldZeroHorrorPhase phase) {
         return switch (phase) {
-            case ACTIVE -> worldzero$randomTicks(level, 20, 40);
-            case PEAK -> worldzero$randomTicks(level, 14, 25);
-            case DECLINE -> worldzero$randomTicks(level, 20, 35);
+            case EARLY -> worldzero$randomTicks(level, 24, 35);
+            case ACTIVE -> worldzero$randomTicks(level, 22, 32);
+            case RISING -> worldzero$randomTicks(level, 20, 28);
+            case PEAK -> worldzero$randomTicks(level, 18, 24);
+            case DECLINE -> worldzero$randomTicks(level, 16, 22);
             default -> worldzero$randomTicks(level, 25, 40);
         };
     }

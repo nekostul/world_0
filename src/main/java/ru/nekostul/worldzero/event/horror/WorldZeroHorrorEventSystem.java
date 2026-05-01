@@ -23,7 +23,9 @@ import java.util.WeakHashMap;
 public final class WorldZeroHorrorEventSystem {
     private static final long WORLDZERO_TICKS_PER_MINUTE = 60L * 20L;
     private static final long WORLDZERO_FIRST_END_TICKS = 30L * WORLDZERO_TICKS_PER_MINUTE;
+    private static final long WORLDZERO_EARLY_END_TICKS = 60L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_ACTIVE_END_TICKS = 90L * WORLDZERO_TICKS_PER_MINUTE;
+    private static final long WORLDZERO_RISING_END_TICKS = 120L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_PEAK_END_TICKS = 150L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_RETRY_COOLDOWN_TICKS = 20L * 20L;
     private static final long WORLDZERO_SAVE_DIRTY_INTERVAL_TICKS = 20L * 20L;
@@ -54,7 +56,10 @@ public final class WorldZeroHorrorEventSystem {
         }
 
         HorrorSaveData saveData = worldzero$getSaveData(level);
-        saveData.worldzero$worldTicks++;
+        long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
+        if (saveData.worldzero$worldTicks != storyTicks) {
+            saveData.worldzero$worldTicks = storyTicks;
+        }
         if (saveData.worldzero$worldTicks % WORLDZERO_SAVE_DIRTY_INTERVAL_TICKS == 0L) {
             saveData.setDirty();
         }
@@ -259,8 +264,14 @@ public final class WorldZeroHorrorEventSystem {
         if (worldTicks < WORLDZERO_FIRST_END_TICKS) {
             return WorldZeroHorrorPhase.FIRST;
         }
+        if (worldTicks < WORLDZERO_EARLY_END_TICKS) {
+            return WorldZeroHorrorPhase.EARLY;
+        }
         if (worldTicks < WORLDZERO_ACTIVE_END_TICKS) {
             return WorldZeroHorrorPhase.ACTIVE;
+        }
+        if (worldTicks < WORLDZERO_RISING_END_TICKS) {
+            return WorldZeroHorrorPhase.RISING;
         }
         if (worldTicks < WORLDZERO_PEAK_END_TICKS) {
             return WorldZeroHorrorPhase.PEAK;
@@ -313,9 +324,11 @@ public final class WorldZeroHorrorEventSystem {
 
     private static long worldzero$randomCooldownTicks(ServerLevel level, WorldZeroHorrorPhase phase) {
         return switch (phase) {
-            case ACTIVE -> worldzero$randomTicks(level, 5, 9);
-            case PEAK -> worldzero$randomTicks(level, 5, 7);
-            case DECLINE -> worldzero$randomTicks(level, 8, 15);
+            case EARLY -> worldzero$randomTicks(level, 12, 18);
+            case ACTIVE -> worldzero$randomTicks(level, 10, 16);
+            case RISING -> worldzero$randomTicks(level, 8, 12);
+            case PEAK -> worldzero$randomTicks(level, 7, 10);
+            case DECLINE -> worldzero$randomTicks(level, 9, 13);
             default -> worldzero$randomTicks(level, 10, 15);
         };
     }

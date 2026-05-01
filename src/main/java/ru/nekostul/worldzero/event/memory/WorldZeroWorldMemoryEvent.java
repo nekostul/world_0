@@ -47,24 +47,24 @@ public final class WorldZeroWorldMemoryEvent {
     private static final String WORLDZERO_SAVE_ID = "worldzero_world_memory";
 
     private static final long WORLDZERO_DORMANT_END_TICKS = 30L * 60L * 20L;
-    private static final long WORLDZERO_FIRST_END_TICKS = 60L * 60L * 20L;
-    private static final long WORLDZERO_ACTIVE_END_TICKS = 120L * 60L * 20L;
+    private static final long WORLDZERO_FIRST_END_TICKS = 90L * 60L * 20L;
+    private static final long WORLDZERO_ACTIVE_END_TICKS = 150L * 60L * 20L;
     private static final long WORLDZERO_PEAK_END_TICKS = 180L * 60L * 20L;
 
-    private static final long WORLDZERO_FIRST_RETRY_MIN_TICKS = 2L * 60L * 20L;
-    private static final long WORLDZERO_FIRST_RETRY_MAX_TICKS = 5L * 60L * 20L;
-    private static final long WORLDZERO_ACTIVE_DELAY_MIN_TICKS = 9L * 60L * 20L;
-    private static final long WORLDZERO_ACTIVE_DELAY_MAX_TICKS = 18L * 60L * 20L;
-    private static final long WORLDZERO_ACTIVE_RETRY_MIN_TICKS = 3L * 60L * 20L;
-    private static final long WORLDZERO_ACTIVE_RETRY_MAX_TICKS = 6L * 60L * 20L;
-    private static final long WORLDZERO_PEAK_DELAY_MIN_TICKS = 6L * 60L * 20L;
-    private static final long WORLDZERO_PEAK_DELAY_MAX_TICKS = 12L * 60L * 20L;
-    private static final long WORLDZERO_PEAK_RETRY_MIN_TICKS = 2L * 60L * 20L;
-    private static final long WORLDZERO_PEAK_RETRY_MAX_TICKS = 5L * 60L * 20L;
-    private static final long WORLDZERO_DECLINE_DELAY_MIN_TICKS = 20L * 60L * 20L;
+    private static final long WORLDZERO_FIRST_RETRY_MIN_TICKS = 4L * 60L * 20L;
+    private static final long WORLDZERO_FIRST_RETRY_MAX_TICKS = 8L * 60L * 20L;
+    private static final long WORLDZERO_ACTIVE_DELAY_MIN_TICKS = 12L * 60L * 20L;
+    private static final long WORLDZERO_ACTIVE_DELAY_MAX_TICKS = 24L * 60L * 20L;
+    private static final long WORLDZERO_ACTIVE_RETRY_MIN_TICKS = 4L * 60L * 20L;
+    private static final long WORLDZERO_ACTIVE_RETRY_MAX_TICKS = 8L * 60L * 20L;
+    private static final long WORLDZERO_PEAK_DELAY_MIN_TICKS = 20L * 60L * 20L;
+    private static final long WORLDZERO_PEAK_DELAY_MAX_TICKS = 35L * 60L * 20L;
+    private static final long WORLDZERO_PEAK_RETRY_MIN_TICKS = 8L * 60L * 20L;
+    private static final long WORLDZERO_PEAK_RETRY_MAX_TICKS = 12L * 60L * 20L;
+    private static final long WORLDZERO_DECLINE_DELAY_MIN_TICKS = 25L * 60L * 20L;
     private static final long WORLDZERO_DECLINE_DELAY_MAX_TICKS = 40L * 60L * 20L;
-    private static final long WORLDZERO_DECLINE_RETRY_MIN_TICKS = 6L * 60L * 20L;
-    private static final long WORLDZERO_DECLINE_RETRY_MAX_TICKS = 12L * 60L * 20L;
+    private static final long WORLDZERO_DECLINE_RETRY_MIN_TICKS = 10L * 60L * 20L;
+    private static final long WORLDZERO_DECLINE_RETRY_MAX_TICKS = 15L * 60L * 20L;
 
     private static final long WORLDZERO_HOUSE_SCAN_INTERVAL_TICKS = 5L * 20L;
     private static final long WORLDZERO_HOUSE_MEMORY_TICKS = 3L * 60L * 20L;
@@ -74,7 +74,7 @@ public final class WorldZeroWorldMemoryEvent {
     private static final double WORLDZERO_HOUSE_PROXIMITY_BLOCKS = 12.0D;
     private static final double WORLDZERO_PLAYER_MIN_DISTANCE_TO_TARGET_BLOCKS = 1.75D;
     private static final double WORLDZERO_WATCH_DOT = 0.35D;
-    private static final double WORLDZERO_PEAK_DOUBLE_CHANGE_CHANCE = 0.18D;
+    private static final double WORLDZERO_ACTIVE_DOUBLE_CHANGE_CHANCE = 0.12D;
 
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SERVER_STATES = new WeakHashMap<>();
 
@@ -129,11 +129,25 @@ public final class WorldZeroWorldMemoryEvent {
         worldzero$closeSilentChestIfNeeded(player.serverLevel(), playerState);
 
         long gameTime = player.serverLevel().getGameTime();
-        long playTimeTicks = ++playerState.worldzero$elapsedPlayTicks;
         boolean shouldPersistPlayTime = gameTime - playerState.worldzero$lastPlayTimeSaveGameTick
                 >= WORLDZERO_PLAYTIME_SAVE_INTERVAL_TICKS;
+        if (!WorldZeroStoryTime.worldzero$countsTowardStoryTime(player)) {
+            if (shouldPersistPlayTime) {
+                worldzero$savePersistentPlayerState(player.serverLevel(), player.getUUID(), playerState);
+            }
+            return;
+        }
+
+        long playTimeTicks = ++playerState.worldzero$elapsedPlayTicks;
 
         if (worldzero$hasConflictingEvent(server)) {
+            if (shouldPersistPlayTime) {
+                worldzero$savePersistentPlayerState(player.serverLevel(), player.getUUID(), playerState);
+            }
+            return;
+        }
+
+        if (!WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player)) {
             if (shouldPersistPlayTime) {
                 worldzero$savePersistentPlayerState(player.serverLevel(), player.getUUID(), playerState);
             }
@@ -175,7 +189,7 @@ public final class WorldZeroWorldMemoryEvent {
             return;
         }
 
-        int maxChanges = phase == Phase.PEAK && player.serverLevel().random.nextDouble() < WORLDZERO_PEAK_DOUBLE_CHANGE_CHANCE
+        int maxChanges = phase == Phase.ACTIVE && player.serverLevel().random.nextDouble() < WORLDZERO_ACTIVE_DOUBLE_CHANGE_CHANCE
                 ? 2
                 : 1;
         int changes = worldzero$triggerAnomalies(player.serverLevel(), player, playerState, house, phase, maxChanges);
@@ -280,7 +294,7 @@ public final class WorldZeroWorldMemoryEvent {
     }
 
     private static long worldzero$scheduleFirstManifestationTick(ServerLevel level, long playTimeTicks) {
-        long earliest = Math.max(playTimeTicks + 2L * 60L * 20L, WORLDZERO_DORMANT_END_TICKS + 4L * 60L * 20L);
+        long earliest = Math.max(playTimeTicks + 4L * 60L * 20L, WORLDZERO_DORMANT_END_TICKS + 4L * 60L * 20L);
         long latest = WORLDZERO_FIRST_END_TICKS - 2L * 60L * 20L;
         if (earliest >= latest) {
             return earliest;
@@ -371,6 +385,9 @@ public final class WorldZeroWorldMemoryEvent {
         List<AnomalyKind> availableKinds = new ArrayList<>();
         if (phase == Phase.FIRST) {
             availableKinds.add(AnomalyKind.DOOR_OPEN);
+        } else if (phase == Phase.PEAK) {
+            availableKinds.add(AnomalyKind.DOOR_OPEN);
+            availableKinds.add(AnomalyKind.CHEST_OPEN);
         } else {
             availableKinds.add(AnomalyKind.DOOR_OPEN);
             availableKinds.add(AnomalyKind.CHEST_OPEN);

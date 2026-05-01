@@ -110,13 +110,14 @@ public final class WorldZeroFootstepsEvent {
             return;
         }
 
+        long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
         if (saveData.worldzero$triggerTick < 0L) {
             long span = WORLDZERO_TRIGGER_MAX_TICKS - WORLDZERO_TRIGGER_MIN_TICKS + 1L;
             saveData.worldzero$triggerTick = WORLDZERO_TRIGGER_MIN_TICKS + (long) (level.random.nextDouble() * span);
             saveData.setDirty();
         }
 
-        if (level.getGameTime() < saveData.worldzero$triggerTick || !level.isNight()) {
+        if (storyTicks < saveData.worldzero$triggerTick || !level.isNight()) {
             return;
         }
 
@@ -383,7 +384,7 @@ public final class WorldZeroFootstepsEvent {
     @Nullable
     private static StartTarget worldzero$pickEligiblePlayer(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (!player.isAlive() || player.isSpectator()) {
+            if (!WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player)) {
                 continue;
             }
 

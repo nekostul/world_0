@@ -88,6 +88,7 @@ public final class WorldZeroHouseEvent {
         worldzero$loadPersistentPlayerState(player.serverLevel(), player.getUUID(), playerState);
 
         long gameTime = player.serverLevel().getGameTime();
+        long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(player.serverLevel());
         worldzero$ensureHouseTimeline(player.serverLevel(), player.getUUID(), playerState);
         if (playerState.worldzero$realFireTriggered) {
             if (playerState.worldzero$bedrockActive) {
@@ -96,7 +97,7 @@ public final class WorldZeroHouseEvent {
             return;
         }
 
-        if (gameTime < WorldZeroConfig.worldzero$houseActiveStartTick()) {
+        if (storyTicks < WorldZeroConfig.worldzero$houseActiveStartTick()) {
             return;
         }
 
@@ -107,7 +108,7 @@ public final class WorldZeroHouseEvent {
                 return;
             }
 
-            if (gameTime >= playerState.worldzero$finalRealFireTick
+            if (storyTicks >= playerState.worldzero$finalRealFireTick
                     && worldzero$igniteRealHouseFire(player, playerState, playerState.worldzero$activeHouse)) {
                 return;
             }
@@ -184,8 +185,8 @@ public final class WorldZeroHouseEvent {
         boolean insideTriggerBand = distanceToHouse >= playerState.worldzero$triggerBandMin
                 && distanceToHouse <= playerState.worldzero$triggerBandMax;
 
-        if (gameTime >= playerState.worldzero$finalRealFireTick) {
-            if (insideTriggerBand) {
+        if (storyTicks >= playerState.worldzero$finalRealFireTick) {
+            if (insideTriggerBand && WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player)) {
                 worldzero$igniteRealHouseFire(player, playerState, detectedHouse);
                 playerState.worldzero$armedForApproach = false;
             }
@@ -195,10 +196,11 @@ public final class WorldZeroHouseEvent {
 
         if (!playerState.worldzero$wasInsideTriggerBand
                 && insideTriggerBand
-                && gameTime >= playerState.worldzero$nextScheduledVisualTick) {
+                && storyTicks >= playerState.worldzero$nextScheduledVisualTick
+                && WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player)) {
             playerState.worldzero$armedForApproach = false;
             if (worldzero$activateBedrockScene(player, playerState, detectedHouse, false)) {
-                playerState.worldzero$nextScheduledVisualTick = gameTime
+                playerState.worldzero$nextScheduledVisualTick = storyTicks
                         + worldzero$randomVisualRepeatTicks(player.serverLevel());
                 worldzero$savePersistentPlayerState(player.serverLevel(), player.getUUID(), playerState);
             }
@@ -596,9 +598,10 @@ public final class WorldZeroHouseEvent {
             changed = true;
         }
 
-        if (playerState.worldzero$finalRealFireTick < 0L) {
-            long minTick = WorldZeroConfig.worldzero$houseRealFireMinTick();
-            long maxTick = WorldZeroConfig.worldzero$houseRealFireMaxTick();
+        long minTick = WorldZeroConfig.worldzero$houseRealFireMinTick();
+        long maxTick = WorldZeroConfig.worldzero$houseRealFireMaxTick();
+        if (playerState.worldzero$finalRealFireTick < minTick
+                || playerState.worldzero$finalRealFireTick > maxTick) {
             long span = Math.max(0L, maxTick - minTick);
             playerState.worldzero$finalRealFireTick = minTick
                     + (long) Math.floor(level.random.nextDouble() * (double) (span + 1L));

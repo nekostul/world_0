@@ -45,7 +45,11 @@ public final class WorldZeroFreezeClientController {
         }
 
         worldzero$freezeActive = true;
-        worldzero$fallbackTicksRemaining = durationTicks > 0 ? durationTicks : WORLDZERO_FREEZE_FALLBACK_TICKS;
+        // The server now owns the real freeze lifetime. Keep the client frozen
+        // until an explicit end packet arrives; this timer is only a failsafe.
+        worldzero$fallbackTicksRemaining = durationTicks > 0
+                ? durationTicks + WORLDZERO_FREEZE_FALLBACK_TICKS
+                : WORLDZERO_FREEZE_FALLBACK_TICKS;
         worldzero$capturedPlayerState = false;
         worldzero$focusEntityId = focusEntityId;
         worldzero$forcedYaw = forcedYaw;
@@ -71,8 +75,16 @@ public final class WorldZeroFreezeClientController {
         }
 
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft == null || minecraft.player == null || minecraft.level == null) {
+        if (minecraft == null) {
             worldzero$clearState();
+            return;
+        }
+
+        if (minecraft.player == null || minecraft.level == null) {
+            worldzero$fallbackTicksRemaining--;
+            if (worldzero$fallbackTicksRemaining <= 0) {
+                worldzero$clearState();
+            }
             return;
         }
 

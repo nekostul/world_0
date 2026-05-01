@@ -29,10 +29,13 @@ import net.minecraftforge.fml.common.Mod;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
 
@@ -48,6 +51,8 @@ public final class WorldZeroLastBlockEvent {
     private static final long WORLDZERO_COOLDOWN_MIN_TICKS = 5L * 60L * 20L;
     private static final long WORLDZERO_COOLDOWN_MAX_TICKS = 12L * 60L * 20L;
     private static final double WORLDZERO_DEBUG_TRACE_DISTANCE_BLOCKS = 6.0D;
+    private static final int WORLDZERO_CLOSED_MINE_SCAN_RADIUS_BLOCKS = 6;
+    private static final int WORLDZERO_CLOSED_MINE_MAX_OPEN_COLUMNS = 42;
     private static final AABB WORLDZERO_ENTITY_SCAN_AABB = new AABB(
             -30_000_000.0D,
             -2_048.0D,
@@ -322,6 +327,10 @@ public final class WorldZeroLastBlockEvent {
             return false;
         }
 
+        if (!worldzero$isClosedMine(level, spawnPlan.worldzero$spawnPos, spawnPlan.worldzero$requiresCarve)) {
+            return false;
+        }
+
         if (spawnPlan.worldzero$requiresCarve && !worldzero$carveSpawnColumn(level, spawnPlan.worldzero$spawnPos)) {
             return false;
         }
@@ -442,6 +451,67 @@ public final class WorldZeroLastBlockEvent {
 
     private static boolean worldzero$isCarvableMineBlock(BlockState state) {
         return state.isAir() || (state.getFluidState().isEmpty() && worldzero$isMineBlock(state));
+    }
+
+    private static boolean worldzero$isClosedMine(ServerLevel level, BlockPos origin, boolean simulateOriginCarve) {
+        if (!worldzero$isOpenMineColumn(level, origin, origin, simulateOriginCarve)) {
+            return false;
+        }
+
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        Set<Long> visited = new HashSet<>();
+        queue.add(origin);
+        visited.add(origin.asLong());
+        int openColumns = 0;
+
+        while (!queue.isEmpty()) {
+            BlockPos current = queue.removeFirst();
+            openColumns++;
+            if (openColumns > WORLDZERO_CLOSED_MINE_MAX_OPEN_COLUMNS) {
+                return false;
+            }
+
+            for (Direction direction : Direction.Plane.HORIZONTAL) {
+                BlockPos next = current.relative(direction);
+                if (Math.abs(next.getX() - origin.getX()) > WORLDZERO_CLOSED_MINE_SCAN_RADIUS_BLOCKS
+                        || Math.abs(next.getZ() - origin.getZ()) > WORLDZERO_CLOSED_MINE_SCAN_RADIUS_BLOCKS) {
+                    continue;
+                }
+
+                if (!visited.add(next.asLong())
+                        || !worldzero$isOpenMineColumn(level, next, origin, simulateOriginCarve)) {
+                    continue;
+                }
+
+                queue.addLast(next);
+            }
+        }
+
+        return true;
+    }
+
+    private static boolean worldzero$isOpenMineColumn(
+            ServerLevel level,
+            BlockPos pos,
+            BlockPos simulatedOrigin,
+            boolean simulateOriginCarve
+    ) {
+        return worldzero$isMineColumnPassable(level, pos, simulatedOrigin, simulateOriginCarve)
+                && worldzero$isMineColumnPassable(level, pos.above(), simulatedOrigin, simulateOriginCarve);
+    }
+
+    private static boolean worldzero$isMineColumnPassable(
+            ServerLevel level,
+            BlockPos pos,
+            BlockPos simulatedOrigin,
+            boolean simulateOriginCarve
+    ) {
+        if (simulateOriginCarve && (pos.equals(simulatedOrigin) || pos.equals(simulatedOrigin.above()))) {
+            return true;
+        }
+
+        BlockState state = level.getBlockState(pos);
+        return state.isAir() && state.getFluidState().isEmpty();
     }
 
     private static List<Direction> worldzero$buildBreakDirectionOrder(ServerPlayer player, BlockPos brokenPos) {

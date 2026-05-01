@@ -190,6 +190,7 @@ public final class WorldZeroFallEvent {
         }
 
         WorldZeroNetwork.sendFallClientAction(player, WorldZeroFallClientPacket.WORLDZERO_ACTION_CLEAR);
+        WorldZeroHorrorEventSystem.worldzero$scheduleWrongWindAfterFall(player.serverLevel());
         WorldZeroParalysisEvent.worldzero$scheduleAfterFall(player);
         worldzero$clearState(server, state);
     }

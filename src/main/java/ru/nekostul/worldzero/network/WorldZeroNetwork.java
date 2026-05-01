@@ -164,6 +164,7 @@ public final class WorldZeroNetwork {
             float forcedYaw,
             float forcedPitch
     ) {
+        WorldZeroServerFreezeController.worldzero$startFreeze(player, durationTicks, forcedYaw, forcedPitch);
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new WorldZeroFreezeStartPacket(durationTicks, focusEntityId, forcedYaw, forcedPitch)
@@ -171,6 +172,7 @@ public final class WorldZeroNetwork {
     }
 
     public static void sendFreezeEnd(ServerPlayer player) {
+        WorldZeroServerFreezeController.worldzero$stopFreeze(player);
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new WorldZeroFreezeEndPacket()

@@ -746,7 +746,12 @@ public final class WorldZeroMinorAnomalies {
     private static boolean worldzero$isPlayerOutside(ServerLevel level, ServerPlayer player) {
         BlockPos feetPos = player.blockPosition();
         BlockPos eyePos = BlockPos.containing(player.getEyePosition());
-        return level.canSeeSky(feetPos) && level.canSeeSky(eyePos);
+        FluidState feetFluid = level.getFluidState(feetPos);
+        FluidState eyeFluid = level.getFluidState(eyePos);
+        return level.canSeeSky(feetPos)
+                && level.canSeeSky(eyePos)
+                && feetFluid.isEmpty()
+                && eyeFluid.isEmpty();
     }
 
     private static boolean worldzero$isLookingTowardSource(ServerPlayer player, Vec3 source, double dotThreshold) {

@@ -193,6 +193,10 @@ public final class WorldZeroFreezeEvent {
             ServerPlayer targetPlayer,
             @javax.annotation.Nullable FreezeSaveData saveData
     ) {
+        if (!worldzero$isPlayerOutside(targetPlayer)) {
+            return false;
+        }
+
         state.worldzero$eventActive = true;
         state.worldzero$eventTriggered = true;
         state.worldzero$freezeEndTick = level.getGameTime() + WORLDZERO_FREEZE_DURATION_TICKS;
@@ -217,12 +221,21 @@ public final class WorldZeroFreezeEvent {
 
     private static ServerPlayer worldzero$pickTargetPlayer(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (player.isAlive() && !player.isSpectator()) {
+            if (player.isAlive() && !player.isSpectator() && worldzero$isPlayerOutside(player)) {
                 return player;
             }
         }
 
         return null;
+    }
+
+    private static boolean worldzero$isPlayerOutside(ServerPlayer player) {
+        ServerLevel level = player.serverLevel();
+        BlockPos feetPos = player.blockPosition();
+        BlockPos eyePos = BlockPos.containing(player.getEyePosition());
+        return level.canSeeSky(feetPos)
+                && level.canSeeSky(eyePos)
+                && WorldZeroHouseDetector.worldzero$findContainingHouse(player) == null;
     }
 
     private static void worldzero$applyFreeze(MinecraftServer server, SessionState state) {

@@ -13,6 +13,9 @@ import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
@@ -24,6 +27,8 @@ public final class WorldZeroHorrorEventSystem {
     private static final long WORLDZERO_PEAK_END_TICKS = 150L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_RETRY_COOLDOWN_TICKS = 20L * 20L;
     private static final long WORLDZERO_SAVE_DIRTY_INTERVAL_TICKS = 20L * 20L;
+    private static final int WORLDZERO_WRONG_WIND_AFTER_FALL_MIN_MINUTES = 15;
+    private static final int WORLDZERO_WRONG_WIND_AFTER_FALL_MAX_MINUTES = 30;
     private static final String WORLDZERO_SAVE_ID = "worldzero_horror_event_system";
     private static final AABB WORLDZERO_ENTITY_SCAN_AABB = new AABB(
             -30_000_000.0D,
@@ -82,6 +87,32 @@ public final class WorldZeroHorrorEventSystem {
         }
         state.worldzero$activeUntilWorldTick = -1L;
 
+        if (saveData.worldzero$scheduledWrongWindTick >= 0L
+                && worldTicks >= saveData.worldzero$scheduledWrongWindTick) {
+            if (state.worldzero$scheduledWrongWindRetryTicks > 0L) {
+                state.worldzero$scheduledWrongWindRetryTicks--;
+                return;
+            }
+
+            if (worldzero$hasConflictingEvent(server) || worldzero$hasActiveEcho(server)) {
+                return;
+            }
+
+            WorldZeroMinorAnomalies.TriggerResult scheduledWrongWind = worldzero$tryTriggerScheduledWrongWind(level, worldTicks);
+            if (scheduledWrongWind == null) {
+                state.worldzero$scheduledWrongWindRetryTicks = WORLDZERO_RETRY_COOLDOWN_TICKS;
+                return;
+            }
+
+            saveData.worldzero$wrongWindTriggered = true;
+            saveData.worldzero$scheduledWrongWindTick = -1L;
+            saveData.setDirty();
+            state.worldzero$scheduledWrongWindRetryTicks = 0L;
+            state.worldzero$activeUntilWorldTick = worldTicks + scheduledWrongWind.worldzero$durationTicks();
+            state.worldzero$cooldownTicks = worldzero$randomCooldownTicks(level, phase);
+            return;
+        }
+
         if (state.worldzero$cooldownTicks > 0L) {
             state.worldzero$cooldownTicks--;
             return;
@@ -96,7 +127,7 @@ public final class WorldZeroHorrorEventSystem {
                 level,
                 phase,
                 worldTicks,
-                !saveData.worldzero$wrongWindTriggered
+                !saveData.worldzero$wrongWindTriggered && saveData.worldzero$scheduledWrongWindTick < 0L
         );
         if (!result.worldzero$triggered()) {
             state.worldzero$cooldownTicks = WORLDZERO_RETRY_COOLDOWN_TICKS;
@@ -105,6 +136,7 @@ public final class WorldZeroHorrorEventSystem {
 
         if (result.worldzero$type() == WorldZeroMinorAnomalies.MinorAnomalyType.WRONG_WIND) {
             saveData.worldzero$wrongWindTriggered = true;
+            saveData.worldzero$scheduledWrongWindTick = -1L;
             saveData.setDirty();
         }
         state.worldzero$activeUntilWorldTick = worldTicks + result.worldzero$durationTicks();
@@ -151,10 +183,37 @@ public final class WorldZeroHorrorEventSystem {
             return false;
         }
 
+        if (anomalyType == WorldZeroMinorAnomalies.MinorAnomalyType.WRONG_WIND) {
+            saveData.worldzero$wrongWindTriggered = true;
+            saveData.worldzero$scheduledWrongWindTick = -1L;
+            saveData.setDirty();
+        }
         state.worldzero$activeUntilWorldTick = worldTicks + result.worldzero$durationTicks();
         state.worldzero$debugForcedActive = true;
         state.worldzero$cooldownTicks = Math.max(state.worldzero$cooldownTicks, WORLDZERO_RETRY_COOLDOWN_TICKS);
         return true;
+    }
+
+    public static void worldzero$scheduleWrongWindAfterFall(ServerLevel level) {
+        if (level == null || level.isClientSide() || level.dimension() != Level.OVERWORLD) {
+            return;
+        }
+
+        HorrorSaveData saveData = worldzero$getSaveData(level);
+        if (saveData.worldzero$wrongWindTriggered) {
+            return;
+        }
+
+        saveData.worldzero$scheduledWrongWindTick = saveData.worldzero$worldTicks
+                + worldzero$randomTicks(
+                level,
+                WORLDZERO_WRONG_WIND_AFTER_FALL_MIN_MINUTES,
+                WORLDZERO_WRONG_WIND_AFTER_FALL_MAX_MINUTES
+        );
+        saveData.setDirty();
+
+        SessionState state = WORLDZERO_SESSION_STATES.computeIfAbsent(level.getServer(), ignored -> new SessionState());
+        state.worldzero$scheduledWrongWindRetryTicks = 0L;
     }
 
     public static long worldzero$getWorldTicks(ServerLevel level) {
@@ -261,6 +320,33 @@ public final class WorldZeroHorrorEventSystem {
         };
     }
 
+    @Nullable
+    private static WorldZeroMinorAnomalies.TriggerResult worldzero$tryTriggerScheduledWrongWind(
+            ServerLevel level,
+            long worldTicks
+    ) {
+        List<ServerPlayer> players = new ArrayList<>(level.players());
+        if (players.isEmpty()) {
+            return null;
+        }
+
+        int offset = level.random.nextInt(players.size());
+        for (int index = 0; index < players.size(); index++) {
+            ServerPlayer player = players.get((offset + index) % players.size());
+            WorldZeroMinorAnomalies.TriggerResult result = WorldZeroMinorAnomalies.worldzero$trigger(
+                    level,
+                    player,
+                    WorldZeroMinorAnomalies.MinorAnomalyType.WRONG_WIND,
+                    worldTicks
+            );
+            if (result.worldzero$triggered()) {
+                return result;
+            }
+        }
+
+        return null;
+    }
+
     private static long worldzero$randomTicks(ServerLevel level, int minMinutes, int maxMinutes) {
         int minutes = Mth.nextInt(level.random, minMinutes, maxMinutes);
         return minutes * WORLDZERO_TICKS_PER_MINUTE;
@@ -273,17 +359,22 @@ public final class WorldZeroHorrorEventSystem {
     private static final class SessionState {
         private long worldzero$cooldownTicks;
         private long worldzero$activeUntilWorldTick = -1L;
+        private long worldzero$scheduledWrongWindRetryTicks;
         private boolean worldzero$debugForcedActive;
     }
 
     private static final class HorrorSaveData extends SavedData {
         private long worldzero$worldTicks;
         private boolean worldzero$wrongWindTriggered;
+        private long worldzero$scheduledWrongWindTick = -1L;
 
         private static HorrorSaveData load(CompoundTag tag) {
             HorrorSaveData saveData = new HorrorSaveData();
             saveData.worldzero$worldTicks = Math.max(0L, tag.getLong("world_ticks"));
             saveData.worldzero$wrongWindTriggered = tag.getBoolean("wrong_wind_triggered");
+            saveData.worldzero$scheduledWrongWindTick = tag.contains("scheduled_wrong_wind_tick")
+                    ? tag.getLong("scheduled_wrong_wind_tick")
+                    : -1L;
             return saveData;
         }
 
@@ -291,6 +382,7 @@ public final class WorldZeroHorrorEventSystem {
         public CompoundTag save(CompoundTag tag) {
             tag.putLong("world_ticks", this.worldzero$worldTicks);
             tag.putBoolean("wrong_wind_triggered", this.worldzero$wrongWindTriggered);
+            tag.putLong("scheduled_wrong_wind_tick", this.worldzero$scheduledWrongWindTick);
             return tag;
         }
     }

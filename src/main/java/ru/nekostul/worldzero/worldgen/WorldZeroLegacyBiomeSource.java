@@ -18,7 +18,7 @@ import net.minecraft.world.level.levelgen.synth.PerlinNoise;
 import java.util.List;
 import java.util.stream.Stream;
 
-public final class gWorldZeroLegacyBiomeSource extends BiomeSource {
+public final class WorldZeroLegacyBiomeSource extends BiomeSource {
     public static final Codec<WorldZeroLegacyBiomeSource> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.LONG.fieldOf("seed").forGetter(WorldZeroLegacyBiomeSource::worldzero$getSeed),
             RegistryOps.retrieveGetter(Registries.BIOME)

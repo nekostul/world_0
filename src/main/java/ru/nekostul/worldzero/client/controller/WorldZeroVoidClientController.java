@@ -7,6 +7,7 @@ import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -32,6 +33,16 @@ public final class WorldZeroVoidClientController {
         return worldzero$keyboardBlockTicksRemaining > 0;
     }
 
+    public static boolean worldzero$isPauseBlocked() {
+        Minecraft minecraft = Minecraft.getInstance();
+        return minecraft != null
+                && minecraft.player != null
+                && minecraft.level != null
+                && minecraft.level.dimension() == WorldZeroVoidDimension.WORLDZERO_VOID_LEVEL
+                && worldzero$keyboardBlockTicksRemaining > 0
+                && !worldzero$isDevInVoid(minecraft);
+    }
+
     public static void worldzero$handleChatLine(String speaker, String messageKey) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.gui == null || speaker.isBlank() || messageKey.isBlank()) {
@@ -55,6 +66,15 @@ public final class WorldZeroVoidClientController {
     }
 
     @SubscribeEvent
+    public static void worldzero$onScreenOpening(ScreenEvent.Opening event) {
+        if (worldzero$isPauseBlocked()
+                && event.getNewScreen() != null
+                && event.getNewScreen().isPauseScreen()) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
     public static void worldzero$onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END || worldzero$keyboardBlockTicksRemaining <= 0) {
             return;
@@ -64,6 +84,18 @@ public final class WorldZeroVoidClientController {
         if (minecraft == null || minecraft.player == null) {
             worldzero$keyboardBlockTicksRemaining = 0;
             return;
+        }
+
+        if (worldzero$isPauseBlocked()) {
+            boolean closedPauseScreen = false;
+            if (minecraft.screen != null && minecraft.screen.isPauseScreen()) {
+                minecraft.setScreen(null);
+                closedPauseScreen = true;
+            }
+
+            if ((closedPauseScreen || minecraft.screen == null) && !minecraft.mouseHandler.isMouseGrabbed()) {
+                minecraft.mouseHandler.grabMouse();
+            }
         }
 
         if (!worldzero$isDevInVoid(minecraft)) {

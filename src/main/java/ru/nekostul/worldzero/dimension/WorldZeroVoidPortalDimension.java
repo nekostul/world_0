@@ -53,6 +53,9 @@ public final class WorldZeroVoidPortalDimension {
     private static final int WORLDZERO_FLOOR_Y = 64;
     private static final int WORLDZERO_PLAYER_Y = WORLDZERO_FLOOR_Y + 1;
     private static final int WORLDZERO_CHUNK_RADIUS = 3;
+    private static final int WORLDZERO_REDSTONE_TORCH_MIN_PER_CHUNK = 2;
+    private static final int WORLDZERO_REDSTONE_TORCH_MAX_PER_CHUNK = 3;
+    private static final int WORLDZERO_REDSTONE_TORCH_MAX_ATTEMPTS = 8;
     private static final int WORLDZERO_STATUE_CELL_SIZE = 14;
     private static final int WORLDZERO_STATUE_CELL_RADIUS = 4;
     private static final String[] WORLDZERO_SIGN_TEXTS = {
@@ -310,6 +313,36 @@ public final class WorldZeroVoidPortalDimension {
                         Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE
                 );
             }
+        }
+        worldzero$placeChunkTorches(level, chunkX, chunkZ);
+    }
+
+    private static void worldzero$placeChunkTorches(ServerLevel level, int chunkX, int chunkZ) {
+        Random random = new Random(level.getSeed() ^ (chunkX * 73428767L) ^ (chunkZ * 912931L) ^ 0x5A17B3L);
+        int minX = chunkX << 4;
+        int minZ = chunkZ << 4;
+        int targetCount = WORLDZERO_REDSTONE_TORCH_MIN_PER_CHUNK
+                + random.nextInt(WORLDZERO_REDSTONE_TORCH_MAX_PER_CHUNK - WORLDZERO_REDSTONE_TORCH_MIN_PER_CHUNK + 1);
+        int placed = 0;
+
+        for (int attempt = 0; attempt < WORLDZERO_REDSTONE_TORCH_MAX_ATTEMPTS && placed < targetCount; attempt++) {
+            int x = minX + 1 + random.nextInt(14);
+            int z = minZ + 1 + random.nextInt(14);
+            if (Math.abs(x) <= 1 && Math.abs(z) <= 1) {
+                continue;
+            }
+
+            BlockPos torchPos = new BlockPos(x, WORLDZERO_PLAYER_Y, z);
+            if (!level.getBlockState(torchPos).isAir()) {
+                continue;
+            }
+
+            level.setBlock(
+                    torchPos,
+                    Blocks.REDSTONE_TORCH.defaultBlockState(),
+                    Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE
+            );
+            placed++;
         }
     }
 

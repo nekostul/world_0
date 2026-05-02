@@ -5,6 +5,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -24,6 +26,7 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -215,6 +218,11 @@ public final class WorldZeroKoridorDimension {
         }
 
         KoridorSaveData saveData = worldzero$getSaveData(level);
+
+        if (!worldzero$ensureSegmentsAround(level, 0L, templateInfo)) {
+            return false;
+        }
+
         saveData.worldzero$returnPoints.put(
                 player.getUUID(),
                 new ReturnPoint(
@@ -226,15 +234,13 @@ public final class WorldZeroKoridorDimension {
                         player.getXRot()
                 )
         );
+        saveData.worldzero$playerStateSnapshots.put(player.getUUID(), PlayerStateSnapshot.worldzero$fromPlayer(player));
         saveData.setDirty();
-
-        if (!worldzero$ensureSegmentsAround(level, 0L, templateInfo)) {
-            return false;
-        }
 
         BlockPos spawnPos = worldzero$getSpawnBlockPos(templateInfo);
         level.getChunkAt(spawnPos);
         player.teleportTo(level, spawnPos.getX() + 0.5D, spawnPos.getY(), spawnPos.getZ() + 0.5D, 0.0F, 0.0F);
+        worldzero$preparePlayerForKoridor(player);
         return true;
     }
 
@@ -294,9 +300,10 @@ public final class WorldZeroKoridorDimension {
 
         KoridorSaveData saveData = worldzero$getSaveData(koridorLevel);
         ReturnPoint returnPoint = saveData.worldzero$returnPoints.remove(player.getUUID());
+        PlayerStateSnapshot playerStateSnapshot = saveData.worldzero$playerStateSnapshots.remove(player.getUUID());
         saveData.setDirty();
 
-        if (returnPoint == null && player.serverLevel().dimension() != WORLDZERO_KORIDOR_LEVEL) {
+        if (returnPoint == null && playerStateSnapshot == null && player.serverLevel().dimension() != WORLDZERO_KORIDOR_LEVEL) {
             return false;
         }
 
@@ -343,6 +350,9 @@ public final class WorldZeroKoridorDimension {
         }
 
         player.teleportTo(targetLevel, targetX, targetY, targetZ, targetYaw, targetPitch);
+        if (playerStateSnapshot != null) {
+            worldzero$restorePlayerState(player, playerStateSnapshot);
+        }
         return true;
     }
 
@@ -1126,6 +1136,38 @@ public final class WorldZeroKoridorDimension {
         return level.getDataStorage().computeIfAbsent(KoridorSaveData::load, KoridorSaveData::new, WORLDZERO_SAVE_ID);
     }
 
+    private static void worldzero$preparePlayerForKoridor(ServerPlayer player) {
+        worldzero$clearPlayerInventory(player);
+        player.setHealth(player.getMaxHealth());
+        player.getFoodData().setFoodLevel(20);
+        player.getFoodData().setSaturation(20.0F);
+        player.getFoodData().setExhaustion(0.0F);
+        player.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        player.fallDistance = 0.0F;
+    }
+
+    private static void worldzero$clearPlayerInventory(ServerPlayer player) {
+        player.getInventory().clearContent();
+        player.getInventory().selected = 0;
+        player.inventoryMenu.setCarried(ItemStack.EMPTY);
+        player.containerMenu.setCarried(ItemStack.EMPTY);
+        player.getInventory().setChanged();
+        player.inventoryMenu.broadcastChanges();
+        player.containerMenu.broadcastChanges();
+    }
+
+    private static void worldzero$restorePlayerState(ServerPlayer player, PlayerStateSnapshot snapshot) {
+        player.getInventory().clearContent();
+        snapshot.worldzero$apply(player);
+        player.inventoryMenu.setCarried(ItemStack.EMPTY);
+        player.containerMenu.setCarried(ItemStack.EMPTY);
+        player.getInventory().setChanged();
+        player.inventoryMenu.broadcastChanges();
+        player.containerMenu.broadcastChanges();
+        player.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        player.fallDistance = 0.0F;
+    }
+
     private static boolean worldzero$isBuildRestricted(Player player) {
         return player != null
                 && player.level().dimension() == WORLDZERO_KORIDOR_LEVEL;
@@ -1242,6 +1284,7 @@ public final class WorldZeroKoridorDimension {
     private static final class KoridorSaveData extends SavedData {
         private final LongOpenHashSet worldzero$generatedSegments = new LongOpenHashSet();
         private final Map<UUID, ReturnPoint> worldzero$returnPoints = new HashMap<>();
+        private final Map<UUID, PlayerStateSnapshot> worldzero$playerStateSnapshots = new HashMap<>();
         private long worldzero$echoRunTriggerTick = -1L;
         private boolean worldzero$echoRunCompleted;
 
@@ -1254,6 +1297,13 @@ public final class WorldZeroKoridorDimension {
                 returnPointsTag.put(entry.getKey().toString(), entry.getValue().worldzero$save());
             }
             tag.put("ReturnPoints", returnPointsTag);
+
+            CompoundTag playerStateSnapshotsTag = new CompoundTag();
+            for (Map.Entry<UUID, PlayerStateSnapshot> entry : this.worldzero$playerStateSnapshots.entrySet()) {
+                playerStateSnapshotsTag.put(entry.getKey().toString(), entry.getValue().worldzero$save());
+            }
+            tag.put("PlayerStateSnapshots", playerStateSnapshotsTag);
+
             tag.putLong("EchoRunTriggerTick", this.worldzero$echoRunTriggerTick);
             tag.putBoolean("EchoRunCompleted", this.worldzero$echoRunCompleted);
             return tag;
@@ -1272,6 +1322,17 @@ public final class WorldZeroKoridorDimension {
                     ReturnPoint returnPoint = ReturnPoint.worldzero$load(returnPointsTag.getCompound(key));
                     if (returnPoint != null) {
                         saveData.worldzero$returnPoints.put(playerId, returnPoint);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+
+            CompoundTag playerStateSnapshotsTag = tag.getCompound("PlayerStateSnapshots");
+            for (String key : playerStateSnapshotsTag.getAllKeys()) {
+                try {
+                    PlayerStateSnapshot snapshot = PlayerStateSnapshot.worldzero$load(playerStateSnapshotsTag.getCompound(key));
+                    if (snapshot != null) {
+                        saveData.worldzero$playerStateSnapshots.put(UUID.fromString(key), snapshot);
                     }
                 } catch (IllegalArgumentException ignored) {
                 }
@@ -1333,6 +1394,46 @@ public final class WorldZeroKoridorDimension {
                     tag.getFloat("Yaw"),
                     tag.getFloat("Pitch")
             );
+        }
+    }
+
+    private static final class PlayerStateSnapshot {
+        private final CompoundTag worldzero$tag;
+
+        private PlayerStateSnapshot(CompoundTag tag) {
+            this.worldzero$tag = tag;
+        }
+
+        private static PlayerStateSnapshot worldzero$fromPlayer(ServerPlayer player) {
+            CompoundTag tag = new CompoundTag();
+            tag.put("Inventory", player.getInventory().save(new ListTag()));
+            tag.putInt("SelectedSlot", player.getInventory().selected);
+            tag.putFloat("Health", player.getHealth());
+
+            CompoundTag foodDataTag = new CompoundTag();
+            player.getFoodData().addAdditionalSaveData(foodDataTag);
+            tag.put("FoodData", foodDataTag);
+            return new PlayerStateSnapshot(tag);
+        }
+
+        private CompoundTag worldzero$save() {
+            return this.worldzero$tag.copy();
+        }
+
+        @Nullable
+        private static PlayerStateSnapshot worldzero$load(CompoundTag tag) {
+            return tag.isEmpty() ? null : new PlayerStateSnapshot(tag.copy());
+        }
+
+        private void worldzero$apply(ServerPlayer player) {
+            ListTag inventoryTag = this.worldzero$tag.getList("Inventory", Tag.TAG_COMPOUND);
+            player.getInventory().load(inventoryTag);
+            player.getInventory().selected = Math.max(0, Math.min(8, this.worldzero$tag.getInt("SelectedSlot")));
+            player.setHealth(Math.min(player.getMaxHealth(), this.worldzero$tag.getFloat("Health")));
+
+            if (this.worldzero$tag.contains("FoodData", Tag.TAG_COMPOUND)) {
+                player.getFoodData().readAdditionalSaveData(this.worldzero$tag.getCompound("FoodData"));
+            }
         }
     }
 }

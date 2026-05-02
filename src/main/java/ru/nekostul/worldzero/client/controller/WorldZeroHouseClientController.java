@@ -89,7 +89,7 @@ public final class WorldZeroHouseClientController {
         Minecraft minecraft = Minecraft.getInstance();
         boolean inHouse = worldzero$isHouseLevel(minecraft);
         if (!inHouse) {
-            if (worldzero$houseActive) {
+            if (worldzero$houseActive || !WORLDZERO_TRACKED_FAKE_CHAT_LINES.isEmpty()) {
                 worldzero$clearState();
             }
             return;

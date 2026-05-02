@@ -179,6 +179,10 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerHouse(context.getSource())))
                         .then(Commands.literal("trigger_house_real")
                                 .executes(context -> worldzero$triggerHouseReal(context.getSource())))
+                        .then(Commands.literal("trigger_double_chat")
+                                .executes(context -> worldzero$triggerDoubleChat(context.getSource())))
+                        .then(Commands.literal("reset_double_chat")
+                                .executes(context -> worldzero$resetDoubleChat(context.getSource())))
                         .then(Commands.literal("detect_house")
                                 .executes(context -> worldzero$detectHouse(context.getSource())))
         );
@@ -782,5 +786,35 @@ public final class WorldZeroDevEntityCommands {
                         + ", " + rangeInfo
         ), false);
         return 1;
+    }
+
+    private static int worldzero$triggerDoubleChat(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroDoubleChatEvent.worldzero$triggerNow(player);
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] double-chat scenario triggered"
+                        : "[WORLD_0][DEV] double-chat scenario trigger failed (be alive in overworld)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$resetDoubleChat(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        boolean reset = WorldZeroDoubleChatEvent.worldzero$resetNow(player);
+        source.sendSuccess(() -> Component.literal(
+                reset
+                        ? "[WORLD_0][DEV] double-chat scenario reset"
+                        : "[WORLD_0][DEV] double-chat scenario had nothing to reset"
+        ), false);
+        return reset ? 1 : 0;
     }
 }

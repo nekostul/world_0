@@ -128,6 +128,13 @@ public final class WorldZeroNetwork {
         );
         WORLDZERO_CHANNEL.registerMessage(
                 worldzero$packetId++,
+                WorldZeroDoubleChatPacket.class,
+                WorldZeroDoubleChatPacket::encode,
+                WorldZeroDoubleChatPacket::decode,
+                WorldZeroDoubleChatPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
                 WorldZeroMinorAnomalyPacket.class,
                 WorldZeroMinorAnomalyPacket::encode,
                 WorldZeroMinorAnomalyPacket::decode,
@@ -255,6 +262,50 @@ public final class WorldZeroNetwork {
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new WorldZeroLocalizedChatLinePacket(speaker, messageKey)
+        );
+    }
+
+    public static void sendDoubleChatPlayerLine(ServerPlayer player, String speaker, String messageKey) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroDoubleChatPacket(
+                        WorldZeroDoubleChatPacket.WORLDZERO_ACTION_PLAYER_LINE,
+                        speaker,
+                        messageKey
+                )
+        );
+    }
+
+    public static void sendDoubleChatSystemLine(ServerPlayer player, String speaker, String messageKey) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroDoubleChatPacket(
+                        WorldZeroDoubleChatPacket.WORLDZERO_ACTION_SYSTEM_LINE,
+                        speaker,
+                        messageKey
+                )
+        );
+    }
+
+    public static void sendDoubleChatAutoLine(ServerPlayer player, String speaker, String messageKey) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroDoubleChatPacket(
+                        WorldZeroDoubleChatPacket.WORLDZERO_ACTION_AUTO_LINE,
+                        speaker,
+                        messageKey
+                )
+        );
+    }
+
+    public static void sendDoubleChatLocalPort(ServerPlayer player, String port) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroDoubleChatPacket(
+                        WorldZeroDoubleChatPacket.WORLDZERO_ACTION_LOCAL_PORT,
+                        "",
+                        port
+                )
         );
     }
 

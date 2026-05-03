@@ -53,14 +53,6 @@ public final class WorldZeroLastBlockEvent {
     private static final double WORLDZERO_DEBUG_TRACE_DISTANCE_BLOCKS = 6.0D;
     private static final int WORLDZERO_CLOSED_MINE_SCAN_RADIUS_BLOCKS = 6;
     private static final int WORLDZERO_CLOSED_MINE_MAX_OPEN_COLUMNS = 42;
-    private static final AABB WORLDZERO_ENTITY_SCAN_AABB = new AABB(
-            -30_000_000.0D,
-            -2_048.0D,
-            -30_000_000.0D,
-            30_000_000.0D,
-            4_096.0D,
-            30_000_000.0D
-    );
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SERVER_STATES = new WeakHashMap<>();
 
     private WorldZeroLastBlockEvent() {
@@ -626,21 +618,7 @@ public final class WorldZeroLastBlockEvent {
     }
 
     private static boolean worldzero$hasActiveEcho(MinecraftServer server) {
-        for (ServerLevel level : server.getAllLevels()) {
-            if (level.dimension() == WorldZeroVoidPortalDimension.WORLDZERO_VOIDPORTAL_LEVEL) {
-                continue;
-            }
-
-            if (!level.getEntitiesOfClass(
-                    WorldZeroEchoEntity.class,
-                    WORLDZERO_ENTITY_SCAN_AABB,
-                    entity -> entity.getType() == WorldZeroEntities.WORLDZERO_ECHO.get()
-                            || entity.getType() == WorldZeroEntities.WORLDZERO_BLACK_ECHO.get()
-            ).isEmpty()) {
-                return true;
-            }
-        }
-        return false;
+        return WorldZeroEchoPresenceTracker.worldzero$hasEchoOrBlackEcho(server);
     }
 
     private static void worldzero$loadPersistentPlayerState(

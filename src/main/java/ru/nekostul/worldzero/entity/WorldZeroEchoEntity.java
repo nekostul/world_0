@@ -87,6 +87,14 @@ public class WorldZeroEchoEntity extends Monster {
     }
 
     @Override
+    public void onAddedToWorld() {
+        super.onAddedToWorld();
+        if (!this.level().isClientSide()) {
+            WorldZeroEchoPresenceTracker.worldzero$trackEcho(this);
+        }
+    }
+
+    @Override
     public boolean isAttackable() {
         return false;
     }
@@ -99,6 +107,14 @@ public class WorldZeroEchoEntity extends Monster {
     @Override
     public boolean hurt(DamageSource source, float amount) {
         return false;
+    }
+
+    @Override
+    public void remove(RemovalReason reason) {
+        if (!this.level().isClientSide()) {
+            WorldZeroEchoPresenceTracker.worldzero$untrackEcho(this);
+        }
+        super.remove(reason);
     }
 
     @Override

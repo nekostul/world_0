@@ -151,6 +151,8 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerMemory(context.getSource())))
                         .then(Commands.literal("trigger_last_block")
                                 .executes(context -> worldzero$triggerLastBlock(context.getSource())))
+                        .then(Commands.literal("trigger_mine_presence")
+                                .executes(context -> worldzero$triggerMinePresence(context.getSource())))
                         .then(Commands.literal("trigger_koridor_run")
                                 .executes(context -> worldzero$triggerKoridorRun(context.getSource())))
                         .then(Commands.literal("trigger_koridor_chase")
@@ -255,6 +257,9 @@ public final class WorldZeroDevEntityCommands {
             stopped++;
         }
         if (WorldZeroLastBlockEvent.worldzero$stopLastBlockNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroMinePresenceEvent.worldzero$stopNow(server)) {
             stopped++;
         }
         if (WorldZeroSkyWatchEvent.worldzero$stopNow(server)) {
@@ -862,6 +867,23 @@ public final class WorldZeroDevEntityCommands {
                         ? "[WORLD_0][DEV] sky-watch event triggered"
                         : "[WORLD_0][DEV] sky-watch event trigger failed"
                         + (blocker == null ? " (notice message could not be sent)" : " (" + blocker + ")")
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerMinePresence(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        String blocker = WorldZeroMinePresenceEvent.worldzero$getDebugTriggerBlocker(player);
+        boolean triggered = WorldZeroMinePresenceEvent.worldzero$triggerNow(player);
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] mine-presence event triggered"
+                        : "[WORLD_0][DEV] mine-presence event trigger failed"
+                        + (blocker == null ? "" : " (" + blocker + ")")
         ), false);
         return triggered ? 1 : 0;
     }

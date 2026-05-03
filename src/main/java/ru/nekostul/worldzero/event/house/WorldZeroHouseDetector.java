@@ -6,9 +6,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -22,28 +25,32 @@ import javax.annotation.Nullable;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
+import java.util.WeakHashMap;
 
 public final class WorldZeroHouseDetector {
     private static final int WORLDZERO_MIN_HOUSE_WIDTH = 4;
     private static final int WORLDZERO_MIN_HOUSE_LENGTH = 4;
     private static final int WORLDZERO_MIN_HOUSE_HEIGHT = 3;
+    private static final int WORLDZERO_CACHE_MOVE_THRESHOLD_BLOCKS = 8;
+    private static final Map<MinecraftServer, Map<UUID, CachedScan>> WORLDZERO_SCAN_CACHE = new WeakHashMap<>();
 
     private WorldZeroHouseDetector() {
     }
 
     @Nullable
     public static DetectedHouse worldzero$findNearbyHouse(ServerPlayer player) {
-        return worldzero$findNearbyHouse(player, true);
+        return worldzero$getCachedNearbyHouse(player, true);
     }
 
     @Nullable
     public static DetectedHouse worldzero$findNearbyHouseForDebug(ServerPlayer player) {
-        return worldzero$findNearbyHouse(player, false);
+        return worldzero$getCachedNearbyHouse(player, false);
     }
 
     @Nullable
     public static DetectedHouse worldzero$findContainingHouse(ServerPlayer player) {
-        DetectedHouse detectedHouse = worldzero$findNearbyHouse(player, false);
+        DetectedHouse detectedHouse = worldzero$getCachedNearbyHouse(player, false);
         if (detectedHouse == null) {
             return null;
         }
@@ -130,6 +137,50 @@ public final class WorldZeroHouseDetector {
         }
 
         return bestHouse;
+    }
+
+    @Nullable
+    private static DetectedHouse worldzero$getCachedNearbyHouse(ServerPlayer player, boolean enforceTriggerDistance) {
+        if (player == null) {
+            return null;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return null;
+        }
+
+        long gameTime = player.serverLevel().getGameTime();
+        BlockPos playerPos = player.blockPosition();
+        CachedScan cachedScan = WORLDZERO_SCAN_CACHE
+                .computeIfAbsent(server, ignored -> new HashMap<>())
+                .get(player.getUUID());
+        if (cachedScan != null
+                && cachedScan.worldzero$enforceTriggerDistance == enforceTriggerDistance
+                && cachedScan.worldzero$dimension == player.serverLevel().dimension()
+                && gameTime <= cachedScan.worldzero$expiresAtGameTick
+                && worldzero$isWithinCacheMoveThreshold(playerPos, cachedScan.worldzero$playerPos)) {
+            return cachedScan.worldzero$detectedHouse;
+        }
+
+        DetectedHouse detectedHouse = worldzero$findNearbyHouse(player, enforceTriggerDistance);
+        WORLDZERO_SCAN_CACHE.computeIfAbsent(server, ignored -> new HashMap<>()).put(
+                player.getUUID(),
+                new CachedScan(
+                        player.serverLevel().dimension(),
+                        playerPos.immutable(),
+                        gameTime + Math.max(1L, WorldZeroConfig.worldzero$houseScanIntervalTicks()),
+                        enforceTriggerDistance,
+                        detectedHouse
+                )
+        );
+        return detectedHouse;
+    }
+
+    private static boolean worldzero$isWithinCacheMoveThreshold(BlockPos currentPos, BlockPos cachedPos) {
+        return Math.abs(currentPos.getX() - cachedPos.getX()) <= WORLDZERO_CACHE_MOVE_THRESHOLD_BLOCKS
+                && Math.abs(currentPos.getY() - cachedPos.getY()) <= WORLDZERO_CACHE_MOVE_THRESHOLD_BLOCKS
+                && Math.abs(currentPos.getZ() - cachedPos.getZ()) <= WORLDZERO_CACHE_MOVE_THRESHOLD_BLOCKS;
     }
 
     private static boolean worldzero$isCandidateInterior(ServerLevel level, BlockPos pos) {
@@ -520,5 +571,14 @@ public final class WorldZeroHouseDetector {
     }
 
     private record EvaluatedRoom(@Nullable DetectedHouse detectedHouse) {
+    }
+
+    private record CachedScan(
+            ResourceKey<Level> worldzero$dimension,
+            BlockPos worldzero$playerPos,
+            long worldzero$expiresAtGameTick,
+            boolean worldzero$enforceTriggerDistance,
+            @Nullable DetectedHouse worldzero$detectedHouse
+    ) {
     }
 }

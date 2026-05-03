@@ -54,6 +54,7 @@ public final class WorldZeroFootstepsEvent {
     private static final int WORLDZERO_WINDOW_ECHO_TICKS = 10 * 20;
     private static final int WORLDZERO_POST_REACTION_TICKS = 2 * 20;
     private static final int WORLDZERO_SILENT_CHEST_TICKS = 3 * 20;
+    private static final long WORLDZERO_BLANK_DISC_SCAN_INTERVAL_TICKS = 10L * 20L;
     private static final double WORLDZERO_STEP_DISTANCE_BLOCKS = 2.75D;
     private static final double WORLDZERO_STEP_VOLUME = 0.65D;
     private static final double WORLDZERO_VIEW_TO_SOURCE_DOT = 0.8D;
@@ -62,17 +63,10 @@ public final class WorldZeroFootstepsEvent {
     private static final double WORLDZERO_ENVIRONMENT_CHANGE_CHANCE = 0.75D;
     private static final int WORLDZERO_INTERACTION_RADIUS_BLOCKS = 8;
     private static final int WORLDZERO_WINDOW_SEARCH_RADIUS_BLOCKS = 2;
-    private static final AABB WORLDZERO_ENTITY_SCAN_AABB = new AABB(
-            -30_000_000.0D,
-            -2_048.0D,
-            -30_000_000.0D,
-            30_000_000.0D,
-            4_096.0D,
-            30_000_000.0D
-    );
     private static final String WORLDZERO_SAVE_ID = "worldzero_footsteps_event";
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SESSION_STATES = new WeakHashMap<>();
     private static final Map<MinecraftServer, BlankDiscPlaybackState> WORLDZERO_BLANK_DISC_PLAYBACKS = new WeakHashMap<>();
+    private static final Map<MinecraftServer, Long> WORLDZERO_NEXT_BLANK_DISC_SCAN_TICK = new WeakHashMap<>();
     private static final Set<UUID> WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS = new HashSet<>();
 
     private WorldZeroFootstepsEvent() {
@@ -133,6 +127,7 @@ public final class WorldZeroFootstepsEvent {
     public static void worldzero$onServerStopped(ServerStoppedEvent event) {
         WORLDZERO_SESSION_STATES.remove(event.getServer());
         WORLDZERO_BLANK_DISC_PLAYBACKS.remove(event.getServer());
+        WORLDZERO_NEXT_BLANK_DISC_SCAN_TICK.remove(event.getServer());
         WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS.clear();
     }
 
@@ -890,21 +885,7 @@ public final class WorldZeroFootstepsEvent {
     }
 
     private static boolean worldzero$hasActiveEcho(MinecraftServer server) {
-        for (ServerLevel serverLevel : server.getAllLevels()) {
-            if (serverLevel.dimension() == WorldZeroVoidPortalDimension.WORLDZERO_VOIDPORTAL_LEVEL) {
-                continue;
-            }
-
-            if (!serverLevel.getEntitiesOfClass(
-                    WorldZeroEchoEntity.class,
-                    WORLDZERO_ENTITY_SCAN_AABB,
-                    entity -> entity.getType() == WorldZeroEntities.WORLDZERO_ECHO.get()
-            ).isEmpty()) {
-                return true;
-            }
-        }
-
-        return false;
+        return WorldZeroEchoPresenceTracker.worldzero$hasNormalEcho(server);
     }
 
     @Nullable
@@ -1034,7 +1015,19 @@ public final class WorldZeroFootstepsEvent {
     }
 
     private static void worldzero$checkBlankDiscInJukeboxes(ServerLevel level) {
+        long gameTime = level.getGameTime();
+        Long nextScanTick = WORLDZERO_NEXT_BLANK_DISC_SCAN_TICK.get(level.getServer());
+        if (nextScanTick != null && gameTime < nextScanTick) {
+            return;
+        }
+        WORLDZERO_NEXT_BLANK_DISC_SCAN_TICK.put(level.getServer(), gameTime + WORLDZERO_BLANK_DISC_SCAN_INTERVAL_TICKS);
+
         for (ServerPlayer player : level.players()) {
+            UUID playerId = player.getUUID();
+            if (WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS.contains(playerId)) {
+                continue;
+            }
+
             BlockPos playerPos = player.blockPosition();
             int minChunkX = (playerPos.getX() >> 4) - 10;
             int maxChunkX = (playerPos.getX() >> 4) + 10;
@@ -1046,18 +1039,10 @@ public final class WorldZeroFootstepsEvent {
                     var chunk = level.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
                     if (chunk instanceof net.minecraft.world.level.chunk.LevelChunk levelChunk) {
                         levelChunk.getBlockEntities().forEach((pos, blockEntity) -> {
-                            if (blockEntity instanceof JukeboxBlockEntity) {
-                                var nbt = blockEntity.saveWithFullMetadata();
-                                if (nbt.contains("RecordItem")) {
-                                    var recordTag = nbt.getCompound("RecordItem");
-                                    if (recordTag.contains("id") && recordTag.getString("id").contains("blank_disc")) {
-                                        UUID playerId = player.getUUID();
-                                        if (!WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS.contains(playerId)) {
-                                            WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS.add(playerId);
-                                            WorldZeroAdvancementTriggers.grantForgottenDisc(player);
-                                        }
-                                    }
-                                }
+                            if (blockEntity instanceof JukeboxBlockEntity jukeboxBlockEntity
+                                    && worldzero$hasBlankDisc(jukeboxBlockEntity.getItem(0))
+                                    && WORLDZERO_BLANK_DISC_ACHIEVEMENT_PLAYERS.add(playerId)) {
+                                WorldZeroAdvancementTriggers.grantForgottenDisc(player);
                             }
                         });
                     }

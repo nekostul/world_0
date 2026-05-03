@@ -38,7 +38,7 @@ public final class WorldZeroSkyWatchClientController {
     private static final int WORLDZERO_WARNING_START_TICKS = 12 * 20;
     private static final int WORLDZERO_MIN_PROMPT_DELAY_TICKS = 5;
     private static final int WORLDZERO_MAX_PROMPT_DELAY_TICKS = 15;
-    private static final int WORLDZERO_MAX_ACTIVE_PROMPTS = 10;
+    private static final int WORLDZERO_MAX_ACTIVE_PROMPTS = 18;
     private static final int WORLDZERO_PROMPT_MIN_LIFETIME_TICKS = 55;
     private static final int WORLDZERO_PROMPT_MAX_LIFETIME_TICKS = 110;
     private static final int WORLDZERO_COUNTER_START = 1300;
@@ -135,15 +135,17 @@ public final class WorldZeroSkyWatchClientController {
 
         worldzero$enforceVolumes(minecraft);
 
-        worldzero$activeTicks--;
-        int elapsedTicks = Math.max(0, worldzero$durationTicks - worldzero$activeTicks);
-        if (elapsedTicks >= WORLDZERO_WARNING_START_TICKS) {
-            if (worldzero$nextPromptTicks > 0) {
-                worldzero$nextPromptTicks--;
-            }
-            if (worldzero$nextPromptTicks <= 0) {
-                worldzero$spawnPrompt();
-                worldzero$nextPromptTicks = worldzero$randomPromptDelay();
+        if (worldzero$activeTicks > 1) {
+            worldzero$activeTicks--;
+            int elapsedTicks = Math.max(0, worldzero$durationTicks - worldzero$activeTicks);
+            if (elapsedTicks >= WORLDZERO_WARNING_START_TICKS) {
+                if (worldzero$nextPromptTicks > 0) {
+                    worldzero$nextPromptTicks--;
+                }
+                if (worldzero$nextPromptTicks <= 0) {
+                    worldzero$spawnPrompt();
+                    worldzero$nextPromptTicks = worldzero$randomPromptDelay();
+                }
             }
         }
 
@@ -154,10 +156,6 @@ public final class WorldZeroSkyWatchClientController {
             if (prompt.worldzero$ticksRemaining <= 0) {
                 iterator.remove();
             }
-        }
-
-        if (worldzero$activeTicks <= 0) {
-            worldzero$clearState();
         }
     }
 
@@ -264,12 +262,26 @@ public final class WorldZeroSkyWatchClientController {
 
         int width = minecraft.getWindow().getGuiScaledWidth();
         int height = minecraft.getWindow().getGuiScaledHeight();
-        boolean leftSide = worldzero$promptRandom.nextBoolean();
         float scale = Mth.nextFloat(worldzero$promptRandom, 0.82F, 1.38F);
-        int x = leftSide
-                ? Mth.floor(width * Mth.nextFloat(worldzero$promptRandom, 0.07F, 0.30F))
-                : Mth.floor(width * Mth.nextFloat(worldzero$promptRandom, 0.68F, 0.90F));
-        int y = Mth.floor(height * Mth.nextFloat(worldzero$promptRandom, 0.16F, 0.74F));
+        int x = Mth.floor(width * 0.5F);
+        int y = Mth.floor(height * 0.5F);
+        boolean foundPosition = false;
+        for (int attempt = 0; attempt < 10; attempt++) {
+            int candidateX = Mth.floor(width * Mth.nextFloat(worldzero$promptRandom, 0.05F, 0.92F));
+            int candidateY = Mth.floor(height * Mth.nextFloat(worldzero$promptRandom, 0.08F, 0.80F));
+            if (!worldzero$isPromptAreaAllowed(width, height, candidateX, candidateY)) {
+                continue;
+            }
+
+            x = candidateX;
+            y = candidateY;
+            foundPosition = true;
+            break;
+        }
+        if (!foundPosition) {
+            x = Mth.floor(width * Mth.nextFloat(worldzero$promptRandom, 0.08F, 0.88F));
+            y = Mth.floor(height * Mth.nextFloat(worldzero$promptRandom, 0.12F, 0.76F));
+        }
         int lifetime = worldzero$promptRandom.nextInt(WORLDZERO_PROMPT_MAX_LIFETIME_TICKS - WORLDZERO_PROMPT_MIN_LIFETIME_TICKS + 1)
                 + WORLDZERO_PROMPT_MIN_LIFETIME_TICKS;
         String key = worldzero$promptRandom.nextBoolean() ? WORLDZERO_HIDE_KEY : WORLDZERO_RUN_KEY;
@@ -289,6 +301,23 @@ public final class WorldZeroSkyWatchClientController {
         return worldzero$promptRandom.nextInt(
                 WORLDZERO_MAX_PROMPT_DELAY_TICKS - WORLDZERO_MIN_PROMPT_DELAY_TICKS + 1
         ) + WORLDZERO_MIN_PROMPT_DELAY_TICKS;
+    }
+
+    private static boolean worldzero$isPromptAreaAllowed(int width, int height, int x, int y) {
+        int centerX = width / 2;
+        int centerY = height / 2;
+        int dx = x - centerX;
+        int dy = y - centerY;
+        if (dx * dx + dy * dy < 95 * 95) {
+            return false;
+        }
+
+        int counterZoneTop = height - 96;
+        if (y >= counterZoneTop && Math.abs(x - centerX) < 140) {
+            return false;
+        }
+
+        return true;
     }
 
     private static void worldzero$playDangerSound() {

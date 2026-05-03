@@ -32,14 +32,6 @@ public final class WorldZeroEchoPhaseOneSpawner {
     private static final double WORLDZERO_ECHO_DESPAWN_MAX_DISTANCE = 10.0D;
     private static final int WORLDZERO_SPAWN_ATTEMPTS = 40;
     private static final double WORLDZERO_VIEW_DOT_THRESHOLD = 0.15D;
-    private static final AABB WORLDZERO_ENTITY_SCAN_AABB = new AABB(
-            -30_000_000.0D,
-            -2_048.0D,
-            -30_000_000.0D,
-            30_000_000.0D,
-            4_096.0D,
-            30_000_000.0D
-    );
     private static final Map<UUID, Long> WORLDZERO_NEXT_ALLOWED_SPAWN_TICK = new HashMap<>();
 
     private WorldZeroEchoPhaseOneSpawner() {
@@ -141,21 +133,7 @@ public final class WorldZeroEchoPhaseOneSpawner {
     }
 
     private static boolean worldzero$hasActiveEcho(MinecraftServer server) {
-        for (ServerLevel serverLevel : server.getAllLevels()) {
-            if (serverLevel.dimension() == WorldZeroVoidPortalDimension.WORLDZERO_VOIDPORTAL_LEVEL) {
-                continue;
-            }
-
-            if (!serverLevel.getEntitiesOfClass(
-                    WorldZeroEchoEntity.class,
-                    WORLDZERO_ENTITY_SCAN_AABB,
-                    echo -> echo.getType() == WorldZeroEntities.WORLDZERO_ECHO.get()
-            ).isEmpty()) {
-                return true;
-            }
-        }
-
-        return false;
+        return WorldZeroEchoPresenceTracker.worldzero$hasNormalEcho(server);
     }
 
     private static boolean worldzero$trySpawnEcho(

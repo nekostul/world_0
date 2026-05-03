@@ -7,7 +7,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -32,14 +31,6 @@ public final class WorldZeroHorrorEventSystem {
     private static final int WORLDZERO_WRONG_WIND_AFTER_FALL_MIN_MINUTES = 15;
     private static final int WORLDZERO_WRONG_WIND_AFTER_FALL_MAX_MINUTES = 30;
     private static final String WORLDZERO_SAVE_ID = "worldzero_horror_event_system";
-    private static final AABB WORLDZERO_ENTITY_SCAN_AABB = new AABB(
-            -30_000_000.0D,
-            -2_048.0D,
-            -30_000_000.0D,
-            30_000_000.0D,
-            4_096.0D,
-            30_000_000.0D
-    );
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SESSION_STATES = new WeakHashMap<>();
 
     private WorldZeroHorrorEventSystem() {
@@ -151,6 +142,7 @@ public final class WorldZeroHorrorEventSystem {
     @SubscribeEvent
     public static void worldzero$onServerStopped(ServerStoppedEvent event) {
         WORLDZERO_SESSION_STATES.remove(event.getServer());
+        WorldZeroEchoPresenceTracker.worldzero$clear(event.getServer());
         WorldZeroMinorAnomalies.worldzero$cancelAll(event.getServer());
     }
 
@@ -294,33 +286,7 @@ public final class WorldZeroHorrorEventSystem {
     }
 
     private static boolean worldzero$hasActiveEcho(MinecraftServer server) {
-        if (server == null) {
-            return false;
-        }
-
-        for (ServerLevel level : server.getAllLevels()) {
-            if (level.dimension() == WorldZeroVoidPortalDimension.WORLDZERO_VOIDPORTAL_LEVEL) {
-                continue;
-            }
-
-            if (!level.getEntitiesOfClass(
-                    WorldZeroEchoEntity.class,
-                    WORLDZERO_ENTITY_SCAN_AABB,
-                    entity -> entity.getType() == WorldZeroEntities.WORLDZERO_ECHO.get()
-                            || entity.getType() == WorldZeroEntities.WORLDZERO_BLACK_ECHO.get()
-            ).isEmpty()) {
-                return true;
-            }
-
-            if (!level.getEntitiesOfClass(
-                    WorldZeroHouseEchoEntity.class,
-                    WORLDZERO_ENTITY_SCAN_AABB
-            ).isEmpty()) {
-                return true;
-            }
-        }
-
-        return false;
+        return WorldZeroEchoPresenceTracker.worldzero$hasAnyEcho(server);
     }
 
     private static long worldzero$randomCooldownTicks(ServerLevel level, WorldZeroHorrorPhase phase) {

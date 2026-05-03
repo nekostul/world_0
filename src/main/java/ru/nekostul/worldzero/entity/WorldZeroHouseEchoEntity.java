@@ -187,6 +187,14 @@ public class WorldZeroHouseEchoEntity extends Monster {
     }
 
     @Override
+    public void onAddedToWorld() {
+        super.onAddedToWorld();
+        if (!this.level().isClientSide()) {
+            WorldZeroEchoPresenceTracker.worldzero$trackHouseEcho(this);
+        }
+    }
+
+    @Override
     public boolean isAttackable() {
         return false;
     }
@@ -205,6 +213,7 @@ public class WorldZeroHouseEchoEntity extends Monster {
     public void remove(RemovalReason reason) {
         if (!this.level().isClientSide() && this.level() instanceof ServerLevel serverLevel) {
             this.worldzero$removeGhostBlock(serverLevel, false);
+            WorldZeroEchoPresenceTracker.worldzero$untrackHouseEcho(this);
         }
         super.remove(reason);
     }

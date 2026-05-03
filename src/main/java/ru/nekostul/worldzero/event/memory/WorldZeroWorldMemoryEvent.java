@@ -831,6 +831,14 @@ public final class WorldZeroWorldMemoryEvent {
                 playerId,
                 ignored -> new PersistentPlayerState()
         );
+        boolean onlyPlayTimeChanged = persistentPlayerState.worldzero$nextAnomalyTick == playerState.worldzero$nextAnomalyTick
+                && persistentPlayerState.worldzero$firstManifestationDone == playerState.worldzero$firstManifestationDone
+                && persistentPlayerState.worldzero$lastAnomalyKind == playerState.worldzero$lastAnomalyKind;
+        if (onlyPlayTimeChanged
+                && level.getGameTime() - playerState.worldzero$lastPlayTimeSaveGameTick < WORLDZERO_PLAYTIME_SAVE_INTERVAL_TICKS) {
+            return;
+        }
+
         persistentPlayerState.worldzero$elapsedPlayTicks = playerState.worldzero$elapsedPlayTicks;
         persistentPlayerState.worldzero$nextAnomalyTick = playerState.worldzero$nextAnomalyTick;
         persistentPlayerState.worldzero$firstManifestationDone = playerState.worldzero$firstManifestationDone;

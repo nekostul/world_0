@@ -19,7 +19,6 @@
     "client.EntityTurnMixin",
     "client.InBedChatScreenMixin",
     "client.KeyboardHandlerMixin",
-    "world.LevelChunkMixin",
     "client.MinecraftMixin",
     "client.MouseHandlerMixin",
     "client.MusicManagerMixin",

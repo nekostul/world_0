@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.timeloop;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -6,6 +6,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.Level;
+import ru.nekostul.worldzero.event.corruption.WorldZeroCorruptionEvent;
+import ru.nekostul.worldzero.event.stalker.WorldZeroStalkerEvent;
+import ru.nekostul.worldzero.network.WorldZeroMajorEventPacket;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import java.util.Map;
 import java.util.UUID;

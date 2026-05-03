@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.feature.xray;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -7,6 +7,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
+import ru.nekostul.worldzero.command.WorldZeroDevCheats;
 
 public final class WorldZeroXrayMask {
     private static final ThreadLocal<Boolean> WORLDZERO_INTERNAL_QUERY = ThreadLocal.withInitial(() -> false);

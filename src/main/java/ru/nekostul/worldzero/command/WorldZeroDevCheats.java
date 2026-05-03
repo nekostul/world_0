@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.command;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;

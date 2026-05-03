@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.client.overlay;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -8,6 +8,8 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderGuiEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.client.controller.WorldZeroFallClientController;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class WorldZeroFallOverlay {

@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.client.controller;
 
 import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Minecraft;
@@ -11,7 +11,9 @@ import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import ru.nekostul.worldzero.mixin.ChatComponentAccessor;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.dimension.WorldZeroVoidDimension;
+import ru.nekostul.worldzero.mixin.client.ChatComponentAccessor;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class WorldZeroVoidClientController {

@@ -1,7 +1,8 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.network;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
+import ru.nekostul.worldzero.event.paralysis.WorldZeroParalysisEvent;
 
 import java.util.function.Supplier;
 

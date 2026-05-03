@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.chat;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -11,6 +11,9 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.event.WorldZeroStoryTime;
+import ru.nekostul.worldzero.event.skywatch.WorldZeroSkyWatchEvent;
 
 import java.util.HashMap;
 import java.util.Map;

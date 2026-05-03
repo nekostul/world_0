@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.growth;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -14,6 +14,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import ru.nekostul.worldzero.event.house.WorldZeroHouseDetector;
 
 import java.util.ArrayList;
 import java.util.Iterator;

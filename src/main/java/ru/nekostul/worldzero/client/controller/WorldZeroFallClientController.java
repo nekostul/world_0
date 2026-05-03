@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.client.controller;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.GuiMessage;
@@ -20,7 +20,11 @@ import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import ru.nekostul.worldzero.mixin.ChatComponentAccessor;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.client.screen.WorldZeroFakeDeathScreen;
+import ru.nekostul.worldzero.mixin.client.ChatComponentAccessor;
+import ru.nekostul.worldzero.network.WorldZeroFallClientPacket;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import java.util.EnumMap;
 import java.util.List;

@@ -1,18 +1,18 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.client;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyboardHandler;
+import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import ru.nekostul.worldzero.WorldZeroBlankDiscClientController;
-import ru.nekostul.worldzero.WorldZeroFallClientController;
-import ru.nekostul.worldzero.WorldZeroFreezeClientController;
-import ru.nekostul.worldzero.WorldZeroHouseBadClientController;
-import ru.nekostul.worldzero.WorldZeroParalysisClientController;
-import ru.nekostul.worldzero.WorldZeroVoidClientController;
-import ru.nekostul.worldzero.WorldZeroVoidDimension;
+import ru.nekostul.worldzero.client.controller.WorldZeroBlankDiscClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroFallClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroFreezeClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroHouseBadClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroParalysisClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroVoidClientController;
+import ru.nekostul.worldzero.dimension.WorldZeroVoidDimension;
 
 @Mixin(KeyboardHandler.class)
 public abstract class KeyboardHandlerMixin {

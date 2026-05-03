@@ -1,11 +1,11 @@
-package ru.nekostul.worldzero.client;
+package ru.nekostul.worldzero.client.renderer;
 
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import ru.nekostul.worldzero.WorldZeroEntities;
 import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.entity.WorldZeroEntities;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class WorldZeroEntityRenderers {

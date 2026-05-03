@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.stalker;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -15,11 +15,13 @@ import net.minecraft.world.entity.ai.util.DefaultRandomPos;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import ru.nekostul.worldzero.entity.WorldZeroEchoEntity;
+import ru.nekostul.worldzero.entity.WorldZeroEntities;
 
 import javax.annotation.Nullable;
 import java.util.HashSet;

@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
@@ -12,6 +12,37 @@ import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.config.WorldZeroConfig;
+import ru.nekostul.worldzero.dimension.WorldZeroHouseBadDimension;
+import ru.nekostul.worldzero.dimension.WorldZeroHouseDimension;
+import ru.nekostul.worldzero.dimension.WorldZeroKoridorDimension;
+import ru.nekostul.worldzero.dimension.WorldZeroVoidDimension;
+import ru.nekostul.worldzero.dimension.WorldZeroVoidPortalDimension;
+import ru.nekostul.worldzero.entity.WorldZeroEchoEntity;
+import ru.nekostul.worldzero.entity.WorldZeroEntities;
+import ru.nekostul.worldzero.entity.WorldZeroHouseEchoEntity;
+import ru.nekostul.worldzero.event.chat.WorldZeroDoubleChatEvent;
+import ru.nekostul.worldzero.event.echo.WorldZeroEchoPhaseOneSpawner;
+import ru.nekostul.worldzero.event.fall.WorldZeroFallEvent;
+import ru.nekostul.worldzero.event.footsteps.WorldZeroFootstepsEvent;
+import ru.nekostul.worldzero.event.freeze.WorldZeroFreezeEvent;
+import ru.nekostul.worldzero.event.horror.WorldZeroHorrorEventSystem;
+import ru.nekostul.worldzero.event.horror.WorldZeroHorrorFinale;
+import ru.nekostul.worldzero.event.horror.WorldZeroMinorAnomalies;
+import ru.nekostul.worldzero.event.house.WorldZeroHouseDetector;
+import ru.nekostul.worldzero.event.house.WorldZeroHouseEvent;
+import ru.nekostul.worldzero.event.major.WorldZeroMajorEventSystem;
+import ru.nekostul.worldzero.event.major.WorldZeroMajorEventType;
+import ru.nekostul.worldzero.event.memory.WorldZeroWorldMemoryEvent;
+import ru.nekostul.worldzero.event.mining.WorldZeroLastBlockEvent;
+import ru.nekostul.worldzero.event.mining.WorldZeroMinePresenceEvent;
+import ru.nekostul.worldzero.event.paralysis.WorldZeroParalysisEvent;
+import ru.nekostul.worldzero.event.skywatch.WorldZeroSkyWatchEvent;
+import ru.nekostul.worldzero.event.structure.WorldZeroOverworldStructureEvent;
+import ru.nekostul.worldzero.event.voidcall.WorldZeroVoidCallEvent;
+import ru.nekostul.worldzero.network.WorldZeroFinalePacket;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class WorldZeroDevEntityCommands {

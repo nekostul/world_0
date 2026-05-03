@@ -1,13 +1,13 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.client;
 
 import net.minecraft.client.MouseHandler;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import ru.nekostul.worldzero.WorldZeroFallClientController;
-import ru.nekostul.worldzero.WorldZeroFreezeClientController;
-import ru.nekostul.worldzero.WorldZeroParalysisClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroFallClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroFreezeClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroParalysisClientController;
 
 @Mixin(MouseHandler.class)
 public abstract class MouseHandlerMixin {

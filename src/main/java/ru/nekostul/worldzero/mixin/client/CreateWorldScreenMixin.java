@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.client;
 
 import com.mojang.serialization.Lifecycle;
 import net.minecraft.client.Minecraft;
@@ -16,8 +16,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import ru.nekostul.worldzero.WorldZeroDevCheats;
-import ru.nekostul.worldzero.WorldZeroState;
+import ru.nekostul.worldzero.command.WorldZeroDevCheats;
+import ru.nekostul.worldzero.state.WorldZeroState;
 
 import java.util.Optional;
 

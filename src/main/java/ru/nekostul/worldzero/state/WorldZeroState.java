@@ -1,9 +1,9 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.state;
 
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Lifecycle;
-import net.minecraft.client.Minecraft;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameRules;

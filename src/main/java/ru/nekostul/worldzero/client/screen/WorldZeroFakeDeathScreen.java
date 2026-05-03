@@ -1,9 +1,10 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.client.screen;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import ru.nekostul.worldzero.client.controller.WorldZeroFallClientController;
 
 public final class WorldZeroFakeDeathScreen extends Screen {
     public WorldZeroFakeDeathScreen() {

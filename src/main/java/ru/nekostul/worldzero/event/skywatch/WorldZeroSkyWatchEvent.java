@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.skywatch;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -13,6 +13,20 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.event.WorldZeroStoryTime;
+import ru.nekostul.worldzero.event.chat.WorldZeroDoubleChatEvent;
+import ru.nekostul.worldzero.event.fall.WorldZeroFallEvent;
+import ru.nekostul.worldzero.event.footsteps.WorldZeroFootstepsEvent;
+import ru.nekostul.worldzero.event.freeze.WorldZeroFreezeEvent;
+import ru.nekostul.worldzero.event.horror.WorldZeroHorrorEventSystem;
+import ru.nekostul.worldzero.event.horror.WorldZeroHorrorFinale;
+import ru.nekostul.worldzero.event.house.WorldZeroHouseDetector;
+import ru.nekostul.worldzero.event.house.WorldZeroHouseEvent;
+import ru.nekostul.worldzero.event.major.WorldZeroMajorEventSystem;
+import ru.nekostul.worldzero.event.paralysis.WorldZeroParalysisEvent;
+import ru.nekostul.worldzero.event.stalker.WorldZeroStalkerEvent;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import javax.annotation.Nullable;
 import java.util.HashMap;

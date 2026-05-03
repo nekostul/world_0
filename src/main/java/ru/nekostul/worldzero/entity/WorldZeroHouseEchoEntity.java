@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.entity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -33,6 +33,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
+import ru.nekostul.worldzero.config.WorldZeroConfig;
+import ru.nekostul.worldzero.event.house.WorldZeroHouseDetector;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -995,6 +998,10 @@ public class WorldZeroHouseEchoEntity extends Monster {
             this.worldzero$restoreState = restoreState;
             this.worldzero$lineOrder = lineOrder;
         }
+
+        public BlockPos worldzero$pos() {
+            return this.worldzero$pos;
+        }
     }
 
     public static final class FarmPlantTarget {
@@ -1019,6 +1026,10 @@ public class WorldZeroHouseEchoEntity extends Monster {
             this.worldzero$plantState = plantState;
             this.worldzero$heldItem = heldItem.copy();
             this.worldzero$lineOrder = lineOrder;
+        }
+
+        public BlockPos worldzero$soilPos() {
+            return this.worldzero$soilPos;
         }
     }
 

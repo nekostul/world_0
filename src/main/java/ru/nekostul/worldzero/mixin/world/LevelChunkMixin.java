@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.world;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import ru.nekostul.worldzero.WorldZeroXrayMask;
+import ru.nekostul.worldzero.feature.xray.WorldZeroXrayMask;
 
 @Mixin(LevelChunk.class)
 public abstract class LevelChunkMixin {

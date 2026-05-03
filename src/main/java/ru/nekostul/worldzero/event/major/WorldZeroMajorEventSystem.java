@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.major;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
@@ -11,6 +11,28 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.entity.WorldZeroEchoPresenceTracker;
+import ru.nekostul.worldzero.event.WorldZeroStoryTime;
+import ru.nekostul.worldzero.event.corruption.WorldZeroCorruptionEvent;
+import ru.nekostul.worldzero.event.fall.WorldZeroFallEvent;
+import ru.nekostul.worldzero.event.footsteps.WorldZeroFootstepsEvent;
+import ru.nekostul.worldzero.event.freeze.WorldZeroFreezeEvent;
+import ru.nekostul.worldzero.event.glitchrain.WorldZeroGlitchRainEvent;
+import ru.nekostul.worldzero.event.growth.WorldZeroGrowthEvent;
+import ru.nekostul.worldzero.event.horror.WorldZeroHorrorEventSystem;
+import ru.nekostul.worldzero.event.horror.WorldZeroHorrorFinale;
+import ru.nekostul.worldzero.event.horror.WorldZeroHorrorPhase;
+import ru.nekostul.worldzero.event.house.WorldZeroHouseEvent;
+import ru.nekostul.worldzero.event.paralysis.WorldZeroParalysisEvent;
+import ru.nekostul.worldzero.event.skywatch.WorldZeroSkyWatchEvent;
+import ru.nekostul.worldzero.event.stalker.WorldZeroStalkerEvent;
+import ru.nekostul.worldzero.event.swarm.WorldZeroSwarmEvent;
+import ru.nekostul.worldzero.event.timeloop.WorldZeroTimeLoopEvent;
+import ru.nekostul.worldzero.event.voidcall.WorldZeroVoidCallEvent;
+import ru.nekostul.worldzero.event.watching.WorldZeroWatchingEvent;
+import ru.nekostul.worldzero.network.WorldZeroMajorEventPacket;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import java.util.ArrayList;
 import java.util.EnumSet;

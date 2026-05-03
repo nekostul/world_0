@@ -1,8 +1,9 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.entity;
 
 import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class WorldZeroEntityAttributes {

@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.network;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -6,6 +6,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.WorldZeroServerFreezeController;
+import ru.nekostul.worldzero.event.skywatch.WorldZeroSkyWatchPacket;
 
 public final class WorldZeroNetwork {
     private static final String WORLDZERO_PROTOCOL_VERSION = "1";

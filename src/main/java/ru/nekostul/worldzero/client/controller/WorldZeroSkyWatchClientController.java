@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.client.controller;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
@@ -18,6 +18,8 @@ import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.event.skywatch.WorldZeroSkyWatchPacket;
 
 import java.util.ArrayList;
 import java.util.EnumMap;

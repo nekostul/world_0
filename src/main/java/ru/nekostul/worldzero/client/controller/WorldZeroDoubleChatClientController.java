@@ -1,10 +1,10 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.client.controller;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -15,8 +15,11 @@ import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import ru.nekostul.worldzero.mixin.ChatComponentAccessor;
-import ru.nekostul.worldzero.mixin.ChatScreenAccessor;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.mixin.client.ChatComponentAccessor;
+import ru.nekostul.worldzero.mixin.client.ChatScreenAccessor;
+import ru.nekostul.worldzero.network.WorldZeroDoubleChatPacket;
+import ru.nekostul.worldzero.state.WorldZeroState;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class WorldZeroDoubleChatClientController {

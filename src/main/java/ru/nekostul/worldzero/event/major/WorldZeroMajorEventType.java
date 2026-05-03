@@ -1,4 +1,5 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.major;
+
 
 public enum WorldZeroMajorEventType {
     WATCHING("watching"),

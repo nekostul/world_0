@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.client;
 
 import net.minecraft.client.gui.components.SplashRenderer;
 import org.spongepowered.asm.mixin.Mixin;

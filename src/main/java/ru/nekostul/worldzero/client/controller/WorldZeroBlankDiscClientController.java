@@ -1,10 +1,10 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.client.controller;
 
 import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
-import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundSource;
@@ -15,7 +15,9 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
-import ru.nekostul.worldzero.mixin.ChatComponentAccessor;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.mixin.client.ChatComponentAccessor;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.client;
 
 import net.minecraft.client.sounds.MusicManager;
 import net.minecraft.sounds.Music;

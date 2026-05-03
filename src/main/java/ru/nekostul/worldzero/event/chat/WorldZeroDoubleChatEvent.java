@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.chat;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
@@ -12,6 +12,13 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.event.WorldZeroStoryTime;
+import ru.nekostul.worldzero.event.fall.WorldZeroFallEvent;
+import ru.nekostul.worldzero.event.freeze.WorldZeroFreezeEvent;
+import ru.nekostul.worldzero.event.horror.WorldZeroHorrorFinale;
+import ru.nekostul.worldzero.event.paralysis.WorldZeroParalysisEvent;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import java.util.HashMap;
 import java.util.Map;

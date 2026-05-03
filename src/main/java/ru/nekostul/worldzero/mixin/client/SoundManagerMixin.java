@@ -1,12 +1,12 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.client;
 
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.SoundManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import ru.nekostul.worldzero.WorldZeroFallDamageClientController;
-import ru.nekostul.worldzero.WorldZeroKoridorClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroFallDamageClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroKoridorClientController;
 
 @Mixin(SoundManager.class)
 public abstract class SoundManagerMixin {

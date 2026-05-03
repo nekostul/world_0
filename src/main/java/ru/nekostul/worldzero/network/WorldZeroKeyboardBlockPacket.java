@@ -1,9 +1,10 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.network;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
+import ru.nekostul.worldzero.client.controller.WorldZeroVoidClientController;
 
 import java.util.function.Supplier;
 

@@ -1,9 +1,13 @@
 package ru.nekostul.worldzero;
 
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import ru.nekostul.worldzero.config.WorldZeroConfig;
+import ru.nekostul.worldzero.entity.WorldZeroEntities;
+import ru.nekostul.worldzero.item.WorldZeroItems;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 import ru.nekostul.worldzero.worldgen.WorldZeroLegacyWorldgen;
 
 @Mod(WorldZeroMod.MOD_ID)

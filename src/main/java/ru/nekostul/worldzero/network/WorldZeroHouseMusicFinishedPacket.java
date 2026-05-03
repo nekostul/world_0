@@ -1,8 +1,9 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.network;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
+import ru.nekostul.worldzero.dimension.WorldZeroHouseDimension;
 
 import java.util.function.Supplier;
 

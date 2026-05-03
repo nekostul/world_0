@@ -1,10 +1,11 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.entity;
 
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
+import ru.nekostul.worldzero.WorldZeroMod;
 
 public final class WorldZeroEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(

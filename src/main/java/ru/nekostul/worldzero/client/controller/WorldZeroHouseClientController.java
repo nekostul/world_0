@@ -1,23 +1,27 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.client.controller;
 
 import net.minecraft.client.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
-import net.minecraft.network.chat.Component;
-import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance.Attenuation;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.RenderHighlightEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import ru.nekostul.worldzero.mixin.ChatComponentAccessor;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.dimension.WorldZeroHouseBadDimension;
+import ru.nekostul.worldzero.dimension.WorldZeroHouseDimension;
+import ru.nekostul.worldzero.mixin.client.ChatComponentAccessor;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;

@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.world;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.MobCategory;
@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import ru.nekostul.worldzero.WorldZeroHorrorEventSystem;
+import ru.nekostul.worldzero.event.horror.WorldZeroHorrorEventSystem;
 
 @Mixin(NaturalSpawner.class)
 public abstract class NaturalSpawnerMixin {

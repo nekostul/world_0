@@ -1,9 +1,9 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.client.controller;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
-import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance.Attenuation;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundSource;
@@ -13,6 +13,8 @@ import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.dimension.WorldZeroKoridorDimension;
 
 import javax.annotation.Nullable;
 import java.util.EnumMap;

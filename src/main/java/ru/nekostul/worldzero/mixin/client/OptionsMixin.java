@@ -1,12 +1,12 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.client;
 
 import net.minecraft.client.Options;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import ru.nekostul.worldzero.WorldZeroFallClientController;
-import ru.nekostul.worldzero.WorldZeroParalysisClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroFallClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroParalysisClientController;
 
 @Mixin(Options.class)
 public abstract class OptionsMixin {

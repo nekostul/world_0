@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.dimension;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -19,6 +19,12 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.entity.WorldZeroEchoEntity;
+import ru.nekostul.worldzero.entity.WorldZeroEntities;
+import ru.nekostul.worldzero.event.horror.WorldZeroHorrorFinale;
+import ru.nekostul.worldzero.network.WorldZeroFinalePacket;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import java.util.Arrays;
 import java.util.HashMap;

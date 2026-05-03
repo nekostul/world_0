@@ -1,5 +1,6 @@
-package ru.nekostul.worldzero.client;
+package ru.nekostul.worldzero.client.renderer;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelLayers;
@@ -7,8 +8,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.HumanoidMobRenderer;
 import net.minecraft.resources.ResourceLocation;
-import com.mojang.blaze3d.vertex.PoseStack;
-import ru.nekostul.worldzero.WorldZeroEchoEntity;
+import ru.nekostul.worldzero.entity.WorldZeroEchoEntity;
 
 public class WorldZeroEchoRenderer extends HumanoidMobRenderer<WorldZeroEchoEntity, PlayerModel<WorldZeroEchoEntity>> {
     private static final ResourceLocation WORLDZERO_STEVE_TEXTURE = ResourceLocation.fromNamespaceAndPath(

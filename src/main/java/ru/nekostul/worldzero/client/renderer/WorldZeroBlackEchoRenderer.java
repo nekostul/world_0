@@ -1,8 +1,8 @@
-package ru.nekostul.worldzero.client;
+package ru.nekostul.worldzero.client.renderer;
 
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
-import ru.nekostul.worldzero.WorldZeroEchoEntity;
+import ru.nekostul.worldzero.entity.WorldZeroEchoEntity;
 
 public class WorldZeroBlackEchoRenderer extends WorldZeroEchoRenderer {
     private static final ResourceLocation WORLDZERO_BLACK_TEXTURE = ResourceLocation.fromNamespaceAndPath(

@@ -1,10 +1,12 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.command;
 
 import net.minecraft.commands.CommandRuntimeException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraftforge.event.CommandEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.state.WorldZeroState;
 
 import java.util.Locale;
 import java.util.Set;

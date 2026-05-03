@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.dimension;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -22,27 +22,27 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.DoorBlock;
-import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.FarmBlock;
+import net.minecraft.world.level.block.FenceGateBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingFallEvent;
@@ -52,7 +52,13 @@ import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
 import ru.nekostul.worldzero.achievement.WorldZeroAdvancementTriggers;
+import ru.nekostul.worldzero.client.controller.WorldZeroHouseClientController;
+import ru.nekostul.worldzero.entity.WorldZeroEntities;
+import ru.nekostul.worldzero.entity.WorldZeroHouseEchoEntity;
+import ru.nekostul.worldzero.event.paralysis.WorldZeroParalysisEvent;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import javax.annotation.Nullable;
 import java.util.ArrayDeque;
@@ -1353,8 +1359,8 @@ public final class WorldZeroHouseDimension {
         }
 
         BlockPos firstTarget = !tillTargets.isEmpty()
-                ? tillTargets.get(0).worldzero$pos
-                : plantTargets.get(0).worldzero$soilPos;
+                ? tillTargets.get(0).worldzero$pos()
+                : plantTargets.get(0).worldzero$soilPos();
         RestorationApproachScript approachScript = worldzero$createFixedRestorationApproach(level);
         BlockPos echoSpawnPos;
         List<BlockPos> approachTargets;

@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.echo;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.MinecraftServer;

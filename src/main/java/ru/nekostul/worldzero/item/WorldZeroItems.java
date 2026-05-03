@@ -1,9 +1,10 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.item;
 
 import net.minecraft.world.item.Item;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
+import ru.nekostul.worldzero.WorldZeroMod;
 
 public final class WorldZeroItems {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(

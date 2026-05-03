@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.item;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;

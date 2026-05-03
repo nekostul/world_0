@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.config;
 
 import net.minecraftforge.common.ForgeConfigSpec;
 

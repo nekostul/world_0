@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
@@ -15,8 +15,8 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import ru.nekostul.worldzero.WorldZeroDevCheats;
-import ru.nekostul.worldzero.WorldZeroState;
+import ru.nekostul.worldzero.command.WorldZeroDevCheats;
+import ru.nekostul.worldzero.state.WorldZeroState;
 
 @Mixin(ShareToLanScreen.class)
 public abstract class ShareToLanScreenMixin {

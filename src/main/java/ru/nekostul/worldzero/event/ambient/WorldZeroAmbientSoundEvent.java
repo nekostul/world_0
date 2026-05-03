@@ -1,6 +1,8 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.ambient;
 
 import net.minecraft.server.level.ServerLevel;
+import ru.nekostul.worldzero.event.horror.WorldZeroHorrorEventSystem;
+import ru.nekostul.worldzero.event.major.WorldZeroMajorEventSystem;
 
 public final class WorldZeroAmbientSoundEvent {
     private WorldZeroAmbientSoundEvent() {

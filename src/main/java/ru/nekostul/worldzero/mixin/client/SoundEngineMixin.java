@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SoundInstance;
@@ -11,10 +11,10 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import ru.nekostul.worldzero.WorldZeroFreezeClientController;
-import ru.nekostul.worldzero.WorldZeroFinaleClientController;
-import ru.nekostul.worldzero.WorldZeroKoridorClientController;
-import ru.nekostul.worldzero.WorldZeroParalysisClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroFinaleClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroFreezeClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroKoridorClientController;
+import ru.nekostul.worldzero.client.controller.WorldZeroParalysisClientController;
 
 @Mixin(SoundEngine.class)
 public abstract class SoundEngineMixin {

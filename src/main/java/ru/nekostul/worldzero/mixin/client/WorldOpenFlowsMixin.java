@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero.mixin;
+package ru.nekostul.worldzero.mixin.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.AlertScreen;
@@ -21,7 +21,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import ru.nekostul.worldzero.WorldZeroState;
+import ru.nekostul.worldzero.state.WorldZeroState;
+import ru.nekostul.worldzero.worldgen.WorldZeroLegacyWorldFactory;
 
 import java.io.IOException;
 import java.util.function.Function;

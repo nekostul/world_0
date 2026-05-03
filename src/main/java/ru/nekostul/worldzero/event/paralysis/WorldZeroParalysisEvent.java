@@ -1,4 +1,4 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.paralysis;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -34,7 +34,21 @@ import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
 import ru.nekostul.worldzero.achievement.WorldZeroAdvancementTriggers;
+import ru.nekostul.worldzero.dimension.WorldZeroKoridorDimension;
+import ru.nekostul.worldzero.entity.WorldZeroEchoEntity;
+import ru.nekostul.worldzero.entity.WorldZeroEntities;
+import ru.nekostul.worldzero.event.WorldZeroStoryTime;
+import ru.nekostul.worldzero.event.ambient.WorldZeroAmbientSoundEvent;
+import ru.nekostul.worldzero.event.fall.WorldZeroFallEvent;
+import ru.nekostul.worldzero.event.footsteps.WorldZeroFootstepsEvent;
+import ru.nekostul.worldzero.event.freeze.WorldZeroFreezeEvent;
+import ru.nekostul.worldzero.event.house.WorldZeroHouseDetector;
+import ru.nekostul.worldzero.event.house.WorldZeroHouseEvent;
+import ru.nekostul.worldzero.event.skywatch.WorldZeroSkyWatchEvent;
+import ru.nekostul.worldzero.network.WorldZeroNetwork;
+import ru.nekostul.worldzero.network.WorldZeroParalysisClientPacket;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;

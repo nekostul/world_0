@@ -1,10 +1,12 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.world;
 
-import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.npc.Villager;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import ru.nekostul.worldzero.WorldZeroMod;
+import ru.nekostul.worldzero.dimension.WorldZeroVoidPortalDimension;
 
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class WorldZeroVillagerBlocker {

@@ -1,4 +1,5 @@
-package ru.nekostul.worldzero;
+package ru.nekostul.worldzero.event.horror;
+
 
 public enum WorldZeroHorrorPhase {
     FIRST,

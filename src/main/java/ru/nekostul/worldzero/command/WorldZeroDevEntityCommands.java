@@ -183,6 +183,16 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerDoubleChat(context.getSource())))
                         .then(Commands.literal("reset_double_chat")
                                 .executes(context -> worldzero$resetDoubleChat(context.getSource())))
+                        .then(Commands.literal("spawn")
+                                .then(Commands.literal("portal")
+                                        .executes(context -> worldzero$spawnStructure(context.getSource(), "portal")))
+                                .then(Commands.literal("portal2")
+                                        .executes(context -> worldzero$spawnStructure(context.getSource(), "portal2")))
+                                .then(Commands.literal("dom")
+                                        .executes(context -> worldzero$spawnStructure(context.getSource(), "dom"))))
+                        .then(Commands.literal("update")
+                                .then(Commands.literal("dom")
+                                        .executes(context -> worldzero$updateDomStructure(context.getSource()))))
                         .then(Commands.literal("detect_house")
                                 .executes(context -> worldzero$detectHouse(context.getSource())))
         );
@@ -786,6 +796,37 @@ public final class WorldZeroDevEntityCommands {
                         + ", " + rangeInfo
         ), false);
         return 1;
+    }
+
+    private static int worldzero$spawnStructure(CommandSourceStack source, String structureName) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        boolean spawned = WorldZeroOverworldStructureEvent.worldzero$spawnDebugStructure(player, structureName);
+        source.sendSuccess(() -> Component.literal(
+                spawned
+                        ? "[WORLD_0][DEV] spawned structure: " + structureName
+                        : "[WORLD_0][DEV] spawn failed for structure: " + structureName
+                        + " (be in overworld and keep a valid surface in front of you)"
+        ), false);
+        return spawned ? 1 : 0;
+    }
+
+    private static int worldzero$updateDomStructure(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        boolean updated = WorldZeroOverworldStructureEvent.worldzero$updateNearestDomDebug(player);
+        source.sendSuccess(() -> Component.literal(
+                updated
+                        ? "[WORLD_0][DEV] updated nearest dom to dom2"
+                        : "[WORLD_0][DEV] update failed for dom (no nearby dom found or no valid template)"
+        ), false);
+        return updated ? 1 : 0;
     }
 
     private static int worldzero$triggerDoubleChat(CommandSourceStack source) {

@@ -33,7 +33,7 @@ public final class WorldZeroDoubleChatEvent {
     private static final int WORLDZERO_LOCAL_PORT_MAX_EXCLUSIVE = 60000;
     private static final String WORLDZERO_MUTATED_NAME_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789_";
     private static final String WORLDZERO_MUTATED_NAME_CHARS_UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
-    private static final String WORLDZERO_PLAYER_GREETING_TRIGGER = "привет";
+    private static final String WORLDZERO_PLAYER_GREETING_TRIGGER = "\u043f\u0440\u0438\u0432\u0435\u0442";
     private static final int WORLDZERO_STAGE_WAITING_JOIN = 0;
     private static final int WORLDZERO_STAGE_WAITING_FIRST_HELLO = 1;
     private static final int WORLDZERO_STAGE_WAITING_FIRST_REPLY = 2;
@@ -194,6 +194,51 @@ public final class WorldZeroDoubleChatEvent {
             saveData.setDirty();
         }
         return removed;
+    }
+
+    public static String worldzero$getSpeakerName(ServerPlayer player) {
+        if (player == null || player.getServer() == null) {
+            return "";
+        }
+
+        ServerLevel overworld = player.getServer().getLevel(Level.OVERWORLD);
+        if (overworld == null) {
+            return "";
+        }
+
+        DoubleChatSaveData saveData = worldzero$getSaveData(overworld);
+        PlayerState state = worldzero$getOrCreateState(
+                saveData,
+                player.getUUID(),
+                WorldZeroStoryTime.worldzero$getStoryTicks(overworld)
+        );
+        if (worldzero$ensureScenarioData(state, player, overworld)) {
+            saveData.setDirty();
+        }
+        return state.worldzero$fakeName;
+    }
+
+    public static boolean worldzero$sendSpeakerLineNow(ServerPlayer player, String messageKey) {
+        if (player == null || messageKey == null || messageKey.isBlank()) {
+            return false;
+        }
+
+        String speaker = worldzero$getSpeakerName(player);
+        if (speaker.isBlank()) {
+            return false;
+        }
+
+        worldzero$sendPlayerLine(player, speaker, messageKey);
+        return true;
+    }
+
+    public static boolean worldzero$sendAutoSelfLineNow(ServerPlayer player, String messageKey) {
+        if (player == null || messageKey == null || messageKey.isBlank()) {
+            return false;
+        }
+
+        WorldZeroNetwork.sendDoubleChatAutoSelfLine(player, messageKey);
+        return true;
     }
 
     private static void worldzero$tickPlayer(
@@ -431,7 +476,7 @@ public final class WorldZeroDoubleChatEvent {
     }
 
     private static void worldzero$sendAutoPlayerLine(ServerPlayer player, String speaker, String messageKey) {
-        WorldZeroNetwork.sendDoubleChatAutoLine(player, speaker, messageKey);
+        WorldZeroNetwork.sendDoubleChatAutoSelfLine(player, messageKey);
     }
 
     private static void worldzero$sendLocalPortLine(ServerPlayer player, String port) {

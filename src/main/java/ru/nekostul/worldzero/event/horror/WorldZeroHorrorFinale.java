@@ -3,6 +3,7 @@ package ru.nekostul.worldzero;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.MinecraftServer;
@@ -48,6 +49,9 @@ public final class WorldZeroHorrorFinale {
     private static final int WORLDZERO_POST_STAGE_FINAL_MENU = 3;
     private static final int WORLDZERO_POST_STAGE_ABSOLUTE_RUNNING = 4;
     private static final int WORLDZERO_POST_STAGE_ABSOLUTE_DONE = 5;
+    private static final Component WORLDZERO_FINAL_WORLD_LOCK_MESSAGE = Component.literal(
+            "Internal Exception: java.io.UTFDataFormatException: malformed input around byte 4100 in blak_echo.session"
+    );
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SESSION_STATES = new WeakHashMap<>();
 
     private WorldZeroHorrorFinale() {
@@ -69,6 +73,11 @@ public final class WorldZeroHorrorFinale {
         }
 
         FinaleSaveData saveData = worldzero$getSaveData(overworld);
+        if (saveData.worldzero$postFinaleStage == WORLDZERO_POST_STAGE_ABSOLUTE_DONE) {
+            player.connection.disconnect(WORLDZERO_FINAL_WORLD_LOCK_MESSAGE);
+            return;
+        }
+
         if (saveData.worldzero$postFinaleStage == WORLDZERO_POST_STAGE_WAITING_VOID) {
             if (WorldZeroVoidDimension.worldzero$teleportPlayerToFinalVoid(player)) {
                 saveData.worldzero$postFinaleStage = WORLDZERO_POST_STAGE_VOID_RUNNING;

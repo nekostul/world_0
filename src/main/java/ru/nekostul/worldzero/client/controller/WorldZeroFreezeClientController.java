@@ -26,19 +26,34 @@ public final class WorldZeroFreezeClientController {
     private static int worldzero$focusEntityId = -1;
     private static float worldzero$forcedYaw = Float.NaN;
     private static float worldzero$forcedPitch = Float.NaN;
+    private static double worldzero$serverLockedX = Double.NaN;
+    private static double worldzero$serverLockedY = Double.NaN;
+    private static double worldzero$serverLockedZ = Double.NaN;
 
     private WorldZeroFreezeClientController() {
     }
 
     public static void startFreeze(int durationTicks) {
-        startFreeze(durationTicks, -1, Float.NaN, Float.NaN);
+        startFreeze(durationTicks, -1, Float.NaN, Float.NaN, Double.NaN, Double.NaN, Double.NaN);
     }
 
     public static void startFreeze(int durationTicks, int focusEntityId) {
-        startFreeze(durationTicks, focusEntityId, Float.NaN, Float.NaN);
+        startFreeze(durationTicks, focusEntityId, Float.NaN, Float.NaN, Double.NaN, Double.NaN, Double.NaN);
     }
 
     public static void startFreeze(int durationTicks, int focusEntityId, float forcedYaw, float forcedPitch) {
+        startFreeze(durationTicks, focusEntityId, forcedYaw, forcedPitch, Double.NaN, Double.NaN, Double.NaN);
+    }
+
+    public static void startFreeze(
+            int durationTicks,
+            int focusEntityId,
+            float forcedYaw,
+            float forcedPitch,
+            double lockedX,
+            double lockedY,
+            double lockedZ
+    ) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null) {
             return;
@@ -54,6 +69,9 @@ public final class WorldZeroFreezeClientController {
         worldzero$focusEntityId = focusEntityId;
         worldzero$forcedYaw = forcedYaw;
         worldzero$forcedPitch = forcedPitch;
+        worldzero$serverLockedX = lockedX;
+        worldzero$serverLockedY = lockedY;
+        worldzero$serverLockedZ = lockedZ;
 
         if (minecraft.getSoundManager() != null) {
             minecraft.getSoundManager().stop();
@@ -89,15 +107,6 @@ public final class WorldZeroFreezeClientController {
         }
 
         LocalPlayer player = minecraft.player;
-        if (!worldzero$capturedPlayerState) {
-            worldzero$lockedX = player.getX();
-            worldzero$lockedY = player.getY();
-            worldzero$lockedZ = player.getZ();
-            worldzero$lockedYaw = Float.isNaN(worldzero$forcedYaw) ? player.getYRot() : worldzero$forcedYaw;
-            worldzero$lockedPitch = Float.isNaN(worldzero$forcedPitch) ? player.getXRot() : worldzero$forcedPitch;
-            worldzero$capturedPlayerState = true;
-        }
-
         if (minecraft.screen != null) {
             minecraft.setScreen(null);
         }
@@ -109,6 +118,16 @@ public final class WorldZeroFreezeClientController {
 
         player.setDeltaMovement(0.0D, 0.0D, 0.0D);
         player.setSprinting(false);
+        player.fallDistance = 0.0F;
+        if (!worldzero$capturedPlayerState) {
+            worldzero$lockedX = Double.isFinite(worldzero$serverLockedX) ? worldzero$serverLockedX : player.getX();
+            worldzero$lockedY = Double.isFinite(worldzero$serverLockedY) ? worldzero$serverLockedY : player.getY();
+            worldzero$lockedZ = Double.isFinite(worldzero$serverLockedZ) ? worldzero$serverLockedZ : player.getZ();
+            worldzero$lockedYaw = Float.isNaN(worldzero$forcedYaw) ? player.getYRot() : worldzero$forcedYaw;
+            worldzero$lockedPitch = Float.isNaN(worldzero$forcedPitch) ? player.getXRot() : worldzero$forcedPitch;
+            worldzero$capturedPlayerState = true;
+        }
+
         player.setPos(worldzero$lockedX, worldzero$lockedY, worldzero$lockedZ);
         float targetYaw = worldzero$lockedYaw;
         float targetPitch = worldzero$lockedPitch;
@@ -176,5 +195,8 @@ public final class WorldZeroFreezeClientController {
         worldzero$focusEntityId = -1;
         worldzero$forcedYaw = Float.NaN;
         worldzero$forcedPitch = Float.NaN;
+        worldzero$serverLockedX = Double.NaN;
+        worldzero$serverLockedY = Double.NaN;
+        worldzero$serverLockedZ = Double.NaN;
     }
 }

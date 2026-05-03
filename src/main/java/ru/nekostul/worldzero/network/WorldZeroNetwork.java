@@ -174,7 +174,15 @@ public final class WorldZeroNetwork {
         WorldZeroServerFreezeController.worldzero$startFreeze(player, durationTicks, forcedYaw, forcedPitch);
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
-                new WorldZeroFreezeStartPacket(durationTicks, focusEntityId, forcedYaw, forcedPitch)
+                new WorldZeroFreezeStartPacket(
+                        durationTicks,
+                        focusEntityId,
+                        forcedYaw,
+                        forcedPitch,
+                        player.getX(),
+                        player.getY(),
+                        player.getZ()
+                )
         );
     }
 
@@ -305,6 +313,17 @@ public final class WorldZeroNetwork {
                         WorldZeroDoubleChatPacket.WORLDZERO_ACTION_LOCAL_PORT,
                         "",
                         port
+                )
+        );
+    }
+
+    public static void sendDoubleChatAutoSelfLine(ServerPlayer player, String messageKey) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroDoubleChatPacket(
+                        WorldZeroDoubleChatPacket.WORLDZERO_ACTION_AUTO_SELF_LINE,
+                        "",
+                        messageKey
                 )
         );
     }

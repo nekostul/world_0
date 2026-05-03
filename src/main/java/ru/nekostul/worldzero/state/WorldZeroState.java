@@ -34,6 +34,7 @@ public final class WorldZeroState {
     private static final String CREATE_REDIRECT_FILE_NAME = "create_redirect_pending.txt";
     private static final String COMMAND_ANOMALY_FILE_NAME = "command_anomaly_seen.txt";
     private static final String FINALE_RECONNECT_STAGE_FILE_NAME = "finale_reconnect_stage.txt";
+    private static final String LOCAL_PUBLISH_LOCK_FILE_NAME = "local_publish_lock.txt";
     private static final String WORLD_SUFFIX = "_0";
     private static final String DEFAULT_PRIMARY_WORLD_NAME = "World_0";
     private static final String NO_PRIMARY_TITLE_KEY = "worldzero.error.title";
@@ -462,6 +463,35 @@ public final class WorldZeroState {
         }
     }
 
+    public static boolean hasLocalPublishLock(Minecraft minecraft) {
+        if (minecraft == null) {
+            return false;
+        }
+
+        return Files.exists(getLocalPublishLockFilePath(minecraft));
+    }
+
+    public static void markLocalPublishLock(Minecraft minecraft) {
+        if (minecraft == null) {
+            return;
+        }
+
+        Path markerFile = getLocalPublishLockFilePath(minecraft);
+        try {
+            Files.createDirectories(markerFile.getParent());
+            Files.writeString(
+                    markerFile,
+                    "locked" + System.lineSeparator(),
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            );
+        } catch (IOException exception) {
+            LOGGER.warn("Failed to persist WORLD_0 local publish lock marker", exception);
+        }
+    }
+
     private static void deleteDirectory(Path directory) throws IOException {
         try (Stream<Path> pathStream = Files.walk(directory)) {
             pathStream
@@ -542,6 +572,10 @@ public final class WorldZeroState {
 
     private static Path getFinaleReconnectStageFilePath(Minecraft minecraft) {
         return getWorldZeroDirectory(minecraft).resolve(FINALE_RECONNECT_STAGE_FILE_NAME);
+    }
+
+    private static Path getLocalPublishLockFilePath(Minecraft minecraft) {
+        return getWorldZeroDirectory(minecraft).resolve(LOCAL_PUBLISH_LOCK_FILE_NAME);
     }
 
     private static Path getWorldZeroDirectory(Minecraft minecraft) {

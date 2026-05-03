@@ -2,6 +2,7 @@ package ru.nekostul.worldzero.mixin;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.AlertScreen;
 import net.minecraft.client.gui.screens.GenericDirtMessageScreen;
 import net.minecraft.client.gui.screens.ShareToLanScreen;
@@ -19,8 +20,29 @@ import ru.nekostul.worldzero.WorldZeroState;
 
 @Mixin(ShareToLanScreen.class)
 public abstract class ShareToLanScreenMixin {
+    private static final String WORLDZERO_OPEN_TO_LAN_KEY = "lanServer.start";
+
     @Shadow
     private boolean commands;
+
+    @Inject(
+            method = "init",
+            at = @At("TAIL")
+    )
+    private void worldzero$disableOpenToLanAfterPortReveal(CallbackInfo callbackInfo) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || !WorldZeroState.hasLocalPublishLock(minecraft)) {
+            return;
+        }
+
+        ShareToLanScreen screen = (ShareToLanScreen) (Object) this;
+        String startLabel = Component.translatable(WORLDZERO_OPEN_TO_LAN_KEY).getString();
+        for (GuiEventListener child : screen.children()) {
+            if (child instanceof Button button && startLabel.equals(button.getMessage().getString())) {
+                button.active = false;
+            }
+        }
+    }
 
     @Inject(
             method = "lambda$init$2(Lnet/minecraft/client/server/IntegratedServer;Lnet/minecraft/client/gui/components/Button;)V",
@@ -32,6 +54,13 @@ public abstract class ShareToLanScreenMixin {
             Button button,
             CallbackInfo callbackInfo
     ) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft != null && WorldZeroState.hasLocalPublishLock(minecraft)) {
+            button.active = false;
+            callbackInfo.cancel();
+            return;
+        }
+
         if (WorldZeroDevCheats.isAllowedForCurrentClient()) {
             return;
         }
@@ -40,7 +69,6 @@ public abstract class ShareToLanScreenMixin {
             return;
         }
 
-        Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null) {
             return;
         }

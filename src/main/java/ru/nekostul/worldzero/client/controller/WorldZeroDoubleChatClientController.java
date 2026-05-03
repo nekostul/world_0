@@ -25,6 +25,7 @@ public final class WorldZeroDoubleChatClientController {
     private static final String WORLDZERO_LOCAL_PORT_KEY = "message.worldzero.double_chat.local_port";
     private static final String WORLDZERO_LOCAL_PORT_COPY_HINT_KEY = "message.worldzero.double_chat.local_port.copy_hint";
     private static boolean worldzero$autoTypingActive;
+    private static boolean worldzero$autoTypingSelfLine;
     private static String worldzero$autoTypingSpeaker = "";
     private static String worldzero$autoTypingMessageKey = "";
     private static int worldzero$autoTypingProgress;
@@ -44,6 +45,8 @@ public final class WorldZeroDoubleChatClientController {
                     worldzero$startAutoTyping(speaker, messageKey);
             case WorldZeroDoubleChatPacket.WORLDZERO_ACTION_LOCAL_PORT ->
                     worldzero$addLocalPortLine(messageKey);
+            case WorldZeroDoubleChatPacket.WORLDZERO_ACTION_AUTO_SELF_LINE ->
+                    worldzero$startAutoTypingSelf(messageKey);
             default -> {
             }
         }
@@ -89,7 +92,11 @@ public final class WorldZeroDoubleChatClientController {
         }
 
         minecraft.setScreen(null);
-        worldzero$addPlayerLine(worldzero$autoTypingSpeaker, worldzero$autoTypingMessageKey);
+        if (worldzero$autoTypingSelfLine) {
+            worldzero$addSelfLine(worldzero$autoTypingMessageKey);
+        } else {
+            worldzero$addPlayerLine(worldzero$autoTypingSpeaker, worldzero$autoTypingMessageKey);
+        }
         worldzero$clearAutoTyping();
     }
 
@@ -129,11 +136,27 @@ public final class WorldZeroDoubleChatClientController {
         worldzero$pushChatLine(Component.translatable(messageKey, Component.literal(speaker)).withStyle(ChatFormatting.YELLOW));
     }
 
+    private static void worldzero$addSelfLine(String messageKey) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.gui == null || minecraft.player == null
+                || messageKey == null || messageKey.isBlank()) {
+            return;
+        }
+
+        worldzero$pushChatLine(Component.translatable(
+                "chat.type.text",
+                minecraft.player.getName(),
+                Component.translatable(messageKey)
+        ));
+    }
+
     private static void worldzero$addLocalPortLine(String port) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.gui == null || port == null || port.isBlank()) {
             return;
         }
+
+        WorldZeroState.markLocalPublishLock(minecraft);
 
         Component portComponent = Component.literal("[" + port + "]").withStyle(style -> style
                 .withColor(ChatFormatting.GREEN)
@@ -168,7 +191,22 @@ public final class WorldZeroDoubleChatClientController {
         }
 
         worldzero$autoTypingActive = true;
+        worldzero$autoTypingSelfLine = false;
         worldzero$autoTypingSpeaker = speaker;
+        worldzero$autoTypingMessageKey = messageKey;
+        worldzero$autoTypingProgress = 0;
+        worldzero$autoTypingTickDelay = 0;
+        worldzero$autoTypingFinishHoldTicks = 0;
+    }
+
+    private static void worldzero$startAutoTypingSelf(String messageKey) {
+        if (messageKey == null || messageKey.isBlank()) {
+            return;
+        }
+
+        worldzero$autoTypingActive = true;
+        worldzero$autoTypingSelfLine = true;
+        worldzero$autoTypingSpeaker = "";
         worldzero$autoTypingMessageKey = messageKey;
         worldzero$autoTypingProgress = 0;
         worldzero$autoTypingTickDelay = 0;
@@ -181,6 +219,7 @@ public final class WorldZeroDoubleChatClientController {
 
     private static void worldzero$clearAutoTyping() {
         worldzero$autoTypingActive = false;
+        worldzero$autoTypingSelfLine = false;
         worldzero$autoTypingSpeaker = "";
         worldzero$autoTypingMessageKey = "";
         worldzero$autoTypingProgress = 0;

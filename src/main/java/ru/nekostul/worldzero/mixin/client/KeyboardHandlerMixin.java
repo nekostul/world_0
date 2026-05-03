@@ -12,7 +12,6 @@ import ru.nekostul.worldzero.client.controller.WorldZeroFreezeClientController;
 import ru.nekostul.worldzero.client.controller.WorldZeroHouseBadClientController;
 import ru.nekostul.worldzero.client.controller.WorldZeroParalysisClientController;
 import ru.nekostul.worldzero.client.controller.WorldZeroVoidClientController;
-import ru.nekostul.worldzero.dimension.WorldZeroVoidDimension;
 
 @Mixin(KeyboardHandler.class)
 public abstract class KeyboardHandlerMixin {
@@ -37,22 +36,9 @@ public abstract class KeyboardHandlerMixin {
     }
 
     private static boolean worldzero$isKeyboardBlocked() {
-        if (worldzero$isDevInVoid()) {
-            return false;
-        }
-
         return WorldZeroFreezeClientController.isFreezeActive()
                 || WorldZeroFallClientController.worldzero$isFallPauseBlocked()
                 || WorldZeroParalysisClientController.worldzero$isKeyboardBlocked()
                 || WorldZeroVoidClientController.worldzero$isKeyboardBlocked();
-    }
-
-    private static boolean worldzero$isDevInVoid() {
-        Minecraft minecraft = Minecraft.getInstance();
-        return minecraft != null
-                && minecraft.player != null
-                && minecraft.level != null
-                && "Dev".equals(minecraft.player.getGameProfile().getName())
-                && minecraft.level.dimension() == WorldZeroVoidDimension.WORLDZERO_VOID_LEVEL;
     }
 }

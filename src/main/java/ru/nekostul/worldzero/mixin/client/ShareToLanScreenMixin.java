@@ -15,7 +15,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import ru.nekostul.worldzero.command.WorldZeroDevCheats;
 import ru.nekostul.worldzero.state.WorldZeroState;
 
 @Mixin(ShareToLanScreen.class)
@@ -58,10 +57,6 @@ public abstract class ShareToLanScreenMixin {
         if (minecraft != null && WorldZeroState.hasLocalPublishLock(minecraft)) {
             button.active = false;
             callbackInfo.cancel();
-            return;
-        }
-
-        if (WorldZeroDevCheats.isAllowedForCurrentClient()) {
             return;
         }
 

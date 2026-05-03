@@ -22,10 +22,6 @@ public final class WorldZeroClientCommandAnomaly {
 
     @SubscribeEvent
     public static void worldzero$registerClientCommands(RegisterClientCommandsEvent event) {
-        if (WorldZeroDevCheats.isAllowedForCurrentClient()) {
-            return;
-        }
-
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
         worldzero$registerBlockedCommand(dispatcher, "gamemode");
         worldzero$registerBlockedCommand(dispatcher, "gamerule");
@@ -45,10 +41,6 @@ public final class WorldZeroClientCommandAnomaly {
     }
 
     private static int worldzero$handleBlockedCheatCommand(CommandContext<CommandSourceStack> context) {
-        if (WorldZeroDevCheats.isAllowedForCurrentClient()) {
-            return 1;
-        }
-
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.gui == null) {
             return 0;

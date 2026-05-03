@@ -16,7 +16,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import ru.nekostul.worldzero.command.WorldZeroDevCheats;
 import ru.nekostul.worldzero.state.WorldZeroState;
 
 import java.util.Optional;
@@ -32,7 +31,7 @@ public abstract class CreateWorldScreenMixin {
             index = 0
     )
     private Tab[] worldzero$keepOnlyGameTab(Tab[] tabs) {
-        if (WorldZeroDevCheats.isAllowedForCurrentClient() || tabs.length == 0) {
+        if (tabs.length == 0) {
             return tabs;
         }
 
@@ -126,10 +125,6 @@ public abstract class CreateWorldScreenMixin {
 
     @Inject(method = "createLevelSettings", at = @At("RETURN"), cancellable = true)
     private void worldzero$forceAllowedCreationSettings(CallbackInfoReturnable<LevelSettings> callbackInfo) {
-        if (WorldZeroDevCheats.isAllowedForCurrentClient()) {
-            return;
-        }
-
         LevelSettings levelSettings = callbackInfo.getReturnValue();
         callbackInfo.setReturnValue(new LevelSettings(
                 levelSettings.levelName(),

@@ -19,7 +19,6 @@ import ru.nekostul.worldzero.dimension.WorldZeroHouseBadDimension;
 @Mod.EventBusSubscriber(modid = WorldZeroMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class WorldZeroHouseBadClientController {
     private static final String WORLDZERO_ALPHA_LABEL = "Minecraft Alpha 1.0.16_02";
-    private static final String WORLDZERO_DEV_NO_BARS_PLAYER_NAME = "Dev";
     private static final int WORLDZERO_FORCED_FOV = 70;
     private static int worldzero$previousFov = -1;
 
@@ -111,11 +110,8 @@ public final class WorldZeroHouseBadClientController {
         GuiGraphics guiGraphics = event.getGuiGraphics();
         int guiWidth = guiGraphics.guiWidth();
         int guiHeight = guiGraphics.guiHeight();
-        int barWidth = 0;
-        if (!worldzero$shouldDisableAspectBars(minecraft)) {
-            int visibleWidth = (guiHeight * 4) / 3;
-            barWidth = Math.max(0, (guiWidth - visibleWidth) / 2);
-        }
+        int visibleWidth = (guiHeight * 4) / 3;
+        int barWidth = Math.max(0, (guiWidth - visibleWidth) / 2);
         if (barWidth > 0) {
             guiGraphics.fill(0, 0, barWidth, guiHeight, 0xFF000000);
             guiGraphics.fill(guiWidth - barWidth, 0, guiWidth, guiHeight, 0xFF000000);
@@ -131,12 +127,6 @@ public final class WorldZeroHouseBadClientController {
                 && minecraft.player != null
                 && minecraft.level != null
                 && minecraft.level.dimension() == WorldZeroHouseBadDimension.WORLDZERO_HOUSE_BAD_LEVEL;
-    }
-
-    private static boolean worldzero$shouldDisableAspectBars(Minecraft minecraft) {
-        return minecraft != null
-                && minecraft.player != null
-                && WORLDZERO_DEV_NO_BARS_PLAYER_NAME.equals(minecraft.player.getGameProfile().getName());
     }
 
     private static void worldzero$enforceFov(Minecraft minecraft) {

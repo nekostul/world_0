@@ -41,8 +41,7 @@ public final class WorldZeroVoidClientController {
                 && minecraft.player != null
                 && minecraft.level != null
                 && minecraft.level.dimension() == WorldZeroVoidDimension.WORLDZERO_VOID_LEVEL
-                && worldzero$keyboardBlockTicksRemaining > 0
-                && !worldzero$isDevInVoid(minecraft);
+                && worldzero$keyboardBlockTicksRemaining > 0;
     }
 
     public static void worldzero$handleChatLine(String speaker, String messageKey) {
@@ -100,9 +99,7 @@ public final class WorldZeroVoidClientController {
             }
         }
 
-        if (!worldzero$isDevInVoid(minecraft)) {
-            worldzero$releaseControlKeys(minecraft.options);
-        }
+        worldzero$releaseControlKeys(minecraft.options);
         worldzero$keyboardBlockTicksRemaining--;
     }
 
@@ -130,11 +127,5 @@ public final class WorldZeroVoidClientController {
         for (int index = 0; index < options.keyHotbarSlots.length; index++) {
             options.keyHotbarSlots[index].setDown(false);
         }
-    }
-
-    private static boolean worldzero$isDevInVoid(Minecraft minecraft) {
-        return minecraft.level != null
-                && "Dev".equals(minecraft.player.getGameProfile().getName())
-                && minecraft.level.dimension() == WorldZeroVoidDimension.WORLDZERO_VOID_LEVEL;
     }
 }

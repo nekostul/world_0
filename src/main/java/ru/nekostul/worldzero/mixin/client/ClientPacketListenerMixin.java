@@ -14,7 +14,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import ru.nekostul.worldzero.command.WorldZeroDevCheats;
 import ru.nekostul.worldzero.state.WorldZeroState;
 
 @Mixin(ClientPacketListener.class)
@@ -61,10 +60,6 @@ public abstract class ClientPacketListenerMixin {
 
     @ModifyVariable(method = "send", at = @At("HEAD"), argsOnly = true)
     private Packet<?> worldzero$forceHardDifficultyPacket(Packet<?> packet) {
-        if (WorldZeroDevCheats.isAllowedForCurrentClient()) {
-            return packet;
-        }
-
         if (!(packet instanceof ServerboundChangeDifficultyPacket)) {
             return packet;
         }

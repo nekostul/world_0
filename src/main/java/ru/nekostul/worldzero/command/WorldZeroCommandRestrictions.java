@@ -28,10 +28,6 @@ public final class WorldZeroCommandRestrictions {
             return;
         }
 
-        if (WorldZeroDevCheats.isAllowedForSource(source)) {
-            return;
-        }
-
         long gameTime = source.getServer().overworld().getGameTime();
         if (gameTime < WORLDZERO_COMMAND_LOCK_START_TICKS) {
             return;

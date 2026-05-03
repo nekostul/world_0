@@ -135,6 +135,13 @@ public final class WorldZeroNetwork {
         );
         WORLDZERO_CHANNEL.registerMessage(
                 worldzero$packetId++,
+                WorldZeroSkyWatchPacket.class,
+                WorldZeroSkyWatchPacket::encode,
+                WorldZeroSkyWatchPacket::decode,
+                WorldZeroSkyWatchPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
                 WorldZeroMinorAnomalyPacket.class,
                 WorldZeroMinorAnomalyPacket::encode,
                 WorldZeroMinorAnomalyPacket::decode,
@@ -325,6 +332,13 @@ public final class WorldZeroNetwork {
                         "",
                         messageKey
                 )
+        );
+    }
+
+    public static void sendSkyWatch(ServerPlayer player, byte action, int durationTicks, int variant) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroSkyWatchPacket(action, durationTicks, variant)
         );
     }
 

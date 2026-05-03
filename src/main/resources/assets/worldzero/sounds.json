@@ -68,6 +68,14 @@
       }
     ]
   },
+  "danger": {
+    "sounds": [
+      {
+        "name": "worldzero:danger",
+        "stream": true
+      }
+    ]
+  },
   "open_door": {
     "sounds": [
       {

@@ -181,6 +181,8 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerHouseReal(context.getSource())))
                         .then(Commands.literal("trigger_double_chat")
                                 .executes(context -> worldzero$triggerDoubleChat(context.getSource())))
+                        .then(Commands.literal("trigger_sky_watch")
+                                .executes(context -> worldzero$triggerSkyWatch(context.getSource())))
                         .then(Commands.literal("reset_double_chat")
                                 .executes(context -> worldzero$resetDoubleChat(context.getSource())))
                         .then(Commands.literal("spawn")
@@ -253,6 +255,9 @@ public final class WorldZeroDevEntityCommands {
             stopped++;
         }
         if (WorldZeroLastBlockEvent.worldzero$stopLastBlockNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroSkyWatchEvent.worldzero$stopNow(server)) {
             stopped++;
         }
         if (WorldZeroFootstepsEvent.worldzero$resetBlankDiscPlayback(server)) {
@@ -840,6 +845,23 @@ public final class WorldZeroDevEntityCommands {
                 triggered
                         ? "[WORLD_0][DEV] double-chat scenario triggered"
                         : "[WORLD_0][DEV] double-chat scenario trigger failed (be alive in overworld)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerSkyWatch(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        String blocker = WorldZeroSkyWatchEvent.worldzero$getDebugTriggerBlocker(player);
+        boolean triggered = WorldZeroSkyWatchEvent.worldzero$triggerNow(player);
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] sky-watch event triggered"
+                        : "[WORLD_0][DEV] sky-watch event trigger failed"
+                        + (blocker == null ? " (notice message could not be sent)" : " (" + blocker + ")")
         ), false);
         return triggered ? 1 : 0;
     }

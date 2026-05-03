@@ -144,6 +144,10 @@ public final class WorldZeroLateChatEvent {
             ServerPlayer player,
             long storyTicks
     ) {
+        if (WorldZeroSkyWatchEvent.worldzero$isActive(level.getServer())) {
+            return;
+        }
+
         PlayerState state = worldzero$getOrCreateState(saveData, player, storyTicks);
         if (!state.worldzero$idleSent) {
             if (storyTicks < state.worldzero$idleTriggerTick || !WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player)) {

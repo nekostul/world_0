@@ -107,5 +107,11 @@
   "message.worldzero.double_chat.late.24": "he is near",
   "message.worldzero.double_chat.late.25": "if you are reading this, do not turn around right away",
   "message.worldzero.double_chat.late.26": "he is standing behind you... or maybe it just feels like it",
-  "message.worldzero.double_chat.late.27": "..."
+  "message.worldzero.double_chat.late.27": "...",
+  "message.worldzero.sky_watch.notice": "i just noticed something in the sky... it is not a mob",
+  "message.worldzero.sky_watch.success": "i think it lost you... do not come back out yet",
+  "message.worldzero.sky_watch.failure": "you did not see it... but now it knows where you are",
+  "message.worldzero.sky_watch.distance": "%s blocks",
+  "message.worldzero.sky_watch.hide": "hide",
+  "message.worldzero.sky_watch.run": "run"
 }

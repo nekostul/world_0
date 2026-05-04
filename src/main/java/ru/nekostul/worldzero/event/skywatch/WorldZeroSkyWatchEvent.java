@@ -1,12 +1,16 @@
 package ru.nekostul.worldzero.event.skywatch;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraftforge.event.TickEvent;
@@ -50,6 +54,11 @@ public final class WorldZeroSkyWatchEvent {
     private static final long WORLDZERO_LATE_RETRY_MAX_TICKS = 4L * WORLDZERO_TICKS_PER_MINUTE;
     private static final double WORLDZERO_ESCAPE_DISTANCE_SQR = 18.0D * 18.0D;
     private static final int WORLDZERO_MIN_SURFACE_DEPTH = 5;
+    private static final long WORLDZERO_MINE_CONTEXT_CACHE_TICKS = 20L * 5L;
+    private static final int WORLDZERO_MINE_SCAN_RADIUS_XZ = 2;
+    private static final int WORLDZERO_MINE_SCAN_RADIUS_Y = 1;
+    private static final int WORLDZERO_MINE_MIN_SOLID_BLOCKS = 18;
+    private static final int WORLDZERO_MINE_MIN_NATURAL_BLOCKS = 14;
     private static final String WORLDZERO_NOTICE_KEY = "message.worldzero.sky_watch.notice";
     private static final String WORLDZERO_SUCCESS_KEY = "message.worldzero.sky_watch.success";
     private static final String WORLDZERO_FAILURE_KEY = "message.worldzero.sky_watch.failure";
@@ -198,6 +207,10 @@ public final class WorldZeroSkyWatchEvent {
             return "player is inside a house";
         }
 
+        if (!worldzero$isMineArea(level, player)) {
+            return "player is not in a mine-like area";
+        }
+
         if (worldzero$hasConflictingEvent(level)) {
             return "another event is active";
         }
@@ -314,6 +327,7 @@ public final class WorldZeroSkyWatchEvent {
 
         if (!WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player)
                 || !worldzero$isUnderground(level, player)
+                || !worldzero$isMineAreaCached(level, player, state, gameTicks)
                 || worldzero$isInsideHouse(player)
                 || worldzero$hasConflictingEvent(level)) {
             state.worldzero$nextAttemptTick = worldzero$scheduleNextAttemptTick(level, storyTicks);
@@ -370,6 +384,65 @@ public final class WorldZeroSkyWatchEvent {
 
         int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feetPos.getX(), feetPos.getZ());
         return surfaceY - feetPos.getY() >= WORLDZERO_MIN_SURFACE_DEPTH;
+    }
+
+    private static boolean worldzero$isMineAreaCached(
+            ServerLevel level,
+            ServerPlayer player,
+            PlayerState state,
+            long gameTicks
+    ) {
+        if (state.worldzero$mineAreaCheckUntilTick > gameTicks) {
+            return state.worldzero$mineAreaCheckResult;
+        }
+
+        boolean mineArea = worldzero$isMineArea(level, player);
+        state.worldzero$mineAreaCheckResult = mineArea;
+        state.worldzero$mineAreaCheckUntilTick = gameTicks + WORLDZERO_MINE_CONTEXT_CACHE_TICKS;
+        return mineArea;
+    }
+
+    private static boolean worldzero$isMineArea(ServerLevel level, ServerPlayer player) {
+        BlockPos center = BlockPos.containing(player.getEyePosition());
+        int solidBlocks = 0;
+        int naturalBlocks = 0;
+
+        for (int dx = -WORLDZERO_MINE_SCAN_RADIUS_XZ; dx <= WORLDZERO_MINE_SCAN_RADIUS_XZ; dx++) {
+            for (int dy = -WORLDZERO_MINE_SCAN_RADIUS_Y; dy <= WORLDZERO_MINE_SCAN_RADIUS_Y; dy++) {
+                for (int dz = -WORLDZERO_MINE_SCAN_RADIUS_XZ; dz <= WORLDZERO_MINE_SCAN_RADIUS_XZ; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) {
+                        continue;
+                    }
+
+                    BlockState state = level.getBlockState(center.offset(dx, dy, dz));
+                    if (state.isAir() || !state.canOcclude()) {
+                        continue;
+                    }
+
+                    solidBlocks++;
+                    if (worldzero$isMineBlock(state)) {
+                        naturalBlocks++;
+                    }
+                }
+            }
+        }
+
+        return solidBlocks >= WORLDZERO_MINE_MIN_SOLID_BLOCKS
+                && naturalBlocks >= WORLDZERO_MINE_MIN_NATURAL_BLOCKS
+                && naturalBlocks * 2 >= solidBlocks;
+    }
+
+    private static boolean worldzero$isMineBlock(BlockState state) {
+        if (state.is(Blocks.GRAVEL) || state.is(Blocks.DEEPSLATE) || state.is(Blocks.COBBLED_DEEPSLATE)) {
+            return true;
+        }
+
+        if (state.is(BlockTags.BASE_STONE_OVERWORLD)) {
+            return true;
+        }
+
+        String blockPath = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+        return blockPath.contains("deepslate") || blockPath.equals("stone");
     }
 
     private static boolean worldzero$isInsideHouse(ServerPlayer player) {
@@ -487,6 +560,8 @@ public final class WorldZeroSkyWatchEvent {
         private double worldzero$startX;
         private double worldzero$startY;
         private double worldzero$startZ;
+        private long worldzero$mineAreaCheckUntilTick;
+        private boolean worldzero$mineAreaCheckResult;
 
         private static PlayerState worldzero$load(CompoundTag tag) {
             PlayerState state = new PlayerState();

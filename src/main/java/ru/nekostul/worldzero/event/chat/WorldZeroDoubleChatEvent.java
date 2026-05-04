@@ -1,9 +1,14 @@
 package ru.nekostul.worldzero.event.chat;
 
+import com.mojang.authlib.GameProfile;
+import io.netty.buffer.Unpooled;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraftforge.event.ServerChatEvent;
@@ -20,7 +25,10 @@ import ru.nekostul.worldzero.event.horror.WorldZeroHorrorFinale;
 import ru.nekostul.worldzero.event.paralysis.WorldZeroParalysisEvent;
 import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
+import java.nio.charset.StandardCharsets;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -123,6 +131,9 @@ public final class WorldZeroDoubleChatEvent {
         if (worldzero$ensureScenarioData(state, player, overworld)) {
             saveData.setDirty();
         }
+        if (state.worldzero$joined) {
+            worldzero$ensureNeighborTabPresence(player, state);
+        }
     }
 
     @SubscribeEvent
@@ -182,6 +193,7 @@ public final class WorldZeroDoubleChatEvent {
         saveData.worldzero$states.put(player.getUUID(), state);
         saveData.setDirty();
         worldzero$sendSystemLine(player, state.worldzero$fakeName, WORLDZERO_JOINED_KEY);
+        worldzero$ensureNeighborTabPresence(player, state);
         return true;
     }
 
@@ -292,6 +304,7 @@ public final class WorldZeroDoubleChatEvent {
             state.worldzero$stage = WORLDZERO_STAGE_WAITING_FIRST_HELLO;
             state.worldzero$nextStoryTick = storyTicks + WORLDZERO_FIRST_HELLO_DELAY_TICKS;
             worldzero$sendSystemLine(player, state.worldzero$fakeName, WORLDZERO_JOINED_KEY);
+            worldzero$ensureNeighborTabPresence(player, state);
             saveData.setDirty();
             return;
         }
@@ -443,6 +456,51 @@ public final class WorldZeroDoubleChatEvent {
         }
 
         return WORLDZERO_LOCAL_PORT_MIN + level.random.nextInt(WORLDZERO_LOCAL_PORT_MAX_EXCLUSIVE - WORLDZERO_LOCAL_PORT_MIN);
+    }
+
+    private static void worldzero$ensureNeighborTabPresence(ServerPlayer player, PlayerState state) {
+        if (player == null || player.connection == null || state == null || !state.worldzero$joined) {
+            return;
+        }
+
+        String fakeName = state.worldzero$fakeName;
+        if (fakeName == null || fakeName.isBlank()) {
+            return;
+        }
+
+        UUID neighborId = worldzero$getNeighborTabUuid(player.getUUID());
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            EnumSet<ClientboundPlayerInfoUpdatePacket.Action> actions = EnumSet.of(
+                    ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER,
+                    ClientboundPlayerInfoUpdatePacket.Action.UPDATE_LISTED
+            );
+            ClientboundPlayerInfoUpdatePacket.Entry entry = new ClientboundPlayerInfoUpdatePacket.Entry(
+                    neighborId,
+                    new GameProfile(neighborId, fakeName),
+                    true,
+                    0,
+                    GameType.SURVIVAL,
+                    null,
+                    null
+            );
+
+            buffer.writeEnumSet(actions, ClientboundPlayerInfoUpdatePacket.Action.class);
+            buffer.writeCollection(List.of(entry), (packetBuffer, packetEntry) -> {
+                packetBuffer.writeUUID(packetEntry.profileId());
+                packetBuffer.writeUtf(packetEntry.profile().getName(), 16);
+                packetBuffer.writeGameProfileProperties(packetEntry.profile().getProperties());
+                packetBuffer.writeBoolean(packetEntry.listed());
+            });
+
+            player.connection.send(new ClientboundPlayerInfoUpdatePacket(buffer));
+        } finally {
+            buffer.release();
+        }
+    }
+
+    private static UUID worldzero$getNeighborTabUuid(UUID ownerId) {
+        return UUID.nameUUIDFromBytes(("worldzero:double_chat:neighbor:" + ownerId).getBytes(StandardCharsets.UTF_8));
     }
 
     private static String worldzero$mutatePlayerName(String name, ServerLevel level) {

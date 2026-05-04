@@ -33,7 +33,6 @@ import net.minecraft.world.level.levelgen.WorldgenRandom;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import net.minecraft.world.level.levelgen.carver.ConfiguredWorldCarver;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
-import net.minecraft.world.level.levelgen.structure.BuiltinStructures;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.levelgen.synth.PerlinNoise;
@@ -69,8 +68,6 @@ public final class WorldZeroLegacyChunkGenerator extends ChunkGenerator {
             "lake_lava_surface",
             "monster_room",
             "monster_room_deep",
-            "fossil_upper",
-            "fossil_lower",
             "desert_well",
             "ore_dirt",
             "ore_gravel",
@@ -131,18 +128,6 @@ public final class WorldZeroLegacyChunkGenerator extends ChunkGenerator {
             "patch_cactus_desert",
             "patch_cactus_decorated",
             "freeze_top_layer"
-    );
-    private static final Set<net.minecraft.resources.ResourceKey<Structure>> WORLDZERO_ALLOWED_STRUCTURES = Set.of(
-            BuiltinStructures.MINESHAFT,
-            BuiltinStructures.MINESHAFT_MESA,
-            BuiltinStructures.JUNGLE_TEMPLE,
-            BuiltinStructures.DESERT_PYRAMID,
-            BuiltinStructures.STRONGHOLD,
-            BuiltinStructures.VILLAGE_PLAINS,
-            BuiltinStructures.VILLAGE_DESERT,
-            BuiltinStructures.VILLAGE_SAVANNA,
-            BuiltinStructures.VILLAGE_SNOWY,
-            BuiltinStructures.VILLAGE_TAIGA
     );
 
     private final long worldzero$seed;
@@ -322,7 +307,7 @@ public final class WorldZeroLegacyChunkGenerator extends ChunkGenerator {
     }
 
     private static boolean worldzero$isAllowedStructure(Holder<Structure> structureHolder) {
-        return structureHolder.unwrapKey().filter(WORLDZERO_ALLOWED_STRUCTURES::contains).isPresent();
+        return WorldZeroStructureGenerationRules.worldzero$isAllowedStructure(structureHolder);
     }
 
     private BiomeGenerationSettings worldzero$buildGenerationSettings(Holder<Biome> biome) {

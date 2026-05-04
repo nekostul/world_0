@@ -6,6 +6,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -131,10 +132,16 @@ public final class WorldZeroSleepControlEvent {
         }
         state.worldzero$lastBedAttemptGameTime = gameTime;
 
+        if (!worldzero$isVanillaSleepWindow(level)) {
+            return;
+        }
+
         boolean forceSleep = state.worldzero$skippedAvailableNights >= 3;
-        boolean canSleepNow = worldzero$canSleepNow(level, player, state, storyTicks, true) || forceSleep;
+        boolean canSleepNow = worldzero$canSleepNow(level, player, state, storyTicks, false) || forceSleep;
         if (!canSleepNow) {
             event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            player.swing(event.getHand(), true);
             player.displayClientMessage(net.minecraft.network.chat.Component.translatable(WORLDZERO_BED_BLOCKED_KEY), true);
             if (storyTicks - state.worldzero$lastCannotSleepLineTick >= WORLDZERO_CANNOT_SLEEP_LINE_COOLDOWN
                     && level.random.nextInt(8) == 0) {
@@ -158,6 +165,10 @@ public final class WorldZeroSleepControlEvent {
             sessionState.worldzero$paralysisByPlayer.put(player.getUUID(), true);
         }
         saveData.setDirty();
+    }
+
+    private static boolean worldzero$isVanillaSleepWindow(ServerLevel level) {
+        return level != null && (level.isNight() || level.isThundering());
     }
 
     private static boolean worldzero$tickPlayer(

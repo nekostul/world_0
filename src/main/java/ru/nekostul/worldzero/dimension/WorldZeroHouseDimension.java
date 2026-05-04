@@ -58,6 +58,7 @@ import ru.nekostul.worldzero.client.controller.WorldZeroHouseClientController;
 import ru.nekostul.worldzero.entity.WorldZeroEntities;
 import ru.nekostul.worldzero.entity.WorldZeroHouseEchoEntity;
 import ru.nekostul.worldzero.event.paralysis.WorldZeroParalysisEvent;
+import ru.nekostul.worldzero.event.sleep.WorldZeroSleepControlEvent;
 import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import javax.annotation.Nullable;
@@ -216,6 +217,10 @@ public final class WorldZeroHouseDimension {
         }
 
         if (WorldZeroParalysisEvent.worldzero$isParalysisActive(server)) {
+            return;
+        }
+
+        if (WorldZeroSleepControlEvent.worldzero$isManagingSleep(server)) {
             return;
         }
 
@@ -439,6 +444,61 @@ public final class WorldZeroHouseDimension {
         }
 
         return worldzero$teleportPlayerToHouseInternal(player, true, HouseVisitMode.RESTORATION);
+    }
+
+    public static boolean worldzero$hasPendingRestorationDream(ServerPlayer player) {
+        if (player == null || !player.isAlive() || player.isSpectator()) {
+            return false;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return false;
+        }
+
+        HouseSaveData saveData = worldzero$getSaveData(server);
+        return saveData.worldzero$restorationPendingPlayers.contains(player.getUUID())
+                && worldzero$hasRestorationDamage(saveData, player.getUUID());
+    }
+
+    public static boolean worldzero$consumePendingRestorationDream(ServerPlayer player) {
+        if (player == null) {
+            return false;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return false;
+        }
+
+        HouseSaveData saveData = worldzero$getSaveData(server);
+        boolean removed = saveData.worldzero$restorationPendingPlayers.remove(player.getUUID());
+        if (removed) {
+            saveData.setDirty();
+        }
+        return removed;
+    }
+
+    public static boolean worldzero$prepareRestorationDream(ServerPlayer player) {
+        if (player == null || !player.isAlive() || player.isSpectator()) {
+            return false;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return false;
+        }
+
+        HouseSaveData saveData = worldzero$getSaveData(server);
+        UUID playerId = player.getUUID();
+        if (!worldzero$hasRestorationDamage(saveData, playerId)
+                && !worldzero$seedDebugRestorationDamage(server, saveData, playerId)) {
+            return false;
+        }
+
+        saveData.worldzero$restorationPendingPlayers.add(playerId);
+        saveData.setDirty();
+        return true;
     }
 
     public static boolean worldzero$teleportPlayerToHouse(ServerPlayer player) {

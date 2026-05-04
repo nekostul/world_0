@@ -113,5 +113,8 @@
   "message.worldzero.sky_watch.failure": "you did not see it... but now it knows where you are",
   "message.worldzero.sky_watch.distance": "%s blocks",
   "message.worldzero.sky_watch.hide": "hide",
-  "message.worldzero.sky_watch.run": "run"
+  "message.worldzero.sky_watch.run": "run",
+  "message.worldzero.sleep_control.can_sleep": "the sky is empty tonight. try lying down in bed.",
+  "message.worldzero.sleep_control.cannot_sleep": "too early. if you lie down now, you won't wake up.",
+  "message.worldzero.sleep_control.pressure": "why are you still standing?"
 }

@@ -36,8 +36,7 @@ public final class WorldZeroGrowthEvent {
         if (!worldzero$isValidPlayer(player) || player.serverLevel().dimension() != Level.OVERWORLD) {
             return false;
         }
-        if (WorldZeroHouseDetector.worldzero$findNearbyHouse(player) != null
-                || WorldZeroHouseDetector.worldzero$findContainingHouse(player) != null) {
+        if (WorldZeroHouseDetector.worldzero$findContainingHouse(player) != null) {
             return false;
         }
 
@@ -53,6 +52,7 @@ public final class WorldZeroGrowthEvent {
                 level.getGameTime()
         ));
         level.playSound(null, player.blockPosition(), SoundEvents.ROOTED_DIRT_PLACE, SoundSource.BLOCKS, 0.45F, 0.7F);
+        level.playSound(null, player.blockPosition(), SoundEvents.AMBIENT_CAVE.value(), SoundSource.AMBIENT, 0.35F, 0.5F);
         return true;
     }
 

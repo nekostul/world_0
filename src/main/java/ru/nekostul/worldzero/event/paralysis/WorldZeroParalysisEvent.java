@@ -46,6 +46,7 @@ import ru.nekostul.worldzero.event.footsteps.WorldZeroFootstepsEvent;
 import ru.nekostul.worldzero.event.freeze.WorldZeroFreezeEvent;
 import ru.nekostul.worldzero.event.house.WorldZeroHouseDetector;
 import ru.nekostul.worldzero.event.house.WorldZeroHouseEvent;
+import ru.nekostul.worldzero.event.sleep.WorldZeroSleepControlEvent;
 import ru.nekostul.worldzero.event.skywatch.WorldZeroSkyWatchEvent;
 import ru.nekostul.worldzero.network.WorldZeroNetwork;
 import ru.nekostul.worldzero.network.WorldZeroParalysisClientPacket;
@@ -127,6 +128,10 @@ public final class WorldZeroParalysisEvent {
         SessionState state = WORLDZERO_SESSION_STATES.computeIfAbsent(server, ignored -> new SessionState());
         if (state.worldzero$phase != Phase.INACTIVE) {
             worldzero$tickActiveEvent(level, state);
+            return;
+        }
+
+        if (WorldZeroSleepControlEvent.worldzero$isManagingSleep(server)) {
             return;
         }
 

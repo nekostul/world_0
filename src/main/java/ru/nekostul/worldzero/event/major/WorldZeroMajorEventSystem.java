@@ -242,13 +242,17 @@ public final class WorldZeroMajorEventSystem {
                     WorldZeroMajorEventType.GROWTH,
                     WorldZeroMajorEventType.STALKER,
                     WorldZeroMajorEventType.VOID_CALL,
-                    WorldZeroMajorEventType.GLITCH_RAIN
+                    WorldZeroMajorEventType.GLITCH_RAIN,
+                    WorldZeroMajorEventType.SWARM,
+                    WorldZeroMajorEventType.TIME_LOOP
             };
             case DECLINE -> new WorldZeroMajorEventType[]{
                     WorldZeroMajorEventType.STALKER,
                     WorldZeroMajorEventType.VOID_CALL,
                     WorldZeroMajorEventType.SWARM,
-                    WorldZeroMajorEventType.TIME_LOOP
+                    WorldZeroMajorEventType.TIME_LOOP,
+                    WorldZeroMajorEventType.GROWTH,
+                    WorldZeroMajorEventType.GLITCH_RAIN
             };
             default -> new WorldZeroMajorEventType[0];
         };

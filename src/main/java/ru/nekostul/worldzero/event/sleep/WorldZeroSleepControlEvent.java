@@ -46,6 +46,7 @@ public final class WorldZeroSleepControlEvent {
     private static final long WORLDZERO_SPECIAL_PRIORITY_TICKS = 120L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_SPECIAL_FORCE_TICKS = 150L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_CAMPAIGN_END_TICKS = 180L * WORLDZERO_TICKS_PER_MINUTE;
+    private static final int WORLDZERO_DIMENSION_SLEEP_DELAY_TICKS = 60;
     private static final int WORLDZERO_MAX_SLEEPS = 6;
     private static final int WORLDZERO_PRESSURE_KEYBOARD_BLOCK_TICKS = 30;
     private static final int WORLDZERO_PRESSURE_SKYWATCH_DURATION_TICKS = 20 * 60 * 20;
@@ -143,7 +144,8 @@ public final class WorldZeroSleepControlEvent {
             event.setCancellationResult(InteractionResult.SUCCESS);
             player.swing(event.getHand(), true);
             player.displayClientMessage(net.minecraft.network.chat.Component.translatable(WORLDZERO_BED_BLOCKED_KEY), true);
-            if (storyTicks - state.worldzero$lastCannotSleepLineTick >= WORLDZERO_CANNOT_SLEEP_LINE_COOLDOWN
+            if (worldzero$canSendBedHints(storyTicks)
+                    && storyTicks - state.worldzero$lastCannotSleepLineTick >= WORLDZERO_CANNOT_SLEEP_LINE_COOLDOWN
                     && level.random.nextInt(8) == 0) {
                 WorldZeroDoubleChatEvent.worldzero$sendSpeakerLineNow(player, WORLDZERO_CANNOT_SLEEP_KEY);
                 state.worldzero$lastCannotSleepLineTick = storyTicks;
@@ -153,11 +155,15 @@ public final class WorldZeroSleepControlEvent {
         }
 
         SleepAction action = worldzero$pickSleepAction(level, player, state, storyTicks);
-        boolean success = worldzero$executeSleepAction(level, player, bedPos, state, action, storyTicks, forceSleep);
+        boolean success;
+        if (worldzero$requiresDelayedDimensionTransfer(action)) {
+            success = worldzero$scheduleDelayedSleepAction(level, player, bedPos, state, action, storyTicks, forceSleep);
+        } else {
+            success = worldzero$executeSleepAction(level, player, bedPos, state, action, storyTicks, forceSleep);
+        }
         event.setCanceled(true);
 
         if (!success) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(WORLDZERO_BED_BLOCKED_KEY), true);
             return;
         }
 
@@ -223,9 +229,15 @@ public final class WorldZeroSleepControlEvent {
             changed = true;
         }
 
+        if (worldzero$tickPendingSleepAction(level, player, state)) {
+            changed = true;
+        }
+
         if (state.worldzero$nightActive) {
             boolean canSleepNow = worldzero$canSleepNow(level, player, state, storyTicks, false);
-            if (canSleepNow && !state.worldzero$canSleepAnnouncedThisNight) {
+            if (canSleepNow
+                    && !state.worldzero$canSleepAnnouncedThisNight
+                    && worldzero$canSendBedHints(storyTicks)) {
                 if (WorldZeroDoubleChatEvent.worldzero$sendSpeakerLineNow(player, WORLDZERO_CAN_SLEEP_KEY)) {
                     state.worldzero$canSleepAnnouncedThisNight = true;
                     state.worldzero$nightWasAvailable = true;
@@ -234,7 +246,8 @@ public final class WorldZeroSleepControlEvent {
             }
         }
 
-        if (state.worldzero$skippedAvailableNights >= 2
+        if (worldzero$canSendBedHints(storyTicks)
+                && state.worldzero$skippedAvailableNights >= 2
                 && storyTicks - state.worldzero$lastPressureLineTick >= WORLDZERO_PRESSURE_LINE_COOLDOWN) {
             if (WorldZeroDoubleChatEvent.worldzero$sendSpeakerLineNow(player, WORLDZERO_PRESSURE_KEY)) {
                 state.worldzero$lastPressureLineTick = storyTicks;
@@ -380,6 +393,79 @@ public final class WorldZeroSleepControlEvent {
                     : SleepAction.NONE;
             default -> SleepAction.NONE;
         };
+    }
+
+    private static boolean worldzero$requiresDelayedDimensionTransfer(SleepAction action) {
+        return action == SleepAction.SPECIAL_HOUSE
+                || action == SleepAction.SPECIAL_KORIDOR
+                || action == SleepAction.SPECIAL_HOUSE_BAD
+                || action == SleepAction.RESTORATION;
+    }
+
+    private static boolean worldzero$scheduleDelayedSleepAction(
+            ServerLevel level,
+            ServerPlayer player,
+            BlockPos bedPos,
+            PlayerState state,
+            SleepAction action,
+            long storyTicks,
+            boolean forceSleep
+    ) {
+        if (!worldzero$startOrdinarySleep(player, bedPos, forceSleep)) {
+            return false;
+        }
+
+        state.worldzero$pendingSleepAction = action;
+        state.worldzero$pendingSleepActionDueGameTick = level.getGameTime() + WORLDZERO_DIMENSION_SLEEP_DELAY_TICKS;
+        state.worldzero$pendingSleepActionStoryTick = storyTicks;
+        return true;
+    }
+
+    private static boolean worldzero$tickPendingSleepAction(
+            ServerLevel level,
+            ServerPlayer player,
+            PlayerState state
+    ) {
+        if (state.worldzero$pendingSleepAction == SleepAction.NONE) {
+            return false;
+        }
+
+        if (!player.isAlive()
+                || player.isSpectator()
+                || player.serverLevel().dimension() != Level.OVERWORLD) {
+            state.worldzero$pendingSleepAction = SleepAction.NONE;
+            state.worldzero$pendingSleepActionDueGameTick = -1L;
+            state.worldzero$pendingSleepActionStoryTick = -1L;
+            return true;
+        }
+
+        if (level.getGameTime() < state.worldzero$pendingSleepActionDueGameTick) {
+            return false;
+        }
+
+        SleepAction action = state.worldzero$pendingSleepAction;
+        if (!worldzero$executeSleepAction(
+                level,
+                player,
+                player.blockPosition(),
+                state,
+                action,
+                state.worldzero$pendingSleepActionStoryTick >= 0L
+                        ? state.worldzero$pendingSleepActionStoryTick
+                        : WorldZeroStoryTime.worldzero$getStoryTicks(level),
+                false
+        )) {
+            return false;
+        }
+
+        state.worldzero$pendingSleepAction = SleepAction.NONE;
+        state.worldzero$pendingSleepActionDueGameTick = -1L;
+        state.worldzero$pendingSleepActionStoryTick = -1L;
+        return true;
+    }
+
+    private static boolean worldzero$canSendBedHints(long storyTicks) {
+        return storyTicks >= WORLDZERO_CONTROL_START_TICKS;
     }
 
     private static boolean worldzero$executeSleepAction(
@@ -555,6 +641,9 @@ public final class WorldZeroSleepControlEvent {
         private boolean worldzero$restorationSleepPending;
         private boolean worldzero$restorationCompleted;
         private boolean worldzero$pressureSkyWatchActive;
+        private SleepAction worldzero$pendingSleepAction = SleepAction.NONE;
+        private long worldzero$pendingSleepActionDueGameTick = -1L;
+        private long worldzero$pendingSleepActionStoryTick = -1L;
         private long worldzero$nextPressureControlTick;
         private long worldzero$lastCannotSleepLineTick = Long.MIN_VALUE;
         private long worldzero$lastPressureLineTick = Long.MIN_VALUE;
@@ -579,6 +668,9 @@ public final class WorldZeroSleepControlEvent {
             tag.putBoolean("restoration_sleep_pending", this.worldzero$restorationSleepPending);
             tag.putBoolean("restoration_completed", this.worldzero$restorationCompleted);
             tag.putBoolean("pressure_sky_watch_active", this.worldzero$pressureSkyWatchActive);
+            tag.putString("pending_sleep_action", this.worldzero$pendingSleepAction.name());
+            tag.putLong("pending_sleep_action_due_game_tick", this.worldzero$pendingSleepActionDueGameTick);
+            tag.putLong("pending_sleep_action_story_tick", this.worldzero$pendingSleepActionStoryTick);
             tag.putLong("next_pressure_control_tick", this.worldzero$nextPressureControlTick);
             tag.putLong("last_cannot_sleep_line_tick", this.worldzero$lastCannotSleepLineTick);
             tag.putLong("last_pressure_line_tick", this.worldzero$lastPressureLineTick);
@@ -607,6 +699,19 @@ public final class WorldZeroSleepControlEvent {
             state.worldzero$restorationSleepPending = tag.getBoolean("restoration_sleep_pending");
             state.worldzero$restorationCompleted = tag.getBoolean("restoration_completed");
             state.worldzero$pressureSkyWatchActive = tag.getBoolean("pressure_sky_watch_active");
+            if (tag.contains("pending_sleep_action")) {
+                try {
+                    state.worldzero$pendingSleepAction = SleepAction.valueOf(tag.getString("pending_sleep_action"));
+                } catch (IllegalArgumentException ignored) {
+                    state.worldzero$pendingSleepAction = SleepAction.NONE;
+                }
+            }
+            state.worldzero$pendingSleepActionDueGameTick = tag.contains("pending_sleep_action_due_game_tick")
+                    ? tag.getLong("pending_sleep_action_due_game_tick")
+                    : -1L;
+            state.worldzero$pendingSleepActionStoryTick = tag.contains("pending_sleep_action_story_tick")
+                    ? tag.getLong("pending_sleep_action_story_tick")
+                    : -1L;
             state.worldzero$nextPressureControlTick = tag.getLong("next_pressure_control_tick");
             state.worldzero$lastCannotSleepLineTick = tag.contains("last_cannot_sleep_line_tick")
                     ? tag.getLong("last_cannot_sleep_line_tick")

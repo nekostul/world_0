@@ -309,6 +309,14 @@ public final class WorldZeroMinorAnomalies {
                 BlockRestoreMode.TEMPORARY_STATE,
                 worldTicks + durationTicks
         ));
+        level.playSound(
+                null,
+                target.pos(),
+                SoundEvents.AMBIENT_CAVE.value(),
+                SoundSource.AMBIENT,
+                0.33F,
+                Mth.nextFloat(level.random, 0.48F, 0.68F)
+        );
         return TriggerResult.worldzero$success(MinorAnomalyType.LIGHT_ANOMALY, durationTicks + 2);
     }
 
@@ -783,11 +791,13 @@ public final class WorldZeroMinorAnomalies {
             case RISING -> new MinorAnomalyType[]{
                     MinorAnomalyType.PERIPHERAL_ECHO,
                     MinorAnomalyType.WHISPER,
+                    MinorAnomalyType.LIGHT_ANOMALY,
                     MinorAnomalyType.WRONG_WIND
             };
             case PEAK -> new MinorAnomalyType[]{
                     MinorAnomalyType.PERIPHERAL_ECHO,
                     MinorAnomalyType.WHISPER,
+                    MinorAnomalyType.LIGHT_ANOMALY,
                     MinorAnomalyType.WRONG_WIND,
                     MinorAnomalyType.SHADOW_DELAY,
                     MinorAnomalyType.ENTITY_BLACKOUT,
@@ -796,6 +806,7 @@ public final class WorldZeroMinorAnomalies {
             case DECLINE -> new MinorAnomalyType[]{
                     MinorAnomalyType.WHISPER,
                     MinorAnomalyType.PERIPHERAL_ECHO,
+                    MinorAnomalyType.LIGHT_ANOMALY,
                     MinorAnomalyType.SHADOW_DELAY,
                     MinorAnomalyType.ENTITY_BLACKOUT,
                     MinorAnomalyType.BLOCK_BLINK

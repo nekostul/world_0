@@ -113,5 +113,8 @@
   "message.worldzero.sky_watch.failure": "ты его не видел... но он теперь знает где ты",
   "message.worldzero.sky_watch.distance": "%s блоков",
   "message.worldzero.sky_watch.hide": "прячься",
-  "message.worldzero.sky_watch.run": "беги"
+  "message.worldzero.sky_watch.run": "беги",
+  "message.worldzero.sleep_control.can_sleep": "сегодня небо пустое. попробуй лечь в кровать.",
+  "message.worldzero.sleep_control.cannot_sleep": "ещё рано. если ляжешь, не проснёшься.",
+  "message.worldzero.sleep_control.pressure": "почему ты всё ещё стоишь?"
 }

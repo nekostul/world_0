@@ -33,7 +33,7 @@ public final class WorldZeroGlitchRainEvent {
 
         ServerLevel level = player.serverLevel();
         if (!level.isRaining()) {
-            return false;
+            level.setWeatherParameters(0, WORLDZERO_DURATION_TICKS + 200, true, level.isThundering());
         }
 
         WORLDZERO_STATES.put(server, new ActiveState(player.getUUID(), level.getGameTime() + WORLDZERO_DURATION_TICKS));
@@ -44,6 +44,7 @@ public final class WorldZeroGlitchRainEvent {
                 level.random.nextInt()
         );
         level.playSound(null, player.blockPosition(), SoundEvents.AMBIENT_CAVE.value(), SoundSource.AMBIENT, 0.35F, 1.7F);
+        level.playSound(null, player.blockPosition(), SoundEvents.ENDERMAN_STARE, SoundSource.AMBIENT, 0.2F, 0.48F);
         return true;
     }
 

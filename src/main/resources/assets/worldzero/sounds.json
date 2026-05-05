@@ -37,6 +37,50 @@
       }
     ]
   },
+  "bejs1": {
+    "sounds": [
+      {
+        "name": "worldzero:bejs1"
+      }
+    ]
+  },
+  "bejs2": {
+    "sounds": [
+      {
+        "name": "worldzero:bejs2"
+      }
+    ]
+  },
+  "bejs4": {
+    "sounds": [
+      {
+        "name": "worldzero:bejs4"
+      }
+    ]
+  },
+  "bejs3": {
+    "sounds": [
+      {
+        "name": "worldzero:bejs3"
+      }
+    ]
+  },
+  "bekorobka": {
+    "sounds": [
+      {
+        "name": "worldzero:bekorobka",
+        "stream": true
+      }
+    ]
+  },
+  "w0": {
+    "sounds": [
+      {
+        "name": "worldzero:w0",
+        "stream": true
+      }
+    ]
+  },
   "knock": {
     "sounds": [
       {

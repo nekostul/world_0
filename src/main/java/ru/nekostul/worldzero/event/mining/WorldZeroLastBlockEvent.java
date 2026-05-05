@@ -625,7 +625,8 @@ public final class WorldZeroLastBlockEvent {
                 || WorldZeroFootstepsEvent.worldzero$isFootstepsActive(server)
                 || WorldZeroHouseEvent.worldzero$isHouseActive(server)
                 || WorldZeroSkyWatchEvent.worldzero$isActive(server)
-                || WorldZeroParalysisEvent.worldzero$isParalysisActive(server);
+                || WorldZeroParalysisEvent.worldzero$isParalysisActive(server)
+                || ru.nekostul.worldzero.event.horror.WorldZeroBlackEchoJumpscareEvent.worldzero$isActive(server);
     }
 
     private static boolean worldzero$hasActiveEcho(MinecraftServer server) {

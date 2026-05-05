@@ -1259,7 +1259,8 @@ public final class WorldZeroParalysisEvent {
                 || WorldZeroFootstepsEvent.worldzero$isFootstepsActive(server)
                 || WorldZeroHouseEvent.worldzero$isHouseActive(server)
                 || WorldZeroSkyWatchEvent.worldzero$isActive(server)
-                || worldzero$isParalysisActive(server);
+                || worldzero$isParalysisActive(server)
+                || ru.nekostul.worldzero.event.horror.WorldZeroBlackEchoJumpscareEvent.worldzero$isActive(server);
     }
 
     private static void worldzero$clearState(

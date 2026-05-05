@@ -67,6 +67,22 @@ public final class WorldZeroSleepControlEvent {
         return server != null;
     }
 
+    public static boolean worldzero$canPlayerSleepNow(@Nullable ServerLevel level, @Nullable ServerPlayer player) {
+        if (level == null || player == null || level.isClientSide() || level.dimension() != Level.OVERWORLD || player.isSpectator()) {
+            return false;
+        }
+
+        if (!worldzero$isVanillaSleepWindow(level)) {
+            return false;
+        }
+
+        SleepControlSaveData saveData = worldzero$getSaveData(level);
+        PlayerState state = saveData.worldzero$players.computeIfAbsent(player.getUUID(), ignored -> new PlayerState());
+        long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
+        boolean forceSleep = state.worldzero$skippedAvailableNights >= 3;
+        return worldzero$canSleepNow(level, player, state, storyTicks, false) || forceSleep;
+    }
+
     @SubscribeEvent
     public static void worldzero$onServerStopped(ServerStoppedEvent event) {
         WORLDZERO_SESSION_STATES.remove(event.getServer());
@@ -581,7 +597,8 @@ public final class WorldZeroSleepControlEvent {
                 || WorldZeroFallEvent.worldzero$isFallActive(server)
                 || WorldZeroFootstepsEvent.worldzero$isFootstepsActive(server)
                 || WorldZeroHouseEvent.worldzero$isHouseActive(server)
-                || WorldZeroParalysisEvent.worldzero$isParalysisActive(server);
+                || WorldZeroParalysisEvent.worldzero$isParalysisActive(server)
+                || ru.nekostul.worldzero.event.horror.WorldZeroBlackEchoJumpscareEvent.worldzero$isActive(server);
     }
 
     @Nullable

@@ -103,6 +103,34 @@ public final class WorldZeroNetwork {
         );
         WORLDZERO_CHANNEL.registerMessage(
                 worldzero$packetId++,
+                WorldZeroEndReturnPacket.class,
+                WorldZeroEndReturnPacket::encode,
+                WorldZeroEndReturnPacket::decode,
+                WorldZeroEndReturnPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroNightDarknessPacket.class,
+                WorldZeroNightDarknessPacket::encode,
+                WorldZeroNightDarknessPacket::decode,
+                WorldZeroNightDarknessPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroHorrorSoundPacket.class,
+                WorldZeroHorrorSoundPacket::encode,
+                WorldZeroHorrorSoundPacket::decode,
+                WorldZeroHorrorSoundPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroHorrorSoundFinishedPacket.class,
+                WorldZeroHorrorSoundFinishedPacket::encode,
+                WorldZeroHorrorSoundFinishedPacket::decode,
+                WorldZeroHorrorSoundFinishedPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
                 WorldZeroHouseClientModePacket.class,
                 WorldZeroHouseClientModePacket::encode,
                 WorldZeroHouseClientModePacket::decode,
@@ -156,6 +184,13 @@ public final class WorldZeroNetwork {
                 WorldZeroMajorEventPacket::encode,
                 WorldZeroMajorEventPacket::decode,
                 WorldZeroMajorEventPacket::handle
+        );
+        WORLDZERO_CHANNEL.registerMessage(
+                worldzero$packetId++,
+                WorldZeroHotbarBlackoutPacket.class,
+                WorldZeroHotbarBlackoutPacket::encode,
+                WorldZeroHotbarBlackoutPacket::decode,
+                WorldZeroHotbarBlackoutPacket::handle
         );
         WORLDZERO_CHANNEL.registerMessage(
                 worldzero$packetId++,
@@ -253,6 +288,48 @@ public final class WorldZeroNetwork {
 
     public static void sendHouseMusicFinished() {
         WORLDZERO_CHANNEL.sendToServer(new WorldZeroHouseMusicFinishedPacket());
+    }
+
+    public static void sendEndReturn(ServerPlayer player, int durationTicks) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroEndReturnPacket(durationTicks)
+        );
+    }
+
+    public static void sendNightDarkness(ServerPlayer player, boolean active) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroNightDarknessPacket(active)
+        );
+    }
+
+    public static void sendHorrorSound(ServerPlayer player, ResourceLocation soundId, float pitch, boolean notifyWhenFinished) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroHorrorSoundPacket(
+                        WorldZeroHorrorSoundPacket.WORLDZERO_ACTION_PLAY,
+                        soundId,
+                        pitch,
+                        notifyWhenFinished
+                )
+        );
+    }
+
+    public static void sendStopHorrorSounds(ServerPlayer player) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroHorrorSoundPacket(
+                        WorldZeroHorrorSoundPacket.WORLDZERO_ACTION_STOP_ALL,
+                        null,
+                        1.0F,
+                        false
+                )
+        );
+    }
+
+    public static void sendHorrorSoundFinished() {
+        WORLDZERO_CHANNEL.sendToServer(new WorldZeroHorrorSoundFinishedPacket());
     }
 
     public static void sendHouseClientMode(ServerPlayer player, byte mode) {
@@ -356,6 +433,13 @@ public final class WorldZeroNetwork {
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new WorldZeroMajorEventPacket(action, durationTicks, variant)
+        );
+    }
+
+    public static void sendHotbarBlackout(ServerPlayer player, int durationTicks) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroHotbarBlackoutPacket(durationTicks)
         );
     }
 

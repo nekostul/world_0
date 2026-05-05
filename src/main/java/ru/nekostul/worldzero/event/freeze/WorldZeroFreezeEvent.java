@@ -35,8 +35,9 @@ import java.util.WeakHashMap;
 public final class WorldZeroFreezeEvent {
     private static final long WORLDZERO_FREEZE_WINDOW_START_TICKS = 45L * 60L * 20L;
     private static final long WORLDZERO_FREEZE_WINDOW_END_TICKS = 60L * 60L * 20L;
-    private static final long WORLDZERO_DELAY_AFTER_FALL_MIN_TICKS = 15L * 60L * 20L;
-    private static final long WORLDZERO_DELAY_AFTER_FALL_MAX_TICKS = 30L * 60L * 20L;
+    private static final long WORLDZERO_DELAY_AFTER_FALL_MIN_TICKS = 25L * 60L * 20L;
+    private static final long WORLDZERO_DELAY_AFTER_FALL_MAX_TICKS = 40L * 60L * 20L;
+    private static final int WORLDZERO_MAX_PLAYS = 2;
     private static final int WORLDZERO_FREEZE_DURATION_TICKS = 5 * 20;
     private static final int WORLDZERO_FREEZE_PREP_TICKS = 2;
     private static final int WORLDZERO_BLACK_ECHO_PASS_MIN_TICKS = 20;
@@ -89,7 +90,7 @@ public final class WorldZeroFreezeEvent {
         if (state.worldzero$preparingFreeze) {
             if (WorldZeroFallEvent.worldzero$isFallActive(server)
                     || WorldZeroAmbientSoundEvent.worldzero$isMajorEventStartBlocked(level)
-                    || saveData.worldzero$completed) {
+                    || saveData.worldzero$playCount >= WORLDZERO_MAX_PLAYS) {
                 worldzero$clearFreezePreparation(state);
                 return;
             }
@@ -106,27 +107,24 @@ public final class WorldZeroFreezeEvent {
             return;
         }
 
-        if (saveData.worldzero$completed) {
+        if (saveData.worldzero$playCount >= WORLDZERO_MAX_PLAYS) {
             return;
         }
 
         long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
         if (saveData.worldzero$triggerTick < 0L) {
-            long tickSpan = WORLDZERO_FREEZE_WINDOW_END_TICKS - WORLDZERO_FREEZE_WINDOW_START_TICKS + 1L;
-            saveData.worldzero$triggerTick = WORLDZERO_FREEZE_WINDOW_START_TICKS
-                    + (long) (level.random.nextDouble() * tickSpan);
-            saveData.setDirty();
+            if (saveData.worldzero$playCount == 0) {
+                long tickSpan = WORLDZERO_FREEZE_WINDOW_END_TICKS - WORLDZERO_FREEZE_WINDOW_START_TICKS + 1L;
+                saveData.worldzero$triggerTick = WORLDZERO_FREEZE_WINDOW_START_TICKS
+                        + (long) (level.random.nextDouble() * tickSpan);
+                saveData.setDirty();
+            } else {
+                return;
+            }
         }
 
-        if (!state.worldzero$eventTriggered) {
-            if (storyTicks > WORLDZERO_FREEZE_WINDOW_END_TICKS
-                    && saveData.worldzero$triggerTick <= WORLDZERO_FREEZE_WINDOW_END_TICKS) {
-                state.worldzero$eventTriggered = true;
-                saveData.worldzero$completed = true;
-                saveData.setDirty();
-            } else if (storyTicks >= saveData.worldzero$triggerTick) {
-                worldzero$tryStartFreezeEvent(level, state, saveData);
-            }
+        if (!state.worldzero$eventTriggered && storyTicks >= saveData.worldzero$triggerTick) {
+            worldzero$tryStartFreezeEvent(level, state, saveData);
         }
     }
 
@@ -183,7 +181,7 @@ public final class WorldZeroFreezeEvent {
         }
 
         FreezeSaveData saveData = worldzero$getSaveData(level);
-        if (saveData.worldzero$completed) {
+        if (saveData.worldzero$playCount >= WORLDZERO_MAX_PLAYS) {
             return;
         }
 
@@ -267,7 +265,8 @@ public final class WorldZeroFreezeEvent {
         WorldZeroAmbientSoundEvent.worldzero$notifyMajorEventStarted(level);
 
         if (saveData != null) {
-            saveData.worldzero$completed = true;
+            saveData.worldzero$playCount++;
+            saveData.worldzero$triggerTick = -1L;
             saveData.setDirty();
             WorldZeroFallEvent.worldzero$rescheduleAfterFreeze(level);
         }
@@ -444,6 +443,7 @@ public final class WorldZeroFreezeEvent {
     }
 
     private static void worldzero$clearFreezeState(SessionState state) {
+        state.worldzero$eventTriggered = false;
         state.worldzero$eventActive = false;
         state.worldzero$freezeEndTick = -1L;
         state.worldzero$lockedX = 0.0D;
@@ -470,19 +470,22 @@ public final class WorldZeroFreezeEvent {
 
     private static final class FreezeSaveData extends SavedData {
         private long worldzero$triggerTick = -1L;
-        private boolean worldzero$completed;
+        private int worldzero$playCount;
 
         private static FreezeSaveData worldzero$load(CompoundTag tag) {
             FreezeSaveData saveData = new FreezeSaveData();
             saveData.worldzero$triggerTick = tag.getLong("trigger_tick");
-            saveData.worldzero$completed = tag.getBoolean("completed");
+            saveData.worldzero$playCount = tag.contains("play_count")
+                    ? Math.max(0, tag.getInt("play_count"))
+                    : (tag.getBoolean("completed") ? 1 : 0);
             return saveData;
         }
 
         @Override
         public CompoundTag save(CompoundTag tag) {
             tag.putLong("trigger_tick", this.worldzero$triggerTick);
-            tag.putBoolean("completed", this.worldzero$completed);
+            tag.putInt("play_count", this.worldzero$playCount);
+            tag.putBoolean("completed", this.worldzero$playCount > 0);
             return tag;
         }
     }

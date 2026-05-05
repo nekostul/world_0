@@ -58,6 +58,9 @@ import java.util.WeakHashMap;
 public final class WorldZeroFootstepsEvent {
     private static final long WORLDZERO_TRIGGER_MIN_TICKS = 60L * 60L * 20L;
     private static final long WORLDZERO_TRIGGER_MAX_TICKS = 90L * 60L * 20L;
+    private static final long WORLDZERO_REPEAT_DELAY_MIN_TICKS = 18L * 60L * 20L;
+    private static final long WORLDZERO_REPEAT_DELAY_MAX_TICKS = 32L * 60L * 20L;
+    private static final int WORLDZERO_MAX_PLAYS = 2;
     private static final int WORLDZERO_SECOND_STEP_MIN_TICKS = 20 * 20;
     private static final int WORLDZERO_SECOND_STEP_MAX_TICKS = 40 * 20;
     private static final int WORLDZERO_IGNORE_MIN_TICKS = 2 * 60 * 20;
@@ -111,15 +114,19 @@ public final class WorldZeroFootstepsEvent {
         }
 
         FootstepsSaveData saveData = worldzero$getSaveData(level);
-        if (saveData.worldzero$completed) {
+        if (saveData.worldzero$playCount >= WORLDZERO_MAX_PLAYS) {
             return;
         }
 
         long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);
         if (saveData.worldzero$triggerTick < 0L) {
-            long span = WORLDZERO_TRIGGER_MAX_TICKS - WORLDZERO_TRIGGER_MIN_TICKS + 1L;
-            saveData.worldzero$triggerTick = WORLDZERO_TRIGGER_MIN_TICKS + (long) (level.random.nextDouble() * span);
-            saveData.setDirty();
+            if (saveData.worldzero$playCount == 0) {
+                long span = WORLDZERO_TRIGGER_MAX_TICKS - WORLDZERO_TRIGGER_MIN_TICKS + 1L;
+                saveData.worldzero$triggerTick = WORLDZERO_TRIGGER_MIN_TICKS + (long) (level.random.nextDouble() * span);
+                saveData.setDirty();
+            } else {
+                return;
+            }
         }
 
         if (storyTicks < saveData.worldzero$triggerTick || !level.isNight()) {
@@ -294,7 +301,11 @@ public final class WorldZeroFootstepsEvent {
         WorldZeroAmbientSoundEvent.worldzero$notifyMajorEventStarted(level);
 
         if (saveData != null) {
-            saveData.worldzero$completed = true;
+            saveData.worldzero$playCount++;
+            saveData.worldzero$triggerTick = saveData.worldzero$playCount >= WORLDZERO_MAX_PLAYS
+                    ? -1L
+                    : WorldZeroStoryTime.worldzero$getStoryTicks(level)
+                    + worldzero$randomRepeatDelay(level);
             saveData.setDirty();
         }
 
@@ -943,6 +954,11 @@ public final class WorldZeroFootstepsEvent {
         return level.getDataStorage().computeIfAbsent(FootstepsSaveData::load, FootstepsSaveData::new, WORLDZERO_SAVE_ID);
     }
 
+    private static long worldzero$randomRepeatDelay(ServerLevel level) {
+        long span = WORLDZERO_REPEAT_DELAY_MAX_TICKS - WORLDZERO_REPEAT_DELAY_MIN_TICKS + 1L;
+        return WORLDZERO_REPEAT_DELAY_MIN_TICKS + (long) (level.random.nextDouble() * span);
+    }
+
     private static FootstepsSaveData worldzero$getPersistentSaveData(MinecraftServer server) {
         ServerLevel overworld = server.overworld();
         return worldzero$getSaveData(overworld != null ? overworld : server.getAllLevels().iterator().next());
@@ -1099,13 +1115,15 @@ public final class WorldZeroFootstepsEvent {
 
     private static final class FootstepsSaveData extends SavedData {
         private long worldzero$triggerTick = -1L;
-        private boolean worldzero$completed;
+        private int worldzero$playCount;
         private boolean worldzero$blankDiscPlaybackDone;
 
         public static FootstepsSaveData load(CompoundTag tag) {
             FootstepsSaveData saveData = new FootstepsSaveData();
             saveData.worldzero$triggerTick = tag.getLong("trigger_tick");
-            saveData.worldzero$completed = tag.getBoolean("completed");
+            saveData.worldzero$playCount = tag.contains("play_count")
+                    ? Math.max(0, tag.getInt("play_count"))
+                    : (tag.getBoolean("completed") ? 1 : 0);
             saveData.worldzero$blankDiscPlaybackDone = tag.getBoolean("blank_disc_playback_done");
             return saveData;
         }
@@ -1113,7 +1131,8 @@ public final class WorldZeroFootstepsEvent {
         @Override
         public CompoundTag save(CompoundTag tag) {
             tag.putLong("trigger_tick", this.worldzero$triggerTick);
-            tag.putBoolean("completed", this.worldzero$completed);
+            tag.putInt("play_count", this.worldzero$playCount);
+            tag.putBoolean("completed", this.worldzero$playCount > 0);
             tag.putBoolean("blank_disc_playback_done", this.worldzero$blankDiscPlaybackDone);
             return tag;
         }

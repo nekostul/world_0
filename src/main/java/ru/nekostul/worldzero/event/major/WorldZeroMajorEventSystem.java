@@ -35,7 +35,7 @@ import ru.nekostul.worldzero.network.WorldZeroMajorEventPacket;
 import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -44,6 +44,7 @@ import java.util.WeakHashMap;
 public final class WorldZeroMajorEventSystem {
     private static final long WORLDZERO_TICKS_PER_MINUTE = 60L * 20L;
     private static final long WORLDZERO_RETRY_COOLDOWN_TICKS = 30L * 20L;
+    private static final int WORLDZERO_MAX_PLAYS_PER_EVENT = 2;
     private static final String WORLDZERO_SAVE_ID = "worldzero_major_event_system";
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SESSION_STATES = new WeakHashMap<>();
 
@@ -103,7 +104,7 @@ public final class WorldZeroMajorEventSystem {
         int offset = level.random.nextInt(candidates.length);
         for (int index = 0; index < candidates.length; index++) {
             WorldZeroMajorEventType eventType = candidates[(offset + index) % candidates.length];
-            if (saveData.worldzero$completedEvents.contains(eventType)) {
+            if (saveData.worldzero$getPlayCount(eventType) >= WORLDZERO_MAX_PLAYS_PER_EVENT) {
                 continue;
             }
             if (worldzero$requiresClearEcho(eventType) && worldzero$hasActiveEcho(server)) {
@@ -111,7 +112,7 @@ public final class WorldZeroMajorEventSystem {
             }
 
             if (worldzero$triggerEvent(player, eventType)) {
-                saveData.worldzero$completedEvents.add(eventType);
+                saveData.worldzero$incrementPlayCount(eventType);
                 saveData.setDirty();
                 state.worldzero$cooldownTicks = worldzero$randomCooldownTicks(level, phase);
                 return;
@@ -197,6 +198,9 @@ public final class WorldZeroMajorEventSystem {
                 || WorldZeroHouseEvent.worldzero$isHouseActive(server)
                 || WorldZeroSkyWatchEvent.worldzero$isActive(server)
                 || WorldZeroParalysisEvent.worldzero$isParalysisActive(server)
+                || ru.nekostul.worldzero.event.horror.WorldZeroBlackEchoJumpscareEvent.worldzero$isActive(server)
+                || ru.nekostul.worldzero.event.horror.WorldZeroTrapEvent.worldzero$isActive(server)
+                || ru.nekostul.worldzero.event.horror.WorldZeroNightDarknessEvent.worldzero$isActive(server)
                 || WorldZeroHorrorFinale.worldzero$isActive(server)
                 || WorldZeroHorrorEventSystem.worldzero$isMinorAnomalyActive(level);
     }
@@ -283,12 +287,12 @@ public final class WorldZeroMajorEventSystem {
 
     private static long worldzero$randomCooldownTicks(ServerLevel level, WorldZeroHorrorPhase phase) {
         return switch (phase) {
-            case EARLY -> worldzero$randomTicks(level, 24, 35);
-            case ACTIVE -> worldzero$randomTicks(level, 22, 32);
-            case RISING -> worldzero$randomTicks(level, 20, 28);
-            case PEAK -> worldzero$randomTicks(level, 18, 24);
-            case DECLINE -> worldzero$randomTicks(level, 16, 22);
-            default -> worldzero$randomTicks(level, 25, 40);
+            case EARLY -> worldzero$randomTicks(level, 18, 26);
+            case ACTIVE -> worldzero$randomTicks(level, 16, 22);
+            case RISING -> worldzero$randomTicks(level, 12, 18);
+            case PEAK -> worldzero$randomTicks(level, 10, 15);
+            case DECLINE -> worldzero$randomTicks(level, 12, 18);
+            default -> worldzero$randomTicks(level, 18, 28);
         };
     }
 
@@ -305,22 +309,38 @@ public final class WorldZeroMajorEventSystem {
     }
 
     private static final class MajorSaveData extends SavedData {
-        private final EnumSet<WorldZeroMajorEventType> worldzero$completedEvents = EnumSet.noneOf(WorldZeroMajorEventType.class);
+        private final Map<WorldZeroMajorEventType, Integer> worldzero$playCounts = new EnumMap<>(WorldZeroMajorEventType.class);
 
         private static MajorSaveData load(CompoundTag tag) {
             MajorSaveData saveData = new MajorSaveData();
             for (WorldZeroMajorEventType eventType : WorldZeroMajorEventType.values()) {
-                if (tag.getBoolean(eventType.worldzero$debugName())) {
-                    saveData.worldzero$completedEvents.add(eventType);
+                String countKey = eventType.worldzero$debugName() + "_count";
+                if (tag.contains(countKey)) {
+                    int count = Math.max(0, tag.getInt(countKey));
+                    if (count > 0) {
+                        saveData.worldzero$playCounts.put(eventType, count);
+                    }
+                } else if (tag.getBoolean(eventType.worldzero$debugName())) {
+                    saveData.worldzero$playCounts.put(eventType, 1);
                 }
             }
             return saveData;
         }
 
+        private int worldzero$getPlayCount(WorldZeroMajorEventType eventType) {
+            return this.worldzero$playCounts.getOrDefault(eventType, 0);
+        }
+
+        private void worldzero$incrementPlayCount(WorldZeroMajorEventType eventType) {
+            this.worldzero$playCounts.put(eventType, this.worldzero$getPlayCount(eventType) + 1);
+        }
+
         @Override
         public CompoundTag save(CompoundTag tag) {
             for (WorldZeroMajorEventType eventType : WorldZeroMajorEventType.values()) {
-                tag.putBoolean(eventType.worldzero$debugName(), this.worldzero$completedEvents.contains(eventType));
+                int count = this.worldzero$getPlayCount(eventType);
+                tag.putInt(eventType.worldzero$debugName() + "_count", count);
+                tag.putBoolean(eventType.worldzero$debugName(), count > 0);
             }
             return tag;
         }

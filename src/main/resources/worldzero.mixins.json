@@ -26,6 +26,8 @@
     "client.OptionInstanceMixin",
     "client.OptionsMixin",
     "client.ParticleEngineMixin",
+    "client.PauseScreenMixin",
+    "client.PlayerTabOverlayMixin",
     "client.ShareToLanScreenMixin",
     "client.SoundEngineMixin",
     "client.SoundManagerMixin",

@@ -27,9 +27,13 @@ import ru.nekostul.worldzero.event.echo.WorldZeroEchoPhaseOneSpawner;
 import ru.nekostul.worldzero.event.fall.WorldZeroFallEvent;
 import ru.nekostul.worldzero.event.footsteps.WorldZeroFootstepsEvent;
 import ru.nekostul.worldzero.event.freeze.WorldZeroFreezeEvent;
+import ru.nekostul.worldzero.event.horror.WorldZeroBlackEchoJumpscareEvent;
 import ru.nekostul.worldzero.event.horror.WorldZeroHorrorEventSystem;
 import ru.nekostul.worldzero.event.horror.WorldZeroHorrorFinale;
+import ru.nekostul.worldzero.event.horror.WorldZeroHotbarBlackoutEvent;
 import ru.nekostul.worldzero.event.horror.WorldZeroMinorAnomalies;
+import ru.nekostul.worldzero.event.horror.WorldZeroNightDarknessEvent;
+import ru.nekostul.worldzero.event.horror.WorldZeroTrapEvent;
 import ru.nekostul.worldzero.event.house.WorldZeroHouseDetector;
 import ru.nekostul.worldzero.event.house.WorldZeroHouseEvent;
 import ru.nekostul.worldzero.event.major.WorldZeroMajorEventSystem;
@@ -216,6 +220,14 @@ public final class WorldZeroDevEntityCommands {
                                 .executes(context -> worldzero$triggerDoubleChat(context.getSource())))
                         .then(Commands.literal("trigger_sky_watch")
                                 .executes(context -> worldzero$triggerSkyWatch(context.getSource())))
+                        .then(Commands.literal("trigger_black_echo_jumpscare")
+                                .executes(context -> worldzero$triggerBlackEchoJumpscare(context.getSource())))
+                        .then(Commands.literal("trigger_hotbar_blackout")
+                                .executes(context -> worldzero$triggerHotbarBlackout(context.getSource())))
+                        .then(Commands.literal("trigger_night_darkness")
+                                .executes(context -> worldzero$triggerNightDarkness(context.getSource())))
+                        .then(Commands.literal("trigger_trap")
+                                .executes(context -> worldzero$triggerTrap(context.getSource())))
                         .then(Commands.literal("reset_double_chat")
                                 .executes(context -> worldzero$resetDoubleChat(context.getSource())))
                         .then(Commands.literal("spawn")
@@ -294,6 +306,15 @@ public final class WorldZeroDevEntityCommands {
             stopped++;
         }
         if (WorldZeroSkyWatchEvent.worldzero$stopNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroBlackEchoJumpscareEvent.worldzero$stopNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroTrapEvent.worldzero$stopNow(server)) {
+            stopped++;
+        }
+        if (WorldZeroNightDarknessEvent.worldzero$stopNow(server)) {
             stopped++;
         }
         if (WorldZeroFootstepsEvent.worldzero$resetBlankDiscPlayback(server)) {
@@ -898,6 +919,66 @@ public final class WorldZeroDevEntityCommands {
                         ? "[WORLD_0][DEV] sky-watch event triggered"
                         : "[WORLD_0][DEV] sky-watch event trigger failed"
                         + (blocker == null ? " (notice message could not be sent)" : " (" + blocker + ")")
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerBlackEchoJumpscare(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroBlackEchoJumpscareEvent.worldzero$triggerNow(player);
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] black_echo jumpscare triggered"
+                        : "[WORLD_0][DEV] black_echo jumpscare trigger failed (conflicting event, active echo, or no valid spawn spot)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerHotbarBlackout(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroHotbarBlackoutEvent.worldzero$triggerNow(player);
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] hotbar blackout triggered"
+                        : "[WORLD_0][DEV] hotbar blackout trigger failed (be alive in overworld)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerNightDarkness(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroNightDarknessEvent.worldzero$triggerNow(player);
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] night darkness event triggered"
+                        : "[WORLD_0][DEV] night darkness trigger failed (conflicting event, active echo, or invalid player state)"
+        ), false);
+        return triggered ? 1 : 0;
+    }
+
+    private static int worldzero$triggerTrap(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            return 0;
+        }
+
+        boolean triggered = WorldZeroTrapEvent.worldzero$triggerNow(player);
+        source.sendSuccess(() -> Component.literal(
+                triggered
+                        ? "[WORLD_0][DEV] trap event triggered"
+                        : "[WORLD_0][DEV] trap event trigger failed (conflicting event, active echo, or invalid player state)"
         ), false);
         return triggered ? 1 : 0;
     }

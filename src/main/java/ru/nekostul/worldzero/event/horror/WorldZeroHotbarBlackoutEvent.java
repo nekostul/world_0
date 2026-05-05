@@ -72,6 +72,18 @@ public final class WorldZeroHotbarBlackoutEvent {
         saveData.setDirty();
     }
 
+    public static boolean worldzero$triggerNow(ServerPlayer player) {
+        if (player == null
+                || !player.isAlive()
+                || player.isSpectator()
+                || player.serverLevel().dimension() != Level.OVERWORLD) {
+            return false;
+        }
+
+        WorldZeroNetwork.sendHotbarBlackout(player, WORLDZERO_BLACKOUT_DURATION_TICKS);
+        return true;
+    }
+
     private static ServerPlayer worldzero$findTargetPlayer(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
             if (WorldZeroStoryTime.worldzero$canReceiveStoryEvent(player)) {

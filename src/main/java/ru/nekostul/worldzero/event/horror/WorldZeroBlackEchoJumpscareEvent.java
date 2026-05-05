@@ -179,6 +179,56 @@ public final class WorldZeroBlackEchoJumpscareEvent {
         return true;
     }
 
+    public static boolean worldzero$triggerNow(ServerPlayer player) {
+        if (player == null
+                || !player.isAlive()
+                || player.isSpectator()
+                || player.serverLevel().dimension() != Level.OVERWORLD) {
+            return false;
+        }
+
+        ServerLevel level = player.serverLevel();
+        MinecraftServer server = player.getServer();
+        if (server == null || worldzero$hasConflictingEvent(level) || WorldZeroEchoPresenceTracker.worldzero$hasAnyEcho(server)) {
+            return false;
+        }
+
+        SessionState state = WORLDZERO_SESSION_STATES.computeIfAbsent(server, ignored -> new SessionState());
+        if (state.worldzero$active) {
+            return false;
+        }
+
+        JumpscareSaveData saveData = worldzero$getSaveData(level);
+        JumpscareVariant preferredVariant = worldzero$pickVariant(level, saveData);
+        if (preferredVariant != null && worldzero$startJumpscare(level, state, player, preferredVariant)) {
+            saveData.worldzero$lastVariantOrdinal = preferredVariant.ordinal();
+            saveData.worldzero$usedVariantMask |= 1 << preferredVariant.ordinal();
+            if ((saveData.worldzero$usedVariantMask & WORLDZERO_ALL_VARIANTS_MASK) == WORLDZERO_ALL_VARIANTS_MASK) {
+                saveData.worldzero$usedVariantMask = 0;
+            }
+            saveData.setDirty();
+            return true;
+        }
+
+        for (JumpscareVariant variant : JumpscareVariant.values()) {
+            if (variant == preferredVariant) {
+                continue;
+            }
+
+            if (worldzero$startJumpscare(level, state, player, variant)) {
+                saveData.worldzero$lastVariantOrdinal = variant.ordinal();
+                saveData.worldzero$usedVariantMask |= 1 << variant.ordinal();
+                if ((saveData.worldzero$usedVariantMask & WORLDZERO_ALL_VARIANTS_MASK) == WORLDZERO_ALL_VARIANTS_MASK) {
+                    saveData.worldzero$usedVariantMask = 0;
+                }
+                saveData.setDirty();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static void worldzero$tickActiveJumpscare(ServerLevel level, SessionState state) {
         MinecraftServer server = level.getServer();
         long storyTicks = WorldZeroStoryTime.worldzero$getStoryTicks(level);

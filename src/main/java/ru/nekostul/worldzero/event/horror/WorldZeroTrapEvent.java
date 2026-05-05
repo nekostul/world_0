@@ -254,6 +254,28 @@ public final class WorldZeroTrapEvent {
         return true;
     }
 
+    public static boolean worldzero$triggerNow(ServerPlayer player) {
+        if (player == null
+                || !player.isAlive()
+                || player.isSpectator()
+                || player.serverLevel().dimension() != Level.OVERWORLD) {
+            return false;
+        }
+
+        MinecraftServer server = player.getServer();
+        ServerLevel level = player.serverLevel();
+        if (server == null || worldzero$hasConflictingEvent(level) || WorldZeroEchoPresenceTracker.worldzero$hasAnyEcho(server)) {
+            return false;
+        }
+
+        SessionState state = WORLDZERO_SESSION_STATES.computeIfAbsent(server, ignored -> new SessionState());
+        if (state.worldzero$phase != Phase.INACTIVE) {
+            return false;
+        }
+
+        return worldzero$startTrap(level, state, player);
+    }
+
     public static void worldzero$acknowledgeAmbientSoundFinished(ServerPlayer player) {
         if (player == null) {
             return;

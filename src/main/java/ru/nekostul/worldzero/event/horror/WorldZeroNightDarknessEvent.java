@@ -160,6 +160,27 @@ public final class WorldZeroNightDarknessEvent {
         return true;
     }
 
+    public static boolean worldzero$triggerNow(ServerPlayer player) {
+        if (player == null
+                || !player.isAlive()
+                || player.isSpectator()
+                || player.serverLevel().dimension() != Level.OVERWORLD) {
+            return false;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null || worldzero$hasConflictingEvent(player.serverLevel()) || WorldZeroEchoPresenceTracker.worldzero$hasAnyEcho(server)) {
+            return false;
+        }
+
+        SessionState state = WORLDZERO_SESSION_STATES.computeIfAbsent(server, ignored -> new SessionState());
+        if (state.worldzero$active) {
+            return false;
+        }
+
+        return worldzero$startEvent(player, state);
+    }
+
     private static void worldzero$tickActiveEvent(MinecraftServer server, SessionState state) {
         ServerPlayer player = server.getPlayerList().getPlayer(state.worldzero$targetPlayerId);
         if (player == null || !player.isAlive() || player.isSpectator() || player.serverLevel().dimension() != Level.OVERWORLD) {

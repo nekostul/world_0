@@ -40,7 +40,7 @@ public abstract class SoundEngineMixin {
             return;
         }
 
-        if (WorldZeroFreezeClientController.isFreezeActive()) {
+        if (WorldZeroFreezeClientController.worldzero$shouldSilenceNonPlayerSounds()) {
             if (source != SoundSource.PLAYERS) {
                 callbackInfo.setReturnValue(0.0F);
                 return;

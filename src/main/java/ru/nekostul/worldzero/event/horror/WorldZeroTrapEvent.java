@@ -56,6 +56,7 @@ public final class WorldZeroTrapEvent {
     private static final int WORLDZERO_REDSTONE_TORCH_COUNT = 3;
     private static final int WORLDZERO_SOUND_END_DROP_DELAY_TICKS = 20;
     private static final int WORLDZERO_DROP_PHASE_TIMEOUT_TICKS = 20 * 18;
+    private static final int WORLDZERO_TRAP_FREEZE_DURATION_TICKS = 20 * 60 * 5;
     private static final int WORLDZERO_CHAT_DELAY_MIN_TICKS = 14;
     private static final int WORLDZERO_CHAT_DELAY_MAX_TICKS = 28;
     private static final int WORLDZERO_BOX_RESTORE_BELOW_FLOOR_DISTANCE = 6;
@@ -398,6 +399,7 @@ public final class WorldZeroTrapEvent {
         );
         player.setDeltaMovement(0.0D, 0.0D, 0.0D);
         player.fallDistance = 0.0F;
+        WorldZeroNetwork.sendFreezeStart(player, WORLDZERO_TRAP_FREEZE_DURATION_TICKS, false);
 
         state.worldzero$phase = Phase.TRAPPED;
         state.worldzero$targetPlayerId = player.getUUID();
@@ -461,6 +463,7 @@ public final class WorldZeroTrapEvent {
     }
 
     private static void worldzero$breakBlockUnderPlayer(ServerLevel level, SessionState state, ServerPlayer player) {
+        WorldZeroNetwork.sendFreezeEnd(player);
         BlockPos below = player.blockPosition().below();
         BlockState blockState = level.getBlockState(below);
         if (!blockState.isAir()) {
@@ -485,8 +488,11 @@ public final class WorldZeroTrapEvent {
         }
 
         ServerPlayer player = server.getPlayerList().getPlayer(state.worldzero$targetPlayerId);
-        if (abort && player != null) {
-            WorldZeroNetwork.sendStopHorrorSounds(player);
+        if (player != null) {
+            WorldZeroNetwork.sendFreezeEnd(player);
+            if (abort) {
+                WorldZeroNetwork.sendStopHorrorSounds(player);
+            }
         }
 
         state.worldzero$reset();

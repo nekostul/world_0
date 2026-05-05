@@ -202,11 +202,15 @@ public final class WorldZeroNetwork {
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks) {
-        sendFreezeStart(player, durationTicks, -1, Float.NaN, Float.NaN);
+        sendFreezeStart(player, durationTicks, -1, Float.NaN, Float.NaN, true);
+    }
+
+    public static void sendFreezeStart(ServerPlayer player, int durationTicks, boolean silenceNonPlayerSounds) {
+        sendFreezeStart(player, durationTicks, -1, Float.NaN, Float.NaN, silenceNonPlayerSounds);
     }
 
     public static void sendFreezeStart(ServerPlayer player, int durationTicks, int focusEntityId) {
-        sendFreezeStart(player, durationTicks, focusEntityId, Float.NaN, Float.NaN);
+        sendFreezeStart(player, durationTicks, focusEntityId, Float.NaN, Float.NaN, true);
     }
 
     public static void sendFreezeStart(
@@ -215,6 +219,17 @@ public final class WorldZeroNetwork {
             int focusEntityId,
             float forcedYaw,
             float forcedPitch
+    ) {
+        sendFreezeStart(player, durationTicks, focusEntityId, forcedYaw, forcedPitch, true);
+    }
+
+    public static void sendFreezeStart(
+            ServerPlayer player,
+            int durationTicks,
+            int focusEntityId,
+            float forcedYaw,
+            float forcedPitch,
+            boolean silenceNonPlayerSounds
     ) {
         WorldZeroServerFreezeController.worldzero$startFreeze(player, durationTicks, forcedYaw, forcedPitch);
         WORLDZERO_CHANNEL.send(
@@ -226,7 +241,8 @@ public final class WorldZeroNetwork {
                         forcedPitch,
                         player.getX(),
                         player.getY(),
-                        player.getZ()
+                        player.getZ(),
+                        silenceNonPlayerSounds
                 )
         );
     }

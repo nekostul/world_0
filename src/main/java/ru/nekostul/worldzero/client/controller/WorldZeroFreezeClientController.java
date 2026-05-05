@@ -30,6 +30,7 @@ public final class WorldZeroFreezeClientController {
     private static double worldzero$serverLockedX = Double.NaN;
     private static double worldzero$serverLockedY = Double.NaN;
     private static double worldzero$serverLockedZ = Double.NaN;
+    private static boolean worldzero$silenceNonPlayerSounds = true;
 
     private WorldZeroFreezeClientController() {
     }
@@ -55,6 +56,19 @@ public final class WorldZeroFreezeClientController {
             double lockedY,
             double lockedZ
     ) {
+        startFreeze(durationTicks, focusEntityId, forcedYaw, forcedPitch, lockedX, lockedY, lockedZ, true);
+    }
+
+    public static void startFreeze(
+            int durationTicks,
+            int focusEntityId,
+            float forcedYaw,
+            float forcedPitch,
+            double lockedX,
+            double lockedY,
+            double lockedZ,
+            boolean silenceNonPlayerSounds
+    ) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null) {
             return;
@@ -73,14 +87,19 @@ public final class WorldZeroFreezeClientController {
         worldzero$serverLockedX = lockedX;
         worldzero$serverLockedY = lockedY;
         worldzero$serverLockedZ = lockedZ;
+        worldzero$silenceNonPlayerSounds = silenceNonPlayerSounds;
 
-        if (minecraft.getSoundManager() != null) {
+        if (silenceNonPlayerSounds && minecraft.getSoundManager() != null) {
             minecraft.getSoundManager().stop();
         }
     }
 
     public static boolean isFreezeActive() {
         return worldzero$freezeActive;
+    }
+
+    public static boolean worldzero$shouldSilenceNonPlayerSounds() {
+        return worldzero$freezeActive && worldzero$silenceNonPlayerSounds;
     }
 
     public static void finishFreeze() {
@@ -199,5 +218,6 @@ public final class WorldZeroFreezeClientController {
         worldzero$serverLockedX = Double.NaN;
         worldzero$serverLockedY = Double.NaN;
         worldzero$serverLockedZ = Double.NaN;
+        worldzero$silenceNonPlayerSounds = true;
     }
 }

@@ -415,9 +415,9 @@ public final class WorldZeroTrapEvent {
         }
 
         player.teleportTo(
-                player.getX(),
+                boxCenter.getX() + 0.5D,
                 boxCenter.getY() + WORLDZERO_BOX_INTERIOR_FLOOR_Y_OFFSET,
-                player.getZ()
+                boxCenter.getZ() + 0.5D
         );
         player.setDeltaMovement(0.0D, 0.0D, 0.0D);
         player.fallDistance = 0.0F;
@@ -485,8 +485,14 @@ public final class WorldZeroTrapEvent {
     }
 
     private static void worldzero$breakBlockUnderPlayer(ServerLevel level, SessionState state, ServerPlayer player) {
+        double centerX = state.worldzero$boxCenter.getX() + 0.5D;
+        double centerY = state.worldzero$boxCenter.getY() + WORLDZERO_BOX_INTERIOR_FLOOR_Y_OFFSET;
+        double centerZ = state.worldzero$boxCenter.getZ() + 0.5D;
+        player.teleportTo(centerX, centerY, centerZ);
+        player.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        player.fallDistance = 0.0F;
         WorldZeroNetwork.sendFreezeEnd(player);
-        BlockPos below = player.blockPosition().below();
+        BlockPos below = state.worldzero$boxCenter;
         BlockState blockState = level.getBlockState(below);
         if (!blockState.isAir()) {
             level.levelEvent(2001, below, Block.getId(blockState));

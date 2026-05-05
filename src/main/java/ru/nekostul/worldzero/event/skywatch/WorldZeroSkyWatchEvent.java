@@ -52,6 +52,11 @@ public final class WorldZeroSkyWatchEvent {
     private static final long WORLDZERO_RETRY_MAX_TICKS = 90L * 20L;
     private static final long WORLDZERO_LATE_RETRY_MIN_TICKS = 2L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_LATE_RETRY_MAX_TICKS = 4L * WORLDZERO_TICKS_PER_MINUTE;
+    private static final long WORLDZERO_REPEAT_DELAY_MIN_TICKS = 10L * WORLDZERO_TICKS_PER_MINUTE;
+    private static final long WORLDZERO_REPEAT_DELAY_MAX_TICKS = 18L * WORLDZERO_TICKS_PER_MINUTE;
+    private static final long WORLDZERO_REPEAT_LATE_DELAY_MIN_TICKS = 4L * WORLDZERO_TICKS_PER_MINUTE;
+    private static final long WORLDZERO_REPEAT_LATE_DELAY_MAX_TICKS = 8L * WORLDZERO_TICKS_PER_MINUTE;
+    private static final int WORLDZERO_MAX_PLAYS = 2;
     private static final double WORLDZERO_ESCAPE_DISTANCE_SQR = 18.0D * 18.0D;
     private static final int WORLDZERO_MIN_SURFACE_DEPTH = 5;
     private static final long WORLDZERO_MINE_CONTEXT_CACHE_TICKS = 20L * 5L;
@@ -177,7 +182,6 @@ public final class WorldZeroSkyWatchEvent {
 
         PlayerState state = new PlayerState();
         state.worldzero$stage = WORLDZERO_STAGE_PRELUDE;
-        state.worldzero$completed = false;
         state.worldzero$seed = level.random.nextInt();
         state.worldzero$nextAttemptTick = -1L;
         state.worldzero$preludeEndTick = level.getGameTime() + WORLDZERO_PRELUDE_DELAY_TICKS;
@@ -230,7 +234,7 @@ public final class WorldZeroSkyWatchEvent {
             long storyTicks
     ) {
         long gameTicks = level.getGameTime();
-        if (state.worldzero$stage == WORLDZERO_STAGE_DONE || state.worldzero$completed) {
+        if (state.worldzero$stage == WORLDZERO_STAGE_DONE || state.worldzero$completedCount >= WORLDZERO_MAX_PLAYS) {
             return false;
         }
 
@@ -290,18 +294,23 @@ public final class WorldZeroSkyWatchEvent {
                 saveData.setDirty();
                 return true;
             }
-            state.worldzero$stage = WORLDZERO_STAGE_DONE;
-            state.worldzero$completed = true;
+            state.worldzero$completedCount++;
+            state.worldzero$stage = state.worldzero$completedCount >= WORLDZERO_MAX_PLAYS
+                    ? WORLDZERO_STAGE_DONE
+                    : WORLDZERO_STAGE_IDLE;
             state.worldzero$clearTick = -1L;
             state.worldzero$eventEndTick = -1L;
+            state.worldzero$preludeEndTick = -1L;
+            state.worldzero$nextAttemptTick = state.worldzero$completedCount >= WORLDZERO_MAX_PLAYS
+                    ? -1L
+                    : worldzero$scheduleRepeatAttemptTick(level, storyTicks);
             saveData.setDirty();
-            return false;
+            return state.worldzero$stage != WORLDZERO_STAGE_DONE;
         }
 
         if (storyTicks < WORLDZERO_WINDOW_START_TICKS || storyTicks >= WORLDZERO_ABSOLUTE_WINDOW_END_TICKS) {
             if (storyTicks >= WORLDZERO_ABSOLUTE_WINDOW_END_TICKS) {
                 state.worldzero$stage = WORLDZERO_STAGE_DONE;
-                state.worldzero$completed = true;
                 saveData.setDirty();
             }
             return false;
@@ -369,6 +378,7 @@ public final class WorldZeroSkyWatchEvent {
                 || WorldZeroFootstepsEvent.worldzero$isFootstepsActive(level.getServer())
                 || WorldZeroHouseEvent.worldzero$isHouseActive(level.getServer())
                 || WorldZeroParalysisEvent.worldzero$isParalysisActive(level.getServer())
+                || ru.nekostul.worldzero.event.horror.WorldZeroBlackEchoJumpscareEvent.worldzero$isActive(level.getServer())
                 || WorldZeroHorrorFinale.worldzero$isActive(level.getServer())
                 || WorldZeroMajorEventSystem.worldzero$isMajorEventActive(level.getServer())
                 || WorldZeroHorrorEventSystem.worldzero$isMinorAnomalyActive(level)
@@ -442,7 +452,9 @@ public final class WorldZeroSkyWatchEvent {
         }
 
         String blockPath = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
-        return blockPath.contains("deepslate") || blockPath.equals("stone");
+        return blockPath.contains("deepslate")
+                || blockPath.equals("stone")
+                || blockPath.endsWith("_ore");
     }
 
     private static boolean worldzero$isInsideHouse(ServerPlayer player) {
@@ -504,6 +516,19 @@ public final class WorldZeroSkyWatchEvent {
         );
     }
 
+    private static long worldzero$scheduleRepeatAttemptTick(ServerLevel level, long storyTicks) {
+        long minDelay = storyTicks < 140L * WORLDZERO_TICKS_PER_MINUTE
+                ? WORLDZERO_REPEAT_DELAY_MIN_TICKS
+                : WORLDZERO_REPEAT_LATE_DELAY_MIN_TICKS;
+        long maxDelay = storyTicks < 140L * WORLDZERO_TICKS_PER_MINUTE
+                ? WORLDZERO_REPEAT_DELAY_MAX_TICKS
+                : WORLDZERO_REPEAT_LATE_DELAY_MAX_TICKS;
+        return Math.min(
+                WORLDZERO_ABSOLUTE_WINDOW_END_TICKS,
+                storyTicks + worldzero$randomBetween(level, minDelay, maxDelay)
+        );
+    }
+
     private static SkyWatchSaveData worldzero$getSaveData(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
                 SkyWatchSaveData::worldzero$load,
@@ -550,7 +575,7 @@ public final class WorldZeroSkyWatchEvent {
     }
 
     private static final class PlayerState {
-        private boolean worldzero$completed;
+        private int worldzero$completedCount;
         private int worldzero$stage;
         private int worldzero$seed;
         private long worldzero$nextAttemptTick = -1L;
@@ -565,7 +590,9 @@ public final class WorldZeroSkyWatchEvent {
 
         private static PlayerState worldzero$load(CompoundTag tag) {
             PlayerState state = new PlayerState();
-            state.worldzero$completed = tag.getBoolean("completed");
+            state.worldzero$completedCount = tag.contains("completed_count")
+                    ? Math.max(0, tag.getInt("completed_count"))
+                    : (tag.getBoolean("completed") ? 1 : 0);
             state.worldzero$stage = tag.getInt("stage");
             state.worldzero$seed = tag.getInt("seed");
             state.worldzero$nextAttemptTick = tag.contains("next_attempt_tick") ? tag.getLong("next_attempt_tick") : -1L;
@@ -575,7 +602,7 @@ public final class WorldZeroSkyWatchEvent {
             state.worldzero$startX = tag.getDouble("start_x");
             state.worldzero$startY = tag.getDouble("start_y");
             state.worldzero$startZ = tag.getDouble("start_z");
-            if (state.worldzero$completed) {
+            if (state.worldzero$completedCount >= WORLDZERO_MAX_PLAYS) {
                 state.worldzero$stage = WORLDZERO_STAGE_DONE;
             }
             return state;
@@ -583,7 +610,8 @@ public final class WorldZeroSkyWatchEvent {
 
         private CompoundTag worldzero$save() {
             CompoundTag tag = new CompoundTag();
-            tag.putBoolean("completed", this.worldzero$completed);
+            tag.putInt("completed_count", this.worldzero$completedCount);
+            tag.putBoolean("completed", this.worldzero$completedCount > 0);
             tag.putInt("stage", this.worldzero$stage);
             tag.putInt("seed", this.worldzero$seed);
             tag.putLong("next_attempt_tick", this.worldzero$nextAttemptTick);

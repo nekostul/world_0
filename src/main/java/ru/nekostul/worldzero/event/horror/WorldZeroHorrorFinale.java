@@ -300,6 +300,7 @@ public final class WorldZeroHorrorFinale {
 
     private static void worldzero$stopConflictingEvents(MinecraftServer server) {
         WorldZeroMinorAnomalies.worldzero$cancelAll(server);
+        WorldZeroBlackEchoJumpscareEvent.worldzero$stopNow(server);
         WorldZeroMajorEventSystem.worldzero$stopAllEvents(server);
         WorldZeroFreezeEvent.worldzero$stopFreezeNow(server);
         WorldZeroFallEvent.worldzero$stopFallNow(server);

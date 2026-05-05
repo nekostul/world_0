@@ -284,7 +284,8 @@ public final class WorldZeroWorldMemoryEvent {
                 || WorldZeroFootstepsEvent.worldzero$isFootstepsActive(server)
                 || WorldZeroHouseEvent.worldzero$isHouseActive(server)
                 || WorldZeroSkyWatchEvent.worldzero$isActive(server)
-                || WorldZeroParalysisEvent.worldzero$isParalysisActive(server);
+                || WorldZeroParalysisEvent.worldzero$isParalysisActive(server)
+                || ru.nekostul.worldzero.event.horror.WorldZeroBlackEchoJumpscareEvent.worldzero$isActive(server);
     }
 
     private static Phase worldzero$resolvePhase(long playTimeTicks) {

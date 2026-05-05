@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:the_nether",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "minecraft:nether_wastes",
+      "features": false,
+      "lakes": false,
+      "layers": [
+        {
+          "block": "minecraft:bedrock",
+          "height": 1
+        },
+        {
+          "block": "minecraft:lava",
+          "height": 31
+        },
+        {
+          "block": "minecraft:netherrack",
+          "height": 32
+        }
+      ],
+      "structure_overrides": []
+    }
+  }
+}

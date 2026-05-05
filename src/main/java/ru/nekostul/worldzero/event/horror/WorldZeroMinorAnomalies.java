@@ -791,14 +791,12 @@ public final class WorldZeroMinorAnomalies {
             case RISING -> new MinorAnomalyType[]{
                     MinorAnomalyType.PERIPHERAL_ECHO,
                     MinorAnomalyType.WHISPER,
-                    MinorAnomalyType.LIGHT_ANOMALY,
-                    MinorAnomalyType.WRONG_WIND
+                    MinorAnomalyType.LIGHT_ANOMALY
             };
             case PEAK -> new MinorAnomalyType[]{
                     MinorAnomalyType.PERIPHERAL_ECHO,
                     MinorAnomalyType.WHISPER,
                     MinorAnomalyType.LIGHT_ANOMALY,
-                    MinorAnomalyType.WRONG_WIND,
                     MinorAnomalyType.SHADOW_DELAY,
                     MinorAnomalyType.ENTITY_BLACKOUT,
                     MinorAnomalyType.BLOCK_BLINK

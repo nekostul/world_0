@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.tags.StructureTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.Item;
@@ -29,6 +30,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -67,6 +69,7 @@ public final class WorldZeroOverworldStructureEvent {
     private static final long WORLDZERO_PORTAL2_AT_TICKS = 30L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_NEIGHBOR_MIN_DELAY_TICKS = 15L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_NEIGHBOR_MAX_DELAY_TICKS = 20L * WORLDZERO_TICKS_PER_MINUTE;
+    private static final long WORLDZERO_DOM_AFTER_PROGRESS5_DELAY_TICKS = 15L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_DOM2_MIN_DELAY_TICKS = 20L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_DOM2_MAX_DELAY_TICKS = 30L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_DOM2_REACTION_DELAY_TICKS = 2L * WORLDZERO_TICKS_PER_MINUTE;
@@ -80,9 +83,9 @@ public final class WorldZeroOverworldStructureEvent {
     private static final int WORLDZERO_PORTAL2_SEPARATION = 48;
     private static final int WORLDZERO_WORKSTATION_MIN_DISTANCE = 14;
     private static final int WORLDZERO_WORKSTATION_MAX_DISTANCE = 28;
-    private static final int WORLDZERO_DOM_MIN_DISTANCE = 24;
-    private static final int WORLDZERO_DOM_MAX_DISTANCE = 38;
-    private static final int WORLDZERO_DOM_PLAYER_MIN_DISTANCE = 18;
+    private static final int WORLDZERO_DOM_MIN_DISTANCE = 34;
+    private static final int WORLDZERO_DOM_MAX_DISTANCE = 52;
+    private static final int WORLDZERO_DOM_PLAYER_MIN_DISTANCE = 28;
     private static final int WORLDZERO_DEBUG_PORTAL_MIN_DISTANCE = 10;
     private static final int WORLDZERO_DEBUG_PORTAL_MAX_DISTANCE = 18;
     private static final int WORLDZERO_DEBUG_DOM_MIN_DISTANCE = 14;
@@ -99,9 +102,9 @@ public final class WorldZeroOverworldStructureEvent {
     private static final int WORLDZERO_DOOR_PATH_LENGTH = 3;
     private static final int WORLDZERO_DOOR_PATH_HALF_WIDTH = 1;
     private static final int WORLDZERO_DEBUG_DOM_UPDATE_RADIUS = 96;
-    private static final int WORLDZERO_DOM_LAVA_CHECK_RADIUS = 8;
-    private static final int WORLDZERO_DOM_LAVA_VERTICAL_BELOW = 2;
-    private static final int WORLDZERO_DOM_LAVA_VERTICAL_ABOVE = 3;
+    private static final int WORLDZERO_DOM_LAVA_CHECK_RADIUS = 12;
+    private static final int WORLDZERO_DOM_LAVA_VERTICAL_BELOW = 6;
+    private static final int WORLDZERO_DOM_LAVA_VERTICAL_ABOVE = 6;
     private static final ResourceLocation WORLDZERO_PORTAL_ID = new ResourceLocation(WorldZeroMod.MOD_ID, "portal");
     private static final ResourceLocation WORLDZERO_PORTAL2_ID = new ResourceLocation(WorldZeroMod.MOD_ID, "portal2");
     private static final ResourceLocation WORLDZERO_DOM_ID = new ResourceLocation(WorldZeroMod.MOD_ID, "dom");
@@ -192,7 +195,10 @@ public final class WorldZeroOverworldStructureEvent {
         }
 
         if (saveData.worldzero$houseDetected) {
-            if (!saveData.worldzero$domPlaced && storyTicks >= saveData.worldzero$domRetryAfterTick) {
+            long domPlacementUnlockTick = worldzero$getDomPlacementUnlockTick(level, saveData);
+            if (!saveData.worldzero$domPlaced
+                    && domPlacementUnlockTick >= 0L
+                    && storyTicks >= Math.max(domPlacementUnlockTick, saveData.worldzero$domRetryAfterTick)) {
                 if (!worldzero$tryPlaceDom(level, saveData, sessionState)) {
                     saveData.worldzero$domRetryAfterTick = storyTicks + WORLDZERO_STRUCTURE_RETRY_TICKS;
                     saveData.setDirty();
@@ -567,6 +573,18 @@ public final class WorldZeroOverworldStructureEvent {
         return true;
     }
 
+    private static long worldzero$getDomPlacementUnlockTick(ServerLevel level, StructureSaveData saveData) {
+        UUID ownerId = worldzero$getHouseOwnerUuid(saveData);
+        if (ownerId == null) {
+            return -1L;
+        }
+
+        long progress5SentTick = WorldZeroDoubleChatEvent.worldzero$getProgress5SentStoryTick(level, ownerId);
+        return progress5SentTick >= 0L
+                ? progress5SentTick + WORLDZERO_DOM_AFTER_PROGRESS5_DELAY_TICKS
+                : -1L;
+    }
+
     private static boolean worldzero$tryUpgradeDom(ServerLevel level, StructureSaveData saveData) {
         if (!saveData.worldzero$domPlaced) {
             return false;
@@ -654,6 +672,13 @@ public final class WorldZeroOverworldStructureEvent {
     }
 
     private static boolean worldzero$sendHouseOwnerLine(ServerLevel level, StructureSaveData saveData, String messageKey) {
+        UUID ownerId = worldzero$getHouseOwnerUuid(saveData);
+        if (ownerId != null
+                && WorldZeroDoubleChatEvent.worldzero$hasNeighborLeft(level, ownerId)
+                && (WORLDZERO_NEIGHBOR_BUILT_KEY.equals(messageKey) || WORLDZERO_DOM_CHANGED_KEY.equals(messageKey))) {
+            return true;
+        }
+
         ServerPlayer owner = worldzero$getHouseOwner(level, saveData);
         return owner != null
                 && WorldZeroStoryTime.worldzero$canReceiveStoryEvent(owner)
@@ -739,12 +764,22 @@ public final class WorldZeroOverworldStructureEvent {
 
     @Nullable
     private static ServerPlayer worldzero$getHouseOwner(ServerLevel level, StructureSaveData saveData) {
+        UUID ownerId = worldzero$getHouseOwnerUuid(saveData);
+        if (ownerId == null) {
+            return null;
+        }
+
+        return level.getServer().getPlayerList().getPlayer(ownerId);
+    }
+
+    @Nullable
+    private static UUID worldzero$getHouseOwnerUuid(StructureSaveData saveData) {
         if (saveData.worldzero$houseOwnerId.isBlank()) {
             return null;
         }
 
         try {
-            return level.getServer().getPlayerList().getPlayer(UUID.fromString(saveData.worldzero$houseOwnerId));
+            return UUID.fromString(saveData.worldzero$houseOwnerId);
         } catch (IllegalArgumentException ignored) {
             return null;
         }
@@ -903,6 +938,9 @@ public final class WorldZeroOverworldStructureEvent {
             if (worldzero$hasNearbyLava(level, origin, size)) {
                 continue;
             }
+            if (worldzero$isInsideVillageStructure(level, origin, size)) {
+                continue;
+            }
             if (worldzero$horizontalDistanceSqr(origin, houseCenter) < (double) (WORLDZERO_DOM_MIN_DISTANCE * WORLDZERO_DOM_MIN_DISTANCE)) {
                 continue;
             }
@@ -910,9 +948,9 @@ public final class WorldZeroOverworldStructureEvent {
                 if (worldzero$horizontalDistanceSqr(origin, owner.blockPosition()) < (double) (WORLDZERO_DOM_PLAYER_MIN_DISTANCE * WORLDZERO_DOM_PLAYER_MIN_DISTANCE)) {
                     continue;
                 }
-                if (worldzero$isInViewCone(owner, worldzero$getStructureCenter(origin, size))) {
-                    continue;
-                }
+            }
+            if (worldzero$isDomImmediatelyNoticeable(level, origin, size)) {
+                continue;
             }
             return origin;
         }
@@ -960,7 +998,10 @@ public final class WorldZeroOverworldStructureEvent {
         int minZ = origin.getZ() - WORLDZERO_DOM_LAVA_CHECK_RADIUS;
         int maxZ = origin.getZ() + size.getZ() - 1 + WORLDZERO_DOM_LAVA_CHECK_RADIUS;
         int minY = Math.max(level.getMinBuildHeight(), origin.getY() - WORLDZERO_DOM_LAVA_VERTICAL_BELOW);
-        int maxY = Math.min(level.getMaxBuildHeight() - 1, origin.getY() + WORLDZERO_DOM_LAVA_VERTICAL_ABOVE);
+        int maxY = Math.min(
+                level.getMaxBuildHeight() - 1,
+                origin.getY() + Math.max(size.getY() + 2, WORLDZERO_DOM_LAVA_VERTICAL_ABOVE)
+        );
 
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
@@ -1626,6 +1667,48 @@ public final class WorldZeroOverworldStructureEvent {
         double dx = first.getX() - second.getX();
         double dz = first.getZ() - second.getZ();
         return dx * dx + dz * dz;
+    }
+
+    private static boolean worldzero$isDomImmediatelyNoticeable(ServerLevel level, BlockPos origin, Vec3i size) {
+        Vec3 center = worldzero$getStructureCenter(origin, size);
+        double minDistanceSqr = (double) (WORLDZERO_DOM_PLAYER_MIN_DISTANCE * WORLDZERO_DOM_PLAYER_MIN_DISTANCE);
+        for (ServerPlayer player : level.players()) {
+            if (!worldzero$isValidPlayer(player)) {
+                continue;
+            }
+
+            double dx = center.x - player.getX();
+            double dz = center.z - player.getZ();
+            if (dx * dx + dz * dz < minDistanceSqr) {
+                return true;
+            }
+
+            if (worldzero$isDomVisibleToPlayer(level, player, origin, size)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean worldzero$isInsideVillageStructure(ServerLevel level, BlockPos origin, Vec3i size) {
+        BlockPos center = BlockPos.containing(worldzero$getStructureCenter(origin, size));
+        BlockPos[] probePositions = new BlockPos[] {
+                center,
+                origin,
+                origin.offset(size.getX() - 1, 0, 0),
+                origin.offset(0, 0, size.getZ() - 1),
+                origin.offset(size.getX() - 1, 0, size.getZ() - 1),
+                origin.offset(size.getX() / 2, 0, size.getZ() / 2)
+        };
+        for (BlockPos probePos : probePositions) {
+            StructureStart villageStart = level.structureManager().getStructureWithPieceAt(probePos, StructureTags.VILLAGE);
+            if (villageStart != StructureStart.INVALID_START) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static boolean worldzero$isDomVisibleToPlayer(ServerLevel level, ServerPlayer player, BlockPos origin, Vec3i size) {

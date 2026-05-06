@@ -11,10 +11,12 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.StructureTags;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
@@ -395,6 +397,10 @@ public final class WorldZeroHouseDetector {
         }
 
         BlockPos center = new BlockPos((minX + maxX) / 2, minY, (minZ + maxZ) / 2);
+        if (worldzero$isInsideVillageStructure(level, center, foundDoor, minX, minY, minZ, maxX, maxY, maxZ)) {
+            return new EvaluatedRoom(null);
+        }
+
         return new EvaluatedRoom(new DetectedHouse(
                 center,
                 new BlockPos(minX, minY, minZ),
@@ -429,6 +435,41 @@ public final class WorldZeroHouseDetector {
                 || state.is(Blocks.BLAST_FURNACE)
                 || state.is(Blocks.SMOKER)
                 || state.is(Blocks.BARREL);
+    }
+
+    private static boolean worldzero$isInsideVillageStructure(
+            ServerLevel level,
+            BlockPos center,
+            @Nullable BlockPos doorPos,
+            int minX,
+            int minY,
+            int minZ,
+            int maxX,
+            int maxY,
+            int maxZ
+    ) {
+        BlockPos[] probePositions = new BlockPos[] {
+                center,
+                new BlockPos(minX, minY, minZ),
+                new BlockPos(minX, maxY, minZ),
+                new BlockPos(maxX, minY, maxZ),
+                new BlockPos(maxX, maxY, maxZ),
+                new BlockPos(minX, minY, maxZ),
+                new BlockPos(maxX, minY, minZ),
+                doorPos
+        };
+        for (BlockPos probePos : probePositions) {
+            if (probePos == null) {
+                continue;
+            }
+
+            StructureStart villageStart = level.structureManager().getStructureWithPieceAt(probePos, StructureTags.VILLAGE);
+            if (villageStart != StructureStart.INVALID_START) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static double worldzero$square(double value) {

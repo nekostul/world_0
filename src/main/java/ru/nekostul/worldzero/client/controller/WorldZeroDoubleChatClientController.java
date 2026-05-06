@@ -50,6 +50,8 @@ public final class WorldZeroDoubleChatClientController {
                     worldzero$addLocalPortLine(messageKey);
             case WorldZeroDoubleChatPacket.WORLDZERO_ACTION_AUTO_SELF_LINE ->
                     worldzero$startAutoTypingSelf(messageKey);
+            case WorldZeroDoubleChatPacket.WORLDZERO_ACTION_WHISPER_LINE ->
+                    worldzero$addWhisperLine(speaker, messageKey);
             default -> {
             }
         }
@@ -137,6 +139,20 @@ public final class WorldZeroDoubleChatClientController {
         }
 
         worldzero$pushChatLine(Component.translatable(messageKey, Component.literal(speaker)).withStyle(ChatFormatting.YELLOW));
+    }
+
+    private static void worldzero$addWhisperLine(String speaker, String messageKey) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.gui == null || speaker == null || speaker.isBlank()
+                || messageKey == null || messageKey.isBlank()) {
+            return;
+        }
+
+        minecraft.gui.getChat().addMessage(Component.translatable(
+                "commands.message.display.incoming",
+                Component.literal(speaker),
+                Component.translatable(messageKey)
+        ).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
     }
 
     private static void worldzero$addSelfLine(String messageKey) {

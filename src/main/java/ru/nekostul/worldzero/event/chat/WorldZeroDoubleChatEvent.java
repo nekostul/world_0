@@ -4,6 +4,7 @@ import com.mojang.authlib.GameProfile;
 import io.netty.buffer.Unpooled;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -94,6 +95,7 @@ public final class WorldZeroDoubleChatEvent {
             "message.worldzero.double_chat.progress.5",
             "message.worldzero.double_chat.progress.6"
     };
+    private static final int WORLDZERO_NEIGHBOR_BUILD_PROGRESS_INDEX = 5;
 
     private WorldZeroDoubleChatEvent() {
     }
@@ -131,7 +133,7 @@ public final class WorldZeroDoubleChatEvent {
         if (worldzero$ensureScenarioData(state, player, overworld)) {
             saveData.setDirty();
         }
-        if (state.worldzero$joined) {
+        if (state.worldzero$joined && !state.worldzero$left) {
             worldzero$ensureNeighborTabPresence(player, state);
         }
     }
@@ -237,6 +239,21 @@ public final class WorldZeroDoubleChatEvent {
         return state.worldzero$fakeName;
     }
 
+    public static String worldzero$getOriginalNeighborSpeakerName(ServerPlayer player) {
+        if (player == null || player.getServer() == null) {
+            return "";
+        }
+
+        ServerLevel overworld = player.getServer().getLevel(Level.OVERWORLD);
+        if (overworld == null) {
+            return "";
+        }
+
+        DoubleChatSaveData saveData = worldzero$getSaveData(overworld);
+        PlayerState state = saveData.worldzero$states.get(player.getUUID());
+        return state != null && state.worldzero$fakeName != null ? state.worldzero$fakeName : "";
+    }
+
     public static boolean worldzero$sendSpeakerLineNow(ServerPlayer player, String messageKey) {
         if (player == null || messageKey == null || messageKey.isBlank()) {
             return false;
@@ -247,8 +264,34 @@ public final class WorldZeroDoubleChatEvent {
             return false;
         }
 
+        return worldzero$sendSpeakerLineNow(player, speaker, messageKey);
+    }
+
+    public static boolean worldzero$sendSpeakerLineNow(ServerPlayer player, String speaker, String messageKey) {
+        if (player == null || speaker == null || speaker.isBlank() || messageKey == null || messageKey.isBlank()) {
+            return false;
+        }
+
         worldzero$sendPlayerLine(player, speaker, messageKey);
         return true;
+    }
+
+    public static boolean worldzero$hasNeighborLeft(ServerLevel level, UUID playerId) {
+        if (level == null || playerId == null) {
+            return false;
+        }
+
+        DoubleChatSaveData saveData = worldzero$getSaveData(level);
+        PlayerState state = saveData.worldzero$states.get(playerId);
+        return state != null && state.worldzero$left;
+    }
+
+    public static boolean worldzero$hasNeighborLeft(ServerPlayer player) {
+        return player != null && worldzero$hasNeighborLeft(player.serverLevel(), player.getUUID());
+    }
+
+    public static long worldzero$getNeighborLeaveStoryTick() {
+        return WORLDZERO_PANIC_AT_TICKS;
     }
 
     public static boolean worldzero$sendAutoSelfLineNow(ServerPlayer player, String messageKey) {
@@ -258,6 +301,26 @@ public final class WorldZeroDoubleChatEvent {
 
         WorldZeroNetwork.sendDoubleChatAutoSelfLine(player, messageKey);
         return true;
+    }
+
+    public static long worldzero$getProgress5SentStoryTick(ServerLevel level, UUID playerId) {
+        if (level == null || playerId == null) {
+            return -1L;
+        }
+
+        DoubleChatSaveData saveData = worldzero$getSaveData(level);
+        PlayerState state = saveData.worldzero$states.get(playerId);
+        if (state == null) {
+            return -1L;
+        }
+
+        if (state.worldzero$progress5SentStoryTick >= 0L) {
+            return state.worldzero$progress5SentStoryTick;
+        }
+
+        return state.worldzero$achievementIndex > WORLDZERO_NEIGHBOR_BUILD_PROGRESS_INDEX
+                ? WORLDZERO_PROGRESS_TICKS[WORLDZERO_NEIGHBOR_BUILD_PROGRESS_INDEX]
+                : -1L;
     }
 
     private static void worldzero$tickPlayer(
@@ -288,6 +351,7 @@ public final class WorldZeroDoubleChatEvent {
             if (state.worldzero$joined) {
                 worldzero$sendPlayerLine(player, state.worldzero$fakeName, WORLDZERO_FINAL_PANIC_KEY);
                 worldzero$sendSystemLine(player, state.worldzero$fakeName, WORLDZERO_LEFT_KEY);
+                worldzero$removeNeighborTabPresence(player);
             }
             state.worldzero$left = true;
             state.worldzero$stage = WORLDZERO_STAGE_COMPLETED;
@@ -396,11 +460,15 @@ public final class WorldZeroDoubleChatEvent {
 
         if (state.worldzero$achievementIndex < WORLDZERO_PROGRESS_TICKS.length
                 && storyTicks >= WORLDZERO_PROGRESS_TICKS[state.worldzero$achievementIndex]) {
+            int progressIndex = state.worldzero$achievementIndex;
             worldzero$sendPlayerLine(
                     player,
                     state.worldzero$fakeName,
-                    WORLDZERO_PROGRESS_KEYS[state.worldzero$achievementIndex]
+                    WORLDZERO_PROGRESS_KEYS[progressIndex]
             );
+            if (progressIndex == WORLDZERO_NEIGHBOR_BUILD_PROGRESS_INDEX) {
+                state.worldzero$progress5SentStoryTick = storyTicks;
+            }
             state.worldzero$achievementIndex++;
             saveData.setDirty();
         }
@@ -459,7 +527,7 @@ public final class WorldZeroDoubleChatEvent {
     }
 
     private static void worldzero$ensureNeighborTabPresence(ServerPlayer player, PlayerState state) {
-        if (player == null || player.connection == null || state == null || !state.worldzero$joined) {
+        if (player == null || player.connection == null || state == null || !state.worldzero$joined || state.worldzero$left) {
             return;
         }
 
@@ -501,6 +569,14 @@ public final class WorldZeroDoubleChatEvent {
 
     private static UUID worldzero$getNeighborTabUuid(UUID ownerId) {
         return UUID.nameUUIDFromBytes(("worldzero:double_chat:neighbor:" + ownerId).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void worldzero$removeNeighborTabPresence(ServerPlayer player) {
+        if (player == null || player.connection == null) {
+            return;
+        }
+
+        player.connection.send(new ClientboundPlayerInfoRemovePacket(List.of(worldzero$getNeighborTabUuid(player.getUUID()))));
     }
 
     private static String worldzero$mutatePlayerName(String name, ServerLevel level) {
@@ -590,6 +666,7 @@ public final class WorldZeroDoubleChatEvent {
         private int worldzero$dialogueIndex;
         private int worldzero$achievementIndex;
         private int worldzero$localPort;
+        private long worldzero$progress5SentStoryTick = -1L;
         private long worldzero$nextStoryTick = -1L;
         private String worldzero$fakeName = "";
 
@@ -602,6 +679,9 @@ public final class WorldZeroDoubleChatEvent {
             state.worldzero$dialogueIndex = Math.max(0, tag.getInt("dialogue_index"));
             state.worldzero$achievementIndex = Math.max(0, tag.getInt("achievement_index"));
             state.worldzero$localPort = tag.getInt("local_port");
+            state.worldzero$progress5SentStoryTick = tag.contains("progress5_sent_story_tick")
+                    ? tag.getLong("progress5_sent_story_tick")
+                    : -1L;
             state.worldzero$nextStoryTick = tag.contains("next_story_tick") ? tag.getLong("next_story_tick") : -1L;
             state.worldzero$fakeName = tag.getString("fake_name");
             return state;
@@ -616,6 +696,7 @@ public final class WorldZeroDoubleChatEvent {
             tag.putInt("dialogue_index", this.worldzero$dialogueIndex);
             tag.putInt("achievement_index", this.worldzero$achievementIndex);
             tag.putInt("local_port", this.worldzero$localPort);
+            tag.putLong("progress5_sent_story_tick", this.worldzero$progress5SentStoryTick);
             tag.putLong("next_story_tick", this.worldzero$nextStoryTick);
             tag.putString("fake_name", this.worldzero$fakeName);
             return tag;

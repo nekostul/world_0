@@ -361,12 +361,12 @@ public final class WorldZeroSkyWatchEvent {
             return false;
         }
 
-        String speaker = WorldZeroDoubleChatEvent.worldzero$getSpeakerName(player);
+        String speaker = WorldZeroDoubleChatEvent.worldzero$getOriginalNeighborSpeakerName(player);
         if (speaker == null || speaker.isBlank()) {
             return false;
         }
 
-        WorldZeroNetwork.sendLocalizedChatLine(player, speaker, messageKey);
+        WorldZeroNetwork.sendDoubleChatWhisperLine(player, speaker, messageKey);
         return true;
     }
 

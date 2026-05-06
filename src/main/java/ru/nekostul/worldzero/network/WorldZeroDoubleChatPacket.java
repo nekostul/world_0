@@ -14,6 +14,7 @@ public final class WorldZeroDoubleChatPacket {
     public static final byte WORLDZERO_ACTION_AUTO_LINE = 2;
     public static final byte WORLDZERO_ACTION_LOCAL_PORT = 3;
     public static final byte WORLDZERO_ACTION_AUTO_SELF_LINE = 4;
+    public static final byte WORLDZERO_ACTION_WHISPER_LINE = 5;
     private final byte worldzero$action;
     private final String worldzero$speaker;
     private final String worldzero$message;

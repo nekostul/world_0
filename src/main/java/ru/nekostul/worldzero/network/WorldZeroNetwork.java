@@ -431,6 +431,17 @@ public final class WorldZeroNetwork {
         );
     }
 
+    public static void sendDoubleChatWhisperLine(ServerPlayer player, String speaker, String messageKey) {
+        WORLDZERO_CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new WorldZeroDoubleChatPacket(
+                        WorldZeroDoubleChatPacket.WORLDZERO_ACTION_WHISPER_LINE,
+                        speaker,
+                        messageKey
+                )
+        );
+    }
+
     public static void sendSkyWatch(ServerPlayer player, byte action, int durationTicks, int variant) {
         WORLDZERO_CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),

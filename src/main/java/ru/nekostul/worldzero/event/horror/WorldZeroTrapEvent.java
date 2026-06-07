@@ -427,6 +427,9 @@ public final class WorldZeroTrapEvent {
                             || y == center.getY()
                             || y == center.getY() + WORLDZERO_BOX_HEIGHT - 1;
                     BlockState newState = shell ? Blocks.BEDROCK.defaultBlockState() : Blocks.AIR.defaultBlockState();
+                    if (blockPos.equals(center)) {
+                        newState = Blocks.DIRT.defaultBlockState();
+                    }
                     worldzero$storeAndSet(level, replacedStates, blockPos, newState);
                 }
             }

@@ -14,6 +14,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Pose;
@@ -1288,14 +1289,16 @@ public final class WorldZeroHouseDimension {
     private static void worldzero$sendRestorationChatLine(ServerPlayer player, int messageIndex) {
         String playerName = player.getGameProfile().getName();
         switch (messageIndex) {
-            case 0, 2 -> WorldZeroNetwork.sendLocalizedChatLine(
+            case 0, 2 -> WorldZeroNetwork.sendHouseChatLine(
                     player,
                     playerName,
+                    WORLDZERO_RESTORATION_CHAT_LINE_KEY_PREFIX + messageIndex,
                     WORLDZERO_RESTORATION_CHAT_LINE_KEY_PREFIX + messageIndex
             );
-            case 1, 3 -> WorldZeroNetwork.sendLocalizedChatLine(
+            case 1, 3 -> WorldZeroNetwork.sendHouseChatLine(
                     player,
                     WORLDZERO_RESTORATION_CHAT_SANEK_NAME,
+                    WORLDZERO_RESTORATION_CHAT_LINE_KEY_PREFIX + messageIndex,
                     WORLDZERO_RESTORATION_CHAT_LINE_KEY_PREFIX + messageIndex
             );
             default -> {
@@ -2150,6 +2153,14 @@ public final class WorldZeroHouseDimension {
                     ));
                 }
             }
+        }
+
+        if (entries.size() > 1) {
+            java.util.Collections.shuffle(entries, new java.util.Random(level.random.nextLong()));
+            int minCount = Math.max(1, entries.size() / 3);
+            int maxCount = Math.max(minCount, entries.size() - 1);
+            int selectedCount = Mth.nextInt(level.random, minCount, maxCount);
+            entries = new ArrayList<>(entries.subList(0, selectedCount));
         }
 
         entries.sort(Comparator

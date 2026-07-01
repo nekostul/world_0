@@ -2,6 +2,7 @@ package ru.nekostul.worldzero.event.chat;
 
 import com.mojang.authlib.GameProfile;
 import io.netty.buffer.Unpooled;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
@@ -9,9 +10,19 @@ import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.ServerChatEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -26,6 +37,7 @@ import ru.nekostul.worldzero.event.horror.WorldZeroHorrorFinale;
 import ru.nekostul.worldzero.event.paralysis.WorldZeroParalysisEvent;
 import ru.nekostul.worldzero.network.WorldZeroNetwork;
 
+import javax.annotation.Nullable;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -96,6 +108,13 @@ public final class WorldZeroDoubleChatEvent {
             "message.worldzero.double_chat.progress.6"
     };
     private static final int WORLDZERO_NEIGHBOR_BUILD_PROGRESS_INDEX = 5;
+    private static final int WORLDZERO_PROGRESS_COAL_INDEX = 0;
+    private static final int WORLDZERO_PROGRESS_WORKSTATION_INDEX = 2;
+    private static final int WORLDZERO_PROGRESS_COAL_MIN_DISTANCE = 16;
+    private static final int WORLDZERO_PROGRESS_COAL_MAX_DISTANCE = 34;
+    private static final int WORLDZERO_PROGRESS_WORKSTATION_MIN_DISTANCE = 14;
+    private static final int WORLDZERO_PROGRESS_WORKSTATION_MAX_DISTANCE = 28;
+    private static final int WORLDZERO_PROGRESS_MAX_CANDIDATE_ATTEMPTS = 48;
 
     private WorldZeroDoubleChatEvent() {
     }
@@ -466,6 +485,7 @@ public final class WorldZeroDoubleChatEvent {
                     state.worldzero$fakeName,
                     WORLDZERO_PROGRESS_KEYS[progressIndex]
             );
+            worldzero$applyProgressWorldChange(level, player, state, progressIndex);
             if (progressIndex == WORLDZERO_NEIGHBOR_BUILD_PROGRESS_INDEX) {
                 state.worldzero$progress5SentStoryTick = storyTicks;
             }
@@ -624,6 +644,223 @@ public final class WorldZeroDoubleChatEvent {
         WorldZeroNetwork.sendDoubleChatLocalPort(player, port);
     }
 
+    private static void worldzero$applyProgressWorldChange(
+            ServerLevel level,
+            ServerPlayer player,
+            PlayerState state,
+            int progressIndex
+    ) {
+        if (level == null || player == null || state == null) {
+            return;
+        }
+
+        if (progressIndex == WORLDZERO_PROGRESS_COAL_INDEX && state.worldzero$coalGiftPos == Long.MIN_VALUE) {
+            BlockPos coalGiftPos = worldzero$findCoalGiftPosition(level, player);
+            if (coalGiftPos != null && worldzero$placeCoalGift(level, coalGiftPos)) {
+                state.worldzero$coalGiftPos = coalGiftPos.asLong();
+            }
+            return;
+        }
+
+        if (progressIndex == WORLDZERO_PROGRESS_WORKSTATION_INDEX && state.worldzero$workstationGiftPos == Long.MIN_VALUE) {
+            BlockPos workstationPos = worldzero$findWorkstationGiftPosition(level, player, state);
+            if (workstationPos != null && worldzero$placeWorkstationGift(level, workstationPos)) {
+                state.worldzero$workstationGiftPos = workstationPos.asLong();
+            }
+        }
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findCoalGiftPosition(ServerLevel level, ServerPlayer player) {
+        Vec3 look = player.getViewVector(1.0F);
+        Vec3 horizontalLook = new Vec3(look.x, 0.0D, look.z);
+        if (horizontalLook.lengthSqr() < 0.0001D) {
+            float radians = (float) Math.toRadians(player.getYRot());
+            horizontalLook = new Vec3(-Math.sin(radians), 0.0D, Math.cos(radians));
+        }
+        horizontalLook = horizontalLook.normalize();
+
+        for (int attempt = 0; attempt < WORLDZERO_PROGRESS_MAX_CANDIDATE_ATTEMPTS; attempt++) {
+            double distance = Mth.nextDouble(level.random, WORLDZERO_PROGRESS_COAL_MIN_DISTANCE, WORLDZERO_PROGRESS_COAL_MAX_DISTANCE);
+            double angleOffset = Mth.nextDouble(level.random, -1.15D, 1.15D);
+            Vec3 direction = horizontalLook.yRot((float) angleOffset);
+            int x = Mth.floor(player.getX() + direction.x * distance);
+            int z = Mth.floor(player.getZ() + direction.z * distance);
+            int topY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+            if (topY < level.getMinBuildHeight()) {
+                continue;
+            }
+
+            for (int y = topY; y >= Math.max(level.getMinBuildHeight(), topY - 24); y--) {
+                BlockPos floorPos = new BlockPos(x, y, z);
+                BlockState floorState = level.getBlockState(floorPos);
+                if (!floorState.isFaceSturdy(level, floorPos, net.minecraft.core.Direction.UP)
+                        || !floorState.getFluidState().isEmpty()) {
+                    continue;
+                }
+
+                BlockPos itemPos = floorPos.above();
+                if (!level.getBlockState(itemPos).isAir() || !level.getBlockState(itemPos.above()).isAir()) {
+                    continue;
+                }
+
+                int openFaces = 0;
+                for (net.minecraft.core.Direction directionCheck : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                    BlockPos sidePos = floorPos.relative(directionCheck);
+                    if (!level.getBlockState(sidePos).canOcclude() || level.getBlockState(sidePos).isAir()) {
+                        openFaces++;
+                    }
+                }
+                if (openFaces < 2) {
+                    continue;
+                }
+
+                return itemPos.immutable();
+            }
+        }
+
+        return null;
+    }
+
+    private static boolean worldzero$placeCoalGift(ServerLevel level, BlockPos pos) {
+        if (!level.getBlockState(pos).isAir()) {
+            return false;
+        }
+
+        ItemEntity itemEntity = new ItemEntity(
+                level,
+                pos.getX() + 0.5D,
+                pos.getY() + 0.15D,
+                pos.getZ() + 0.5D,
+                new ItemStack(Items.COAL, 6 + level.random.nextInt(9))
+        );
+        itemEntity.setDeltaMovement(Vec3.ZERO);
+        itemEntity.setUnlimitedLifetime();
+        level.addFreshEntity(itemEntity);
+        return true;
+    }
+
+    @Nullable
+    private static BlockPos worldzero$findWorkstationGiftPosition(
+            ServerLevel level,
+            ServerPlayer player,
+            PlayerState state
+    ) {
+        Vec3 forward = worldzero$getForwardVector(player, state);
+        Vec3 right = new Vec3(-forward.z, 0.0D, forward.x);
+
+        for (int attempt = 0; attempt < WORLDZERO_PROGRESS_MAX_CANDIDATE_ATTEMPTS; attempt++) {
+            double distance = Mth.nextDouble(level.random, WORLDZERO_PROGRESS_WORKSTATION_MIN_DISTANCE, WORLDZERO_PROGRESS_WORKSTATION_MAX_DISTANCE);
+            double forwardScale = 0.8D + level.random.nextDouble() * 0.5D;
+            double sideScale = Mth.nextDouble(level.random, -5.0D, 5.0D);
+            Vec3 target = player.position()
+                    .add(forward.scale(distance * forwardScale))
+                    .add(right.scale(sideScale));
+
+            int x = Mth.floor(target.x);
+            int z = Mth.floor(target.z);
+            int y = worldzero$getSimpleSurfaceY(level, x, z);
+            if (y == Integer.MIN_VALUE) {
+                continue;
+            }
+
+            BlockPos tablePos = new BlockPos(x, y, z);
+            if (!worldzero$isWaterNearby(level, tablePos, 3)) {
+                continue;
+            }
+            if (!worldzero$canPlaceSimpleBlockAt(level, tablePos)) {
+                continue;
+            }
+
+            return tablePos.immutable();
+        }
+
+        return null;
+    }
+
+    private static boolean worldzero$placeWorkstationGift(ServerLevel level, BlockPos pos) {
+        if (!worldzero$canPlaceSimpleBlockAt(level, pos)) {
+            return false;
+        }
+
+        worldzero$clearSimplePlacementArea(level, pos);
+        level.setBlock(
+                pos,
+                Blocks.CRAFTING_TABLE.defaultBlockState(),
+                Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE
+        );
+        return true;
+    }
+
+    private static Vec3 worldzero$getForwardVector(ServerPlayer player, PlayerState state) {
+        Vec3 currentPos = player.position();
+        if (state.worldzero$previousPosition != null) {
+            Vec3 movement = currentPos.subtract(state.worldzero$previousPosition);
+            Vec3 horizontalMovement = new Vec3(movement.x, 0.0D, movement.z);
+            if (horizontalMovement.lengthSqr() > 0.25D) {
+                return horizontalMovement.normalize();
+            }
+        }
+
+        Vec3 look = player.getViewVector(1.0F);
+        Vec3 horizontalLook = new Vec3(look.x, 0.0D, look.z);
+        return horizontalLook.lengthSqr() > 0.0001D ? horizontalLook.normalize() : new Vec3(0.0D, 0.0D, 1.0D);
+    }
+
+    private static int worldzero$getSimpleSurfaceY(ServerLevel level, int x, int z) {
+        int rawTop = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+        if (rawTop < level.getMinBuildHeight()) {
+            return Integer.MIN_VALUE;
+        }
+
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos(x, rawTop, z);
+        while (cursor.getY() > level.getMinBuildHeight()) {
+            BlockState state = level.getBlockState(cursor);
+            if (state.isAir()) {
+                cursor.move(net.minecraft.core.Direction.DOWN);
+                continue;
+            }
+            if (!state.getFluidState().isEmpty()) {
+                return Integer.MIN_VALUE;
+            }
+            return cursor.getY() + 1;
+        }
+        return Integer.MIN_VALUE;
+    }
+
+    private static boolean worldzero$canPlaceSimpleBlockAt(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        BlockState above = level.getBlockState(pos.above());
+        BlockState below = level.getBlockState(pos.below());
+        return below.isFaceSturdy(level, pos.below(), net.minecraft.core.Direction.UP)
+                && below.getFluidState().isEmpty()
+                && state.isAir()
+                && above.isAir()
+                && state.getFluidState().isEmpty()
+                && above.getFluidState().isEmpty();
+    }
+
+    private static void worldzero$clearSimplePlacementArea(ServerLevel level, BlockPos pos) {
+        for (int y = 0; y <= 1; y++) {
+            BlockPos target = pos.above(y);
+            if (!level.getBlockState(target).isAir()) {
+                level.setBlock(target, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            }
+        }
+    }
+
+    private static boolean worldzero$isWaterNearby(ServerLevel level, BlockPos pos, int radius) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                BlockPos checkPos = pos.offset(dx, -1, dz);
+                if (level.getFluidState(checkPos).is(FluidTags.WATER) || level.getFluidState(checkPos.above()).is(FluidTags.WATER)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private static DoubleChatSaveData worldzero$getSaveData(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
                 DoubleChatSaveData::worldzero$load,
@@ -666,9 +903,13 @@ public final class WorldZeroDoubleChatEvent {
         private int worldzero$dialogueIndex;
         private int worldzero$achievementIndex;
         private int worldzero$localPort;
+        private long worldzero$coalGiftPos = Long.MIN_VALUE;
+        private long worldzero$workstationGiftPos = Long.MIN_VALUE;
         private long worldzero$progress5SentStoryTick = -1L;
         private long worldzero$nextStoryTick = -1L;
         private String worldzero$fakeName = "";
+        @Nullable
+        private Vec3 worldzero$previousPosition;
 
         private static PlayerState worldzero$load(CompoundTag tag) {
             PlayerState state = new PlayerState();
@@ -679,6 +920,10 @@ public final class WorldZeroDoubleChatEvent {
             state.worldzero$dialogueIndex = Math.max(0, tag.getInt("dialogue_index"));
             state.worldzero$achievementIndex = Math.max(0, tag.getInt("achievement_index"));
             state.worldzero$localPort = tag.getInt("local_port");
+            state.worldzero$coalGiftPos = tag.contains("coal_gift_pos") ? tag.getLong("coal_gift_pos") : Long.MIN_VALUE;
+            state.worldzero$workstationGiftPos = tag.contains("workstation_gift_pos")
+                    ? tag.getLong("workstation_gift_pos")
+                    : Long.MIN_VALUE;
             state.worldzero$progress5SentStoryTick = tag.contains("progress5_sent_story_tick")
                     ? tag.getLong("progress5_sent_story_tick")
                     : -1L;
@@ -696,6 +941,12 @@ public final class WorldZeroDoubleChatEvent {
             tag.putInt("dialogue_index", this.worldzero$dialogueIndex);
             tag.putInt("achievement_index", this.worldzero$achievementIndex);
             tag.putInt("local_port", this.worldzero$localPort);
+            if (this.worldzero$coalGiftPos != Long.MIN_VALUE) {
+                tag.putLong("coal_gift_pos", this.worldzero$coalGiftPos);
+            }
+            if (this.worldzero$workstationGiftPos != Long.MIN_VALUE) {
+                tag.putLong("workstation_gift_pos", this.worldzero$workstationGiftPos);
+            }
             tag.putLong("progress5_sent_story_tick", this.worldzero$progress5SentStoryTick);
             tag.putLong("next_story_tick", this.worldzero$nextStoryTick);
             tag.putString("fake_name", this.worldzero$fakeName);

@@ -59,18 +59,24 @@ public final class WorldZeroHouseClientController {
             return;
         }
 
-        String message = defaultMessage;
-        if (minecraft.options != null
-                && minecraft.options.languageCode != null
-                && minecraft.options.languageCode.toLowerCase(java.util.Locale.ROOT).startsWith("en")
-                && !englishMessage.isBlank()) {
-            message = englishMessage;
+        Component messageComponent;
+        if (defaultMessage.startsWith("message.") && englishMessage.startsWith("message.")) {
+            messageComponent = Component.translatable(defaultMessage);
+        } else {
+            String message = defaultMessage;
+            if (minecraft.options != null
+                    && minecraft.options.languageCode != null
+                    && minecraft.options.languageCode.toLowerCase(java.util.Locale.ROOT).startsWith("en")
+                    && !englishMessage.isBlank()) {
+                message = englishMessage;
+            }
+            messageComponent = Component.literal(message);
         }
 
         Component chatLine = Component.translatable(
                 "chat.type.text",
                 Component.literal(speaker),
-                Component.literal(message)
+                messageComponent
         );
         ChatComponent chat = minecraft.gui.getChat();
         ChatComponentAccessor accessor = (ChatComponentAccessor) (Object) chat;

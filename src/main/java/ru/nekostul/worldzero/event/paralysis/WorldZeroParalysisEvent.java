@@ -18,9 +18,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.AABB;
@@ -48,6 +50,7 @@ import ru.nekostul.worldzero.event.house.WorldZeroHouseDetector;
 import ru.nekostul.worldzero.event.house.WorldZeroHouseEvent;
 import ru.nekostul.worldzero.event.sleep.WorldZeroSleepControlEvent;
 import ru.nekostul.worldzero.event.skywatch.WorldZeroSkyWatchEvent;
+import ru.nekostul.worldzero.item.WorldZeroItems;
 import ru.nekostul.worldzero.network.WorldZeroNetwork;
 import ru.nekostul.worldzero.network.WorldZeroParalysisClientPacket;
 
@@ -1085,37 +1088,99 @@ public final class WorldZeroParalysisEvent {
             return false;
         }
 
-        if (!(level.getBlockEntity(chestPos) instanceof Container container)) {
+        ArrayList<Container> containers = worldzero$getChestContainers(level, chestPos);
+        if (containers.isEmpty()) {
             return false;
         }
 
-        for (int slot = 0; slot < container.getContainerSize(); slot++) {
-            ItemStack stack = container.getItem(slot);
-            if (!stack.is(Items.DIAMOND)) {
-                continue;
-            }
+        for (Container container : containers) {
+            for (int slot = 0; slot < container.getContainerSize(); slot++) {
+                ItemStack stack = container.getItem(slot);
+                if (!stack.is(Items.DIAMOND)) {
+                    continue;
+                }
 
-            int maxCount = Math.min(stack.getMaxStackSize(), container.getMaxStackSize());
-            if (stack.getCount() >= maxCount) {
-                continue;
-            }
+                int maxCount = Math.min(stack.getMaxStackSize(), container.getMaxStackSize());
+                if (stack.getCount() >= maxCount) {
+                    continue;
+                }
 
-            stack.grow(1);
-            container.setChanged();
-            return true;
+                stack.grow(1);
+                container.setChanged();
+                return true;
+            }
         }
 
-        for (int slot = 0; slot < container.getContainerSize(); slot++) {
-            if (!container.getItem(slot).isEmpty()) {
-                continue;
-            }
+        for (Container container : containers) {
+            for (int slot = 0; slot < container.getContainerSize(); slot++) {
+                if (!container.getItem(slot).isEmpty()) {
+                    continue;
+                }
 
-            container.setItem(slot, new ItemStack(Items.DIAMOND, 1));
-            container.setChanged();
-            return true;
+                container.setItem(slot, new ItemStack(Items.DIAMOND, 1));
+                container.setChanged();
+                return true;
+            }
+        }
+
+        ArrayList<Integer> replaceableSlots = new ArrayList<>();
+        int combinedSlot = 0;
+        for (Container container : containers) {
+            for (int slot = 0; slot < container.getContainerSize(); slot++) {
+                ItemStack stack = container.getItem(slot);
+                if (!stack.isEmpty() && !worldzero$isProtectedChestItem(stack)) {
+                    replaceableSlots.add(combinedSlot);
+                }
+                combinedSlot++;
+            }
+        }
+
+        if (replaceableSlots.isEmpty()) {
+            return false;
+        }
+
+        int selectedCombinedSlot = replaceableSlots.get(level.random.nextInt(replaceableSlots.size()));
+        for (Container container : containers) {
+            if (selectedCombinedSlot < container.getContainerSize()) {
+                container.setItem(selectedCombinedSlot, new ItemStack(Items.DIAMOND, 1));
+                container.setChanged();
+                return true;
+            }
+            selectedCombinedSlot -= container.getContainerSize();
         }
 
         return false;
+    }
+
+    private static ArrayList<Container> worldzero$getChestContainers(ServerLevel level, BlockPos chestPos) {
+        ArrayList<Container> containers = new ArrayList<>();
+        BlockState state = level.getBlockState(chestPos);
+        if (!worldzero$isChestLikeBlock(state)) {
+            return containers;
+        }
+
+        if (level.getBlockEntity(chestPos) instanceof Container container) {
+            containers.add(container);
+        }
+
+        if (!(state.getBlock() instanceof ChestBlock)
+                || !state.hasProperty(ChestBlock.TYPE)
+                || state.getValue(ChestBlock.TYPE) == ChestType.SINGLE) {
+            return containers;
+        }
+
+        BlockPos connectedPos = chestPos.relative(ChestBlock.getConnectedDirection(state));
+        BlockState connectedState = level.getBlockState(connectedPos);
+        if (worldzero$isChestLikeBlock(connectedState)
+                && level.getBlockEntity(connectedPos) instanceof Container connectedContainer) {
+            containers.add(connectedContainer);
+        }
+
+        return containers;
+    }
+
+    private static boolean worldzero$isProtectedChestItem(ItemStack stack) {
+        return !stack.isEmpty() && stack.is(WorldZeroItems.WORLDZERO_BLANK_DISC.get());
     }
 
     @Nullable

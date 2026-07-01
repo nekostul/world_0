@@ -56,7 +56,7 @@ public final class WorldZeroSkyWatchEvent {
     private static final long WORLDZERO_REPEAT_DELAY_MAX_TICKS = 18L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_REPEAT_LATE_DELAY_MIN_TICKS = 4L * WORLDZERO_TICKS_PER_MINUTE;
     private static final long WORLDZERO_REPEAT_LATE_DELAY_MAX_TICKS = 8L * WORLDZERO_TICKS_PER_MINUTE;
-    private static final int WORLDZERO_MAX_PLAYS = 2;
+    private static final int WORLDZERO_MAX_PLAYS = 1;
     private static final double WORLDZERO_ESCAPE_DISTANCE_SQR = 18.0D * 18.0D;
     private static final int WORLDZERO_MIN_SURFACE_DEPTH = 5;
     private static final long WORLDZERO_MINE_CONTEXT_CACHE_TICKS = 20L * 5L;

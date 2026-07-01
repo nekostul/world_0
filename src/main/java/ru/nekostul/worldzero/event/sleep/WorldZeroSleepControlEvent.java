@@ -160,11 +160,15 @@ public final class WorldZeroSleepControlEvent {
             event.setCancellationResult(InteractionResult.SUCCESS);
             player.swing(event.getHand(), true);
             player.displayClientMessage(net.minecraft.network.chat.Component.translatable(WORLDZERO_BED_BLOCKED_KEY), true);
+            if (!state.worldzero$bedBlockedSeen) {
+                state.worldzero$bedBlockedSeen = true;
+            }
             if (worldzero$canSendBedHints(storyTicks)
                     && storyTicks - state.worldzero$lastCannotSleepLineTick >= WORLDZERO_CANNOT_SLEEP_LINE_COOLDOWN
                     && level.random.nextInt(8) == 0) {
-                WorldZeroDoubleChatEvent.worldzero$sendSpeakerLineNow(player, WORLDZERO_CANNOT_SLEEP_KEY);
-                state.worldzero$lastCannotSleepLineTick = storyTicks;
+                if (worldzero$sendSleepHintWhisper(player, WORLDZERO_CANNOT_SLEEP_KEY)) {
+                    state.worldzero$lastCannotSleepLineTick = storyTicks;
+                }
             }
             saveData.setDirty();
             return;
@@ -253,8 +257,9 @@ public final class WorldZeroSleepControlEvent {
             boolean canSleepNow = worldzero$canSleepNow(level, player, state, storyTicks, false);
             if (canSleepNow
                     && !state.worldzero$canSleepAnnouncedThisNight
-                    && worldzero$canSendBedHints(storyTicks)) {
-                if (WorldZeroDoubleChatEvent.worldzero$sendSpeakerLineNow(player, WORLDZERO_CAN_SLEEP_KEY)) {
+                    && worldzero$canSendBedHints(storyTicks)
+                    && state.worldzero$bedBlockedSeen) {
+                if (worldzero$sendSleepHintWhisper(player, WORLDZERO_CAN_SLEEP_KEY)) {
                     state.worldzero$canSleepAnnouncedThisNight = true;
                     state.worldzero$nightWasAvailable = true;
                     changed = true;
@@ -265,7 +270,7 @@ public final class WorldZeroSleepControlEvent {
         if (worldzero$canSendBedHints(storyTicks)
                 && state.worldzero$skippedAvailableNights >= 2
                 && storyTicks - state.worldzero$lastPressureLineTick >= WORLDZERO_PRESSURE_LINE_COOLDOWN) {
-            if (WorldZeroDoubleChatEvent.worldzero$sendSpeakerLineNow(player, WORLDZERO_PRESSURE_KEY)) {
+            if (worldzero$sendSleepHintWhisper(player, WORLDZERO_PRESSURE_KEY)) {
                 state.worldzero$lastPressureLineTick = storyTicks;
                 changed = true;
             }
@@ -484,6 +489,20 @@ public final class WorldZeroSleepControlEvent {
         return storyTicks >= WORLDZERO_CONTROL_START_TICKS;
     }
 
+    private static boolean worldzero$sendSleepHintWhisper(ServerPlayer player, String messageKey) {
+        if (player == null || messageKey == null || messageKey.isBlank()) {
+            return false;
+        }
+
+        String speaker = WorldZeroDoubleChatEvent.worldzero$getOriginalNeighborSpeakerName(player);
+        if (speaker == null || speaker.isBlank()) {
+            return false;
+        }
+
+        WorldZeroNetwork.sendDoubleChatWhisperLine(player, speaker, messageKey);
+        return true;
+    }
+
     private static boolean worldzero$executeSleepAction(
             ServerLevel level,
             ServerPlayer player,
@@ -653,6 +672,7 @@ public final class WorldZeroSleepControlEvent {
         private boolean worldzero$sleptThisNight;
         private boolean worldzero$nightWasAvailable;
         private boolean worldzero$canSleepAnnouncedThisNight;
+        private boolean worldzero$bedBlockedSeen;
         private boolean worldzero$paralysisTriggered;
         private boolean worldzero$awaitingHouseReturn;
         private boolean worldzero$restorationSleepPending;
@@ -680,6 +700,7 @@ public final class WorldZeroSleepControlEvent {
             tag.putBoolean("slept_this_night", this.worldzero$sleptThisNight);
             tag.putBoolean("night_was_available", this.worldzero$nightWasAvailable);
             tag.putBoolean("can_sleep_announced_this_night", this.worldzero$canSleepAnnouncedThisNight);
+            tag.putBoolean("bed_blocked_seen", this.worldzero$bedBlockedSeen);
             tag.putBoolean("paralysis_triggered", this.worldzero$paralysisTriggered);
             tag.putBoolean("awaiting_house_return", this.worldzero$awaitingHouseReturn);
             tag.putBoolean("restoration_sleep_pending", this.worldzero$restorationSleepPending);
@@ -711,6 +732,7 @@ public final class WorldZeroSleepControlEvent {
             state.worldzero$sleptThisNight = tag.getBoolean("slept_this_night");
             state.worldzero$nightWasAvailable = tag.getBoolean("night_was_available");
             state.worldzero$canSleepAnnouncedThisNight = tag.getBoolean("can_sleep_announced_this_night");
+            state.worldzero$bedBlockedSeen = tag.getBoolean("bed_blocked_seen");
             state.worldzero$paralysisTriggered = tag.getBoolean("paralysis_triggered");
             state.worldzero$awaitingHouseReturn = tag.getBoolean("awaiting_house_return");
             state.worldzero$restorationSleepPending = tag.getBoolean("restoration_sleep_pending");

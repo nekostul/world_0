@@ -45,7 +45,7 @@ public final class WorldZeroFallEvent {
     private static final long WORLDZERO_FALL_WINDOW_END_TICKS = 150L * 60L * 20L;
     private static final long WORLDZERO_DELAY_AFTER_FREEZE_MIN_TICKS = 24L * 60L * 20L;
     private static final long WORLDZERO_DELAY_AFTER_FREEZE_MAX_TICKS = 42L * 60L * 20L;
-    private static final int WORLDZERO_MAX_PLAYS = 2;
+    private static final int WORLDZERO_MAX_PLAYS = 1;
     private static final int WORLDZERO_FALL_FREEZE_TICKS = 5 * 20;
     private static final double WORLDZERO_BLACK_ECHO_FRONT_DISTANCE_BLOCKS = 3.0D;
     private static final int WORLDZERO_HOLE_RADIUS_BLOCKS = 1;

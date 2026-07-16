@@ -183,7 +183,16 @@ public final class WorldZeroVoidPortalDimension {
 
         Map<UUID, ReturnPoint> returnPoints = WORLDZERO_RETURN_POINTS.computeIfAbsent(server, ignored -> new HashMap<>());
         if (returnPoints.containsKey(player.getUUID())) {
-            return false;
+            if (player.serverLevel().dimension() == WORLDZERO_VOIDPORTAL_LEVEL) {
+                return false;
+            }
+
+            // Self-heal a stale void_portal session so the next portal entry is not blocked forever.
+            returnPoints.remove(player.getUUID());
+            if (returnPoints.isEmpty()) {
+                WORLDZERO_RETURN_POINTS.remove(server);
+            }
+            worldzero$removeInventorySnapshot(server, player.getUUID());
         }
         WORLDZERO_INVENTORY_SNAPSHOTS.computeIfAbsent(server, ignored -> new HashMap<>()).put(
                 player.getUUID(),

@@ -35,6 +35,7 @@ public final class WorldZeroState {
     private static final String COMMAND_ANOMALY_FILE_NAME = "command_anomaly_seen.txt";
     private static final String FINALE_RECONNECT_STAGE_FILE_NAME = "finale_reconnect_stage.txt";
     private static final String LOCAL_PUBLISH_LOCK_FILE_NAME = "local_publish_lock.txt";
+    private static final String FINAL_WORLD_CREATION_LOCK_FILE_NAME = "final_world_creation_lock.txt";
     private static final String WORLD_SUFFIX = "_0";
     private static final String DEFAULT_PRIMARY_WORLD_NAME = "World_0";
     private static final String NO_PRIMARY_TITLE_KEY = "worldzero.error.title";
@@ -492,6 +493,35 @@ public final class WorldZeroState {
         }
     }
 
+    public static boolean hasFinalWorldCreationLock(Minecraft minecraft) {
+        if (minecraft == null) {
+            return false;
+        }
+
+        return Files.exists(getFinalWorldCreationLockFilePath(minecraft));
+    }
+
+    public static void markFinalWorldCreationLock(Minecraft minecraft) {
+        if (minecraft == null) {
+            return;
+        }
+
+        Path markerFile = getFinalWorldCreationLockFilePath(minecraft);
+        try {
+            Files.createDirectories(markerFile.getParent());
+            Files.writeString(
+                    markerFile,
+                    "locked" + System.lineSeparator(),
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            );
+        } catch (IOException exception) {
+            LOGGER.warn("Failed to persist WORLD_0 final world creation lock marker", exception);
+        }
+    }
+
     private static void deleteDirectory(Path directory) throws IOException {
         try (Stream<Path> pathStream = Files.walk(directory)) {
             pathStream
@@ -576,6 +606,10 @@ public final class WorldZeroState {
 
     private static Path getLocalPublishLockFilePath(Minecraft minecraft) {
         return getWorldZeroDirectory(minecraft).resolve(LOCAL_PUBLISH_LOCK_FILE_NAME);
+    }
+
+    private static Path getFinalWorldCreationLockFilePath(Minecraft minecraft) {
+        return getWorldZeroDirectory(minecraft).resolve(FINAL_WORLD_CREATION_LOCK_FILE_NAME);
     }
 
     private static Path getWorldZeroDirectory(Minecraft minecraft) {

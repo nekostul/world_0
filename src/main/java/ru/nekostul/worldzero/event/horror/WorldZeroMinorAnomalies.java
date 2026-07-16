@@ -946,65 +946,66 @@ public final class WorldZeroMinorAnomalies {
 
     @Nullable
     private static ObjectPresenceTarget worldzero$findObjectPresenceTarget(ServerLevel level, ServerPlayer player) {
-        List<ObjectPresenceTarget> targets = new ArrayList<>();
+        ObjectPresenceTarget selectedTarget = null;
+        int targetCount = 0;
         BlockPos center = player.blockPosition();
         BlockPos min = center.offset(-WORLDZERO_OBJECT_RADIUS_BLOCKS, -4, -WORLDZERO_OBJECT_RADIUS_BLOCKS);
         BlockPos max = center.offset(WORLDZERO_OBJECT_RADIUS_BLOCKS, 4, WORLDZERO_OBJECT_RADIUS_BLOCKS);
 
         for (BlockPos mutablePos : BlockPos.betweenClosed(min, max)) {
-            BlockPos pos = mutablePos.immutable();
-            double distanceSqr = pos.distSqr(center);
+            double distanceSqr = mutablePos.distSqr(center);
             if (distanceSqr < WORLDZERO_MIN_OBJECT_DISTANCE_SQR
                     || distanceSqr > WORLDZERO_MAX_OBJECT_DISTANCE_SQR
-                    || worldzero$isDirectlyInFront(player, pos, 0.82D)) {
+                    || worldzero$isDirectlyInFront(player, mutablePos, 0.82D)) {
                 continue;
             }
 
-            BlockState state = level.getBlockState(pos);
+            BlockState state = level.getBlockState(mutablePos);
             if (state.is(BlockTags.DOORS)
                     && state.hasProperty(DoorBlock.HALF)
                     && state.hasProperty(DoorBlock.OPEN)
                     && state.getValue(DoorBlock.HALF) == DoubleBlockHalf.LOWER
                     && !state.getValue(DoorBlock.OPEN)) {
-                targets.add(new ObjectPresenceTarget(true, pos));
+                targetCount++;
+                if (level.random.nextInt(targetCount) == 0) {
+                    selectedTarget = new ObjectPresenceTarget(true, mutablePos.immutable());
+                }
             } else if (state.getBlock() instanceof ChestBlock) {
-                targets.add(new ObjectPresenceTarget(false, pos));
+                targetCount++;
+                if (level.random.nextInt(targetCount) == 0) {
+                    selectedTarget = new ObjectPresenceTarget(false, mutablePos.immutable());
+                }
             }
         }
 
-        if (targets.isEmpty()) {
-            return null;
-        }
-
-        return targets.get(level.random.nextInt(targets.size()));
+        return selectedTarget;
     }
 
     @Nullable
     private static LightTarget worldzero$findLightTarget(ServerLevel level, ServerPlayer player) {
-        List<LightTarget> targets = new ArrayList<>();
+        LightTarget selectedTarget = null;
+        int targetCount = 0;
         BlockPos center = player.blockPosition();
         BlockPos min = center.offset(-WORLDZERO_LIGHT_RADIUS_BLOCKS, -5, -WORLDZERO_LIGHT_RADIUS_BLOCKS);
         BlockPos max = center.offset(WORLDZERO_LIGHT_RADIUS_BLOCKS, 5, WORLDZERO_LIGHT_RADIUS_BLOCKS);
 
         for (BlockPos mutablePos : BlockPos.betweenClosed(min, max)) {
-            BlockPos pos = mutablePos.immutable();
-            double distanceSqr = pos.distSqr(center);
+            double distanceSqr = mutablePos.distSqr(center);
             if (distanceSqr < 3.0D * 3.0D || distanceSqr > WORLDZERO_LIGHT_RADIUS_BLOCKS * WORLDZERO_LIGHT_RADIUS_BLOCKS) {
                 continue;
             }
 
-            BlockState originalState = level.getBlockState(pos);
+            BlockState originalState = level.getBlockState(mutablePos);
             BlockState temporaryState = worldzero$createTemporaryLightState(originalState);
             if (temporaryState != null) {
-                targets.add(new LightTarget(pos, originalState, temporaryState));
+                targetCount++;
+                if (level.random.nextInt(targetCount) == 0) {
+                    selectedTarget = new LightTarget(mutablePos.immutable(), originalState, temporaryState);
+                }
             }
         }
 
-        if (targets.isEmpty()) {
-            return null;
-        }
-
-        return targets.get(level.random.nextInt(targets.size()));
+        return selectedTarget;
     }
 
     @Nullable

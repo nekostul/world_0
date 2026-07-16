@@ -2,6 +2,7 @@ package ru.nekostul.worldzero.client.controller;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -162,6 +163,33 @@ public final class WorldZeroFinaleClientController {
         }
     }
 
+    @SubscribeEvent
+    public static void worldzero$onScreenInit(ScreenEvent.Init.Post event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null
+                || !(event.getScreen() instanceof SelectWorldScreen)
+                || !WorldZeroState.hasFinalWorldCreationLock(minecraft)) {
+            return;
+        }
+
+        String createWorldText = net.minecraft.network.chat.Component.translatable("selectWorld.create").getString();
+        int expectedX = event.getScreen().width / 2 + 4;
+        int expectedY = event.getScreen().height - 52;
+        for (net.minecraft.client.gui.components.events.GuiEventListener listener : event.getListenersList()) {
+            if (!(listener instanceof Button button)) {
+                continue;
+            }
+
+            if (button.getX() == expectedX
+                    && button.getY() == expectedY
+                    && button.getWidth() == 150
+                    && button.getHeight() == 20
+                    && createWorldText.equals(button.getMessage().getString())) {
+                button.active = false;
+            }
+        }
+    }
+
     private static boolean worldzero$shouldBreakSound(int ticksRemaining) {
         int pulse = Math.abs(ticksRemaining * 13 + worldzero$soundBreakSeed);
         return pulse % 37 < 4 || pulse % 53 == 0;
@@ -260,6 +288,7 @@ public final class WorldZeroFinaleClientController {
         WorldZeroFreezeClientController.finishFreeze();
         worldzero$stopAllSounds();
         WorldZeroState.writeFinaleReconnectStage(minecraft, 1);
+        WorldZeroState.markFinalWorldCreationLock(minecraft);
         if (minecraft.level != null) {
             minecraft.level.disconnect();
         }

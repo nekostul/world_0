@@ -3,6 +3,7 @@ package ru.nekostul.worldzero.mixin.client;
 import com.mojang.serialization.Lifecycle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.tabs.Tab;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
 import net.minecraft.world.Difficulty;
@@ -15,6 +16,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.nekostul.worldzero.state.WorldZeroState;
 
@@ -22,6 +24,17 @@ import java.util.Optional;
 
 @Mixin(CreateWorldScreen.class)
 public abstract class CreateWorldScreenMixin {
+    @Inject(method = "openFresh", at = @At("HEAD"), cancellable = true)
+    private static void worldzero$blockFreshWorldCreationWhenFinalLockActive(
+            Minecraft minecraft,
+            Screen screen,
+            CallbackInfo callbackInfo
+    ) {
+        if (WorldZeroState.hasFinalWorldCreationLock(minecraft)) {
+            callbackInfo.cancel();
+        }
+    }
+
     @ModifyArg(
             method = "init",
             at = @At(

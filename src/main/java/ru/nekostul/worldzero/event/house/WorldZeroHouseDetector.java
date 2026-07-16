@@ -1,5 +1,6 @@
 package ru.nekostul.worldzero.event.house;
 
+import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.BlockPos;
@@ -97,6 +98,8 @@ public final class WorldZeroHouseDetector {
         int verticalRange = WorldZeroConfig.worldzero$houseSearchVerticalRangeBlocks();
         LongSet visited = new LongOpenHashSet();
         DetectedHouse bestHouse = null;
+        BlockPos.MutableBlockPos candidatePos = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos candidateScratch = new BlockPos.MutableBlockPos();
 
         for (int y = playerPos.getY() - verticalRange; y <= playerPos.getY() + verticalRange; y++) {
             for (int x = playerPos.getX() - searchRadius; x <= playerPos.getX() + searchRadius; x++) {
@@ -107,17 +110,17 @@ public final class WorldZeroHouseDetector {
                         continue;
                     }
 
-                    BlockPos candidate = new BlockPos(x, y, z);
-                    long candidateKey = candidate.asLong();
+                    candidatePos.set(x, y, z);
+                    long candidateKey = candidatePos.asLong();
                     if (visited.contains(candidateKey)) {
                         continue;
                     }
 
-                    if (!worldzero$isCandidateInterior(level, candidate)) {
+                    if (!worldzero$isCandidateInterior(level, candidatePos, candidateScratch)) {
                         continue;
                     }
 
-                    EvaluatedRoom room = worldzero$scanRoom(level, candidate, visited);
+                    EvaluatedRoom room = worldzero$scanRoom(level, candidatePos.immutable(), visited);
                     if (room == null || room.detectedHouse == null) {
                         continue;
                     }
@@ -186,17 +189,17 @@ public final class WorldZeroHouseDetector {
                 && Math.abs(currentPos.getZ() - cachedPos.getZ()) <= WORLDZERO_CACHE_MOVE_THRESHOLD_BLOCKS;
     }
 
-    private static boolean worldzero$isCandidateInterior(ServerLevel level, BlockPos pos) {
+    private static boolean worldzero$isCandidateInterior(ServerLevel level, BlockPos pos, BlockPos.MutableBlockPos scratchPos) {
         BlockState state = level.getBlockState(pos);
         if (!state.isAir()) {
             return false;
         }
 
-        if (!level.getBlockState(pos.above()).isAir()) {
+        if (!level.getBlockState(scratchPos.set(pos.getX(), pos.getY() + 1, pos.getZ())).isAir()) {
             return false;
         }
 
-        BlockState belowState = level.getBlockState(pos.below());
+        BlockState belowState = level.getBlockState(scratchPos.set(pos.getX(), pos.getY() - 1, pos.getZ()));
         return !belowState.isAir() && belowState.getFluidState().isEmpty();
     }
 
@@ -206,9 +209,11 @@ public final class WorldZeroHouseDetector {
         int maxHeight = WorldZeroConfig.worldzero$houseRoomMaxHeightBlocks();
         int maxVolume = (maxHorizontalRadius * 2 + 1) * (maxHorizontalRadius * 2 + 1) * (maxHeight + 2);
         LongSet localVisited = new LongOpenHashSet();
-        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
-        queue.add(start);
-        localVisited.add(start.asLong());
+        LongArrayFIFOQueue queue = new LongArrayFIFOQueue();
+        long startKey = start.asLong();
+        queue.enqueue(startKey);
+        localVisited.add(startKey);
+        BlockPos.MutableBlockPos queryPos = new BlockPos.MutableBlockPos();
 
         int minX = start.getX();
         int maxX = start.getX();
@@ -218,7 +223,7 @@ public final class WorldZeroHouseDetector {
         int maxZ = start.getZ();
 
         while (!queue.isEmpty()) {
-            BlockPos current = queue.removeFirst();
+            BlockPos current = BlockPos.of(queue.dequeueLong());
             minX = Math.min(minX, current.getX());
             maxX = Math.max(maxX, current.getX());
             minY = Math.min(minY, current.getY());
@@ -252,12 +257,12 @@ public final class WorldZeroHouseDetector {
                     continue;
                 }
 
-                if (!level.getBlockState(next).isAir()) {
+                if (!level.getBlockState(queryPos.set(next.getX(), next.getY(), next.getZ())).isAir()) {
                     continue;
                 }
 
                 localVisited.add(nextKey);
-                queue.addLast(next);
+                queue.enqueue(nextKey);
             }
         }
 
@@ -281,6 +286,8 @@ public final class WorldZeroHouseDetector {
         int roofClosed = 0;
         Map<Long, Integer> minYByColumn = new HashMap<>();
         Map<Long, Integer> maxYByColumn = new HashMap<>();
+        BlockPos.MutableBlockPos boundaryPos = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos scanPos = new BlockPos.MutableBlockPos();
 
         for (long packedPos : localVisited) {
             BlockPos interiorPos = BlockPos.of(packedPos);
@@ -295,7 +302,7 @@ public final class WorldZeroHouseDetector {
                 }
 
                 wallChecks++;
-                if (worldzero$isClosedBoundary(level, neighborPos)) {
+                if (worldzero$isClosedBoundary(level, boundaryPos.set(neighborPos.getX(), neighborPos.getY(), neighborPos.getZ()))) {
                     wallClosed++;
                 }
             }
@@ -305,9 +312,8 @@ public final class WorldZeroHouseDetector {
             int x = worldzero$columnX(entry.getKey());
             int z = worldzero$columnZ(entry.getKey());
 
-            BlockPos floorPos = new BlockPos(x, entry.getValue() - 1, z);
             wallChecks++;
-            if (worldzero$isClosedBoundary(level, floorPos)) {
+            if (worldzero$isClosedBoundary(level, boundaryPos.set(x, entry.getValue() - 1, z))) {
                 wallClosed++;
             }
         }
@@ -316,9 +322,8 @@ public final class WorldZeroHouseDetector {
             int x = worldzero$columnX(entry.getKey());
             int z = worldzero$columnZ(entry.getKey());
 
-            BlockPos roofPos = new BlockPos(x, entry.getValue() + 1, z);
             roofChecks++;
-            if (worldzero$isClosedBoundary(level, roofPos)) {
+            if (worldzero$isClosedBoundary(level, boundaryPos.set(x, entry.getValue() + 1, z))) {
                 roofClosed++;
             }
         }
@@ -347,7 +352,7 @@ public final class WorldZeroHouseDetector {
         for (int x = minX - 1; x <= maxX + 1; x++) {
             for (int y = minY - 1; y <= maxY + 1; y++) {
                 for (int z = minZ - 1; z <= maxZ + 1; z++) {
-                    BlockPos scanPos = new BlockPos(x, y, z);
+                    scanPos.set(x, y, z);
                     BlockState scanState = level.getBlockState(scanPos);
                     if (scanState.isAir()) {
                         continue;
@@ -355,7 +360,7 @@ public final class WorldZeroHouseDetector {
 
                     if (!hasDoor && scanState.is(BlockTags.DOORS)) {
                         hasDoor = true;
-                        foundDoor = scanPos;
+                        foundDoor = scanPos.immutable();
                         score += 2;
                     }
 

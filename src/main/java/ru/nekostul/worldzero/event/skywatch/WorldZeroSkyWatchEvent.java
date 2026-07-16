@@ -14,6 +14,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -115,6 +116,21 @@ public final class WorldZeroSkyWatchEvent {
 
     @SubscribeEvent
     public static void worldzero$onServerStopped(ServerStoppedEvent event) {
+        worldzero$stopNow(event.getServer());
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            worldzero$clearActiveStateNow(player, false);
+        }
+    }
+
+    @SubscribeEvent
+    public static void worldzero$onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            worldzero$clearActiveStateNow(player, true);
+        }
     }
 
     public static boolean worldzero$isActive(MinecraftServer server) {
@@ -226,6 +242,37 @@ public final class WorldZeroSkyWatchEvent {
         return null;
     }
 
+    private static void worldzero$clearActiveStateNow(ServerPlayer player, boolean sendClearPacket) {
+        if (player == null) {
+            return;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return;
+        }
+
+        ServerLevel overworld = server.getLevel(Level.OVERWORLD);
+        if (overworld == null) {
+            return;
+        }
+
+        SkyWatchSaveData saveData = worldzero$getSaveData(overworld);
+        PlayerState state = saveData.worldzero$players.get(player.getUUID());
+        if (state == null) {
+            return;
+        }
+
+        if (!worldzero$isStageActive(state)) {
+            return;
+        }
+
+        if (sendClearPacket) {
+            WorldZeroNetwork.sendSkyWatch(player, WorldZeroSkyWatchPacket.WORLDZERO_ACTION_CLEAR, 0, 0);
+        }
+        worldzero$resetInterruptedState(overworld, saveData, state, WorldZeroStoryTime.worldzero$getStoryTicks(overworld));
+    }
+
     private static boolean worldzero$tickPlayer(
             ServerLevel level,
             SkyWatchSaveData saveData,
@@ -239,14 +286,10 @@ public final class WorldZeroSkyWatchEvent {
         }
 
         if (player == null || !player.isAlive() || player.isSpectator() || player.serverLevel().dimension() != Level.OVERWORLD) {
-            if (state.worldzero$stage == WORLDZERO_STAGE_PRELUDE || state.worldzero$stage == WORLDZERO_STAGE_RUNNING) {
-                state.worldzero$stage = WORLDZERO_STAGE_IDLE;
-                state.worldzero$preludeEndTick = -1L;
-                state.worldzero$clearTick = -1L;
-                state.worldzero$eventEndTick = -1L;
-                saveData.setDirty();
+            if (worldzero$isStageActive(state)) {
+                worldzero$resetInterruptedState(level, saveData, state, storyTicks);
             }
-            return state.worldzero$stage == WORLDZERO_STAGE_PRELUDE || state.worldzero$stage == WORLDZERO_STAGE_RUNNING;
+            return worldzero$isStageActive(state);
         }
 
         if (state.worldzero$stage == WORLDZERO_STAGE_PRELUDE) {
@@ -539,11 +582,31 @@ public final class WorldZeroSkyWatchEvent {
 
     private static boolean worldzero$hasActiveState(SkyWatchSaveData saveData) {
         for (PlayerState state : saveData.worldzero$players.values()) {
-            if (state.worldzero$stage == WORLDZERO_STAGE_PRELUDE || state.worldzero$stage == WORLDZERO_STAGE_RUNNING) {
+            if (worldzero$isStageActive(state)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean worldzero$isStageActive(PlayerState state) {
+        return state != null
+                && (state.worldzero$stage == WORLDZERO_STAGE_PRELUDE || state.worldzero$stage == WORLDZERO_STAGE_RUNNING);
+    }
+
+    private static void worldzero$resetInterruptedState(
+            ServerLevel level,
+            SkyWatchSaveData saveData,
+            PlayerState state,
+            long storyTicks
+    ) {
+        state.worldzero$stage = WORLDZERO_STAGE_IDLE;
+        state.worldzero$nextAttemptTick = worldzero$scheduleNextAttemptTick(level, storyTicks);
+        state.worldzero$preludeEndTick = -1L;
+        state.worldzero$clearTick = -1L;
+        state.worldzero$eventEndTick = -1L;
+        saveData.worldzero$active = false;
+        saveData.setDirty();
     }
 
     private static final class SkyWatchSaveData extends SavedData {

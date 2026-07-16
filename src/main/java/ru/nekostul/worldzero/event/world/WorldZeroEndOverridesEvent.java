@@ -24,9 +24,11 @@ import ru.nekostul.worldzero.network.WorldZeroNetwork;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
 
@@ -45,6 +47,7 @@ public final class WorldZeroEndOverridesEvent {
     private static final double WORLDZERO_DRAGON_Z = 0.5D;
     private static final int WORLDZERO_RETURN_BLACK_TICKS = 40;
     private static final int WORLDZERO_RETURN_DELAY_TICKS = 5;
+    private static final int WORLDZERO_DRAGON_RESCAN_INTERVAL_TICKS = 40;
     private static final Map<MinecraftServer, SessionState> WORLDZERO_SESSION_STATES = new WeakHashMap<>();
 
     private WorldZeroEndOverridesEvent() {
@@ -63,8 +66,23 @@ public final class WorldZeroEndOverridesEvent {
         MinecraftServer server = level.getServer();
         SessionState state = WORLDZERO_SESSION_STATES.computeIfAbsent(server, ignored -> new SessionState());
 
-        for (EnderDragon dragon : level.getEntitiesOfClass(EnderDragon.class, WORLDZERO_END_SCAN_AABB, candidate -> candidate != null && candidate.isAlive())) {
+        Iterator<UUID> dragonIterator = state.worldzero$trackedDragonIds.iterator();
+        while (dragonIterator.hasNext()) {
+            UUID dragonId = dragonIterator.next();
+            if (!(level.getEntity(dragonId) instanceof EnderDragon dragon) || !dragon.isAlive()) {
+                dragonIterator.remove();
+                continue;
+            }
+
             worldzero$freezeDragon(dragon);
+        }
+
+        if (level.getGameTime() >= state.worldzero$nextDragonRescanTick) {
+            for (EnderDragon dragon : level.getEntitiesOfClass(EnderDragon.class, WORLDZERO_END_SCAN_AABB, candidate -> candidate != null && candidate.isAlive())) {
+                worldzero$freezeDragon(dragon);
+                state.worldzero$trackedDragonIds.add(dragon.getUUID());
+            }
+            state.worldzero$nextDragonRescanTick = level.getGameTime() + WORLDZERO_DRAGON_RESCAN_INTERVAL_TICKS;
         }
 
         if (state.worldzero$pendingReturns.isEmpty()) {
@@ -108,6 +126,13 @@ public final class WorldZeroEndOverridesEvent {
 
         if (event.getEntity() instanceof EnderDragon dragon && event.getLevel() instanceof ServerLevel level && level.dimension() == Level.END) {
             worldzero$freezeDragon(dragon);
+            MinecraftServer server = level.getServer();
+            if (server != null) {
+                WORLDZERO_SESSION_STATES
+                        .computeIfAbsent(server, ignored -> new SessionState())
+                        .worldzero$trackedDragonIds
+                        .add(dragon.getUUID());
+            }
         }
     }
 
@@ -128,6 +153,7 @@ public final class WorldZeroEndOverridesEvent {
 
         MinecraftServer server = level.getServer();
         SessionState state = WORLDZERO_SESSION_STATES.computeIfAbsent(server, ignored -> new SessionState());
+        state.worldzero$trackedDragonIds.remove(dragon.getUUID());
         List<ServerPlayer> players = new ArrayList<>(level.players());
         for (ServerPlayer player : players) {
             if (!player.isAlive() || player.isSpectator()) {
@@ -194,5 +220,7 @@ public final class WorldZeroEndOverridesEvent {
 
     private static final class SessionState {
         private final Map<UUID, Long> worldzero$pendingReturns = new HashMap<>();
+        private final Set<UUID> worldzero$trackedDragonIds = new HashSet<>();
+        private long worldzero$nextDragonRescanTick;
     }
 }
